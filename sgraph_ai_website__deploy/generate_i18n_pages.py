@@ -24,7 +24,7 @@ from pathlib import Path
 # ── Configuration ──────────────────────────────────────────────────────────
 
 WEBSITE_DIR     = Path(__file__).parent.parent / 'sgraph_ai_website'
-IFD_VERSION_DIR = WEBSITE_DIR / 'v0' / 'v0.1' / 'v0.1.0'   # locale pages live in their IFD slot
+IFD_VERSION_DIR = WEBSITE_DIR / 'v0' / 'v0.2' / 'v0.2.0'   # active IFD line — v0.1.x is archive only
 SOURCE_DIR      = IFD_VERSION_DIR / 'en-gb'
 I18N_DIR        = WEBSITE_DIR / 'i18n'                       # translation JSON stays at the website root
 SITE_URL        = 'https://sgraph.ai'

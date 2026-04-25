@@ -41,7 +41,10 @@ on:
         required: false
 
 env:
-  WEBSITE_DIR : sgraph_ai_website
+  # latest/ on S3 mirrors the active IFD line (v0.2.x). Older versions under
+  # sgraph_ai_website/v0/ (e.g. v0.1.x) live in git as historical archives only
+  # and are NOT uploaded by this pipeline.
+  WEBSITE_DIR : sgraph_ai_website/v0/v0.2/v0.2.0
   SITE_NAME   : sgraph-ai
   PACKAGE_NAME: sgraph_ai_website
 
