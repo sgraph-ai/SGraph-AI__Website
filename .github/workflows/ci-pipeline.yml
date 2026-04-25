@@ -1,0 +1,147 @@
+name: CI Pipeline (Base)
+
+# Reusable pipeline for sgraph.ai website. Mirrors the SGraph-AI__App__Send
+# pipeline pattern: one reusable workflow + per-branch dispatchers.
+#
+# Steps:
+#   1. increment-tag       — bumps the git tag (and version file) on dev/main
+#   2. check-aws-credentials — gates the deploy job on required secrets
+#   3. deploy              — runs sgraph_ai_website__deploy/deploy_static_site.py
+#                            against S3 + CloudFront for the target environment
+
+on:
+  workflow_call:
+    inputs:
+      git_branch:
+        required: true
+        type: string
+      release_type:
+        required: false
+        type: string
+        default: ""
+      should_increment_tag:
+        required: false
+        type: boolean
+        default: false
+      target_deploy:
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        required: false
+      WEBSITE_S3_BUCKET:
+        required: false
+      WEBSITE_CF_DIST:
+        required: false
+      WEBSITE_CF_DIST_MAIN:
+        required: false
+
+env:
+  AWS_REGION  : eu-west-2
+  WEBSITE_DIR : sgraph_ai_website
+  SITE_NAME   : sgraph-ai
+
+jobs:
+  increment-tag:
+    name: Increment Tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Increment Tag
+        if: inputs.should_increment_tag
+        uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/git__increment-tag@dev
+        with:
+          release_type: ${{ inputs.release_type }}
+
+  check-aws-credentials:
+    name: Check AWS Credentials
+    runs-on: ubuntu-latest
+    outputs:
+      has-credentials: ${{ steps.check.outputs.has-credentials }}
+    steps:
+      - id: check
+        run: |
+          if [[ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]] && \
+             [[ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]] && \
+             [[ -n "${{ secrets.WEBSITE_S3_BUCKET }}" ]]; then
+            echo "has-credentials=true" >> $GITHUB_OUTPUT
+            echo "AWS credentials configured"
+          else
+            echo "has-credentials=false" >> $GITHUB_OUTPUT
+            echo "AWS credentials missing — deploy job will be skipped"
+          fi
+
+  deploy:
+    if: needs.check-aws-credentials.outputs.has-credentials == 'true'
+    name: "Deploy to S3 + CloudFront (${{ inputs.target_deploy }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [increment-tag, check-aws-credentials]
+    environment: ${{ inputs.target_deploy }}
+    concurrency:
+      group: "website-deploy-${{ inputs.target_deploy }}"
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git Update Current Branch
+        if: inputs.should_increment_tag
+        uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/git__update_branch@dev
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id     : ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region            : ${{ env.AWS_REGION }}
+
+      - name: Read version
+        id: version
+        run: echo "version=$(cat sgraph_ai_website/version)" >> "$GITHUB_OUTPUT"
+
+      - name: Generate i18n locale pages
+        run: python sgraph_ai_website__deploy/generate_i18n_pages.py
+
+      - name: Resolve deployment environment
+        id: env
+        run: |
+          DEPLOY_ENV="${{ inputs.target_deploy }}"
+          if [ "$DEPLOY_ENV" == "prod" ] || [ "$DEPLOY_ENV" == "production" ]; then
+            echo "deploy_env=prod" >> $GITHUB_OUTPUT
+            echo "Deploying to PRODUCTION (sgraph.ai) → S3: websites/sgraph-ai/prod/"
+          elif [ "$DEPLOY_ENV" == "main" ]; then
+            echo "deploy_env=main" >> $GITHUB_OUTPUT
+            echo "Deploying to MAIN → S3: websites/sgraph-ai/main/"
+          else
+            echo "deploy_env=dev" >> $GITHUB_OUTPUT
+            echo "Deploying to DEV → S3: websites/sgraph-ai/dev/"
+          fi
+
+      - name: Deploy static site
+        run: |
+          python sgraph_ai_website__deploy/deploy_static_site.py \
+            --site ${{ env.SITE_NAME }} \
+            --version ${{ steps.version.outputs.version }} \
+            --source-dir ${{ env.WEBSITE_DIR }} \
+            --bucket ${{ secrets.WEBSITE_S3_BUCKET }} \
+            --region ${{ env.AWS_REGION }} \
+            --deploy-env ${{ steps.env.outputs.deploy_env }} \
+            --cloudfront-distribution-id ${{ secrets.WEBSITE_CF_DIST }} ${{ secrets.WEBSITE_CF_DIST_MAIN }} \
+            --smoke-test-url "https://sgraph.ai" \
+            --version-file sgraph_ai_website/version
+
+      - name: Store CI artifacts
+        run: |
+          python sgraph_ai_website__deploy/store_ci_artifacts.py \
+            --version ${{ steps.version.outputs.version }} \
+            --bucket ${{ secrets.WEBSITE_S3_BUCKET }} \
+            --region ${{ env.AWS_REGION }} \
+            --site ${{ env.SITE_NAME }}

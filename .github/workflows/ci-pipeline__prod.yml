@@ -1,0 +1,17 @@
+name: CI Pipeline - PROD
+
+# Production deploys are manual-only (workflow_dispatch). They do NOT
+# increment the tag — they deploy whatever version is currently on the
+# default branch tip.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-prod:
+    uses: ./.github/workflows/ci-pipeline.yml
+    with:
+      git_branch          : 'main'
+      target_deploy       : 'prod'
+      should_increment_tag: false
+    secrets: inherit

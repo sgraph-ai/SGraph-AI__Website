@@ -556,7 +556,7 @@ def parse_args():
         default=None,
         help="Path to a version file to upload to the site root as /version. "
              "Makes the app version accessible at e.g. https://sgraph.ai/version. "
-             "Typically: version",
+             "Typically: sgraph_ai_website/version",
     )
     parser.add_argument(
         "--clean-latest",

@@ -20,7 +20,7 @@ from xml.dom.minidom import parseString
 
 # ── Configuration ──────────────────────────────────────────────────────────
 
-WEBSITE_DIR = Path(__file__).parent.parent
+WEBSITE_DIR = Path(__file__).parent.parent / 'sgraph_ai_website'
 SITE_URL    = 'https://sgraph.ai'
 LASTMOD     = '2026-03-01'
 
@@ -189,7 +189,7 @@ def generate_sitemap():
 def main():
     parser = argparse.ArgumentParser(description='Generate sitemap.xml for sgraph.ai')
     parser.add_argument('--output', type=str, default=None,
-                        help='Output file path (default: repo root sitemap.xml)')
+                        help='Output file path (default: sgraph_ai_website/sitemap.xml)')
     parser.add_argument('--dry-run', action='store_true',
                         help='Print stats without writing the file')
     args = parser.parse_args()

@@ -3,8 +3,8 @@
 # Local dev server for the main website (dev.sgraph.ai)
 #
 # In production, the CI deploy script flattens the versioned IFD structure:
-#   v0/v0.2/v0.2.0/en-gb/   →  latest/en-gb/
-#   v0/v0.2/v0.2.0/_common/  →  latest/_common/
+#   sgraph_ai_website/v0/v0.2/v0.2.0/en-gb/   →  latest/en-gb/
+#   sgraph_ai_website/v0/v0.2/v0.2.0/_common/  →  latest/_common/
 #
 # This script replicates that locally by copying content from the versioned
 # directory into a temporary directory that mirrors the production URL structure.
@@ -15,7 +15,7 @@
 PORT=10060
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-WEBSITE_DIR="$REPO_ROOT"
+WEBSITE_DIR="$REPO_ROOT/sgraph_ai_website"
 SERVE_DIR="$REPO_ROOT/.local-server-website"
 
 # ─── Discover all v0.2.x versions (IFD overlay pattern) ─────────────────────

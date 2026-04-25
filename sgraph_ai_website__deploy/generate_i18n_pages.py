@@ -23,7 +23,7 @@ from pathlib import Path
 
 # ── Configuration ──────────────────────────────────────────────────────────
 
-WEBSITE_DIR = Path(__file__).parent.parent
+WEBSITE_DIR = Path(__file__).parent.parent / 'sgraph_ai_website'
 SOURCE_DIR  = WEBSITE_DIR / 'en-gb'
 I18N_DIR    = WEBSITE_DIR / 'i18n'
 SITE_URL    = 'https://sgraph.ai'
@@ -256,7 +256,7 @@ def _escape_attr(text):
 def main():
     parser = argparse.ArgumentParser(description='Generate i18n locale pages for sgraph.ai')
     parser.add_argument('--output-dir', type=str, default=None,
-                        help='Output directory (default: repo root)')
+                        help='Output directory (default: sgraph_ai_website/)')
     parser.add_argument('--dry-run', action='store_true',
                         help='Show what would be generated without writing files')
     parser.add_argument('--update-english', action='store_true',

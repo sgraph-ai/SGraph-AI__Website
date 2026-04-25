@@ -260,7 +260,105 @@ decision before Phase 5 cutover:
    `claude/refactor-sg-website-repo-hahze`.
 2. Add the five secrets; create the three environments; merge the branch
    into `dev`.
-3. Watch the first `deploy-website.yml` workflow run. Smoke-test
+3. Watch the first `ci-pipeline__dev.yml` workflow run. Smoke-test
    `https://dev.sgraph.ai` per dev pack §07.
 4. If dev looks good → Phase 5 (cutover + cleanup of the Send repo), per
    `phase_5__release/08_cutover-and-cleanup.md`.
+
+---
+
+## Addendum — post-migration restructure (2026-04-25)
+
+The dev pack v0.22.6 specified a flat layout (drop the `sgraph_ai__website/`
+prefix). After the initial migration landed, the human asked for a different
+shape — namespace the website code into folders to keep the repo root minimal,
+and adopt the same auto-increment CI pattern used by `SGraph-AI__App__Send`.
+This addendum records that restructure on top of the original migration.
+
+### Layout change (deviation D6)
+
+Reverses the dev pack §02 flatten decision in favour of namespaced folders:
+
+```
+Before (post-initial migration)            After (this restructure)
+────────────────────────────────           ──────────────────────────────
+/index.html                                /sgraph_ai_website/index.html
+/404.html                                  /sgraph_ai_website/404.html
+/robots.txt                                /sgraph_ai_website/robots.txt
+/sitemap.xml                               /sgraph_ai_website/sitemap.xml
+/_common/                                  /sgraph_ai_website/_common/
+/en-gb/                                    /sgraph_ai_website/en-gb/
+/i18n/                                     /sgraph_ai_website/i18n/
+/v0/                                       /sgraph_ai_website/v0/
+/cloudfront/                               /sgraph_ai_website/cloudfront/
+/version                                   /sgraph_ai_website/version
+/scripts/                                  /sgraph_ai_website__deploy/
+```
+
+Repo root now contains only: `README.md`, `LICENSE`, `MIGRATION-REPORT.md`,
+`.gitignore`, `.github/`, `sgraph_ai_website/`, `sgraph_ai_website__deploy/`.
+
+Note: GitHub Actions discovers workflow YAML only at `.github/workflows/`, so
+those files cannot be moved into a namespace folder. The Python scripts and
+the run-locally shell script that the workflows call live in
+`sgraph_ai_website__deploy/`.
+
+### CI pipelines added (mirroring SGraph-AI__App__Send)
+
+`deploy-website.yml` was deleted and replaced with the Send-style pattern:
+
+| File | Trigger | Notes |
+|------|---------|-------|
+| `.github/workflows/ci-pipeline.yml` | `workflow_call` (reusable) | `increment-tag` → `check-aws-credentials` → `deploy` (concurrency-grouped per env). Uses OSBot's `git__increment-tag@dev` action. |
+| `.github/workflows/ci-pipeline__dev.yml` | Push to `dev` | `release_type: minor`, `should_increment_tag: true`, `target_deploy: dev` |
+| `.github/workflows/ci-pipeline__main.yml` | Push to `main` | `release_type: major`, `should_increment_tag: true`, `target_deploy: main` |
+| `.github/workflows/ci-pipeline__prod.yml` | Manual `workflow_dispatch` only | `should_increment_tag: false`, `target_deploy: prod` |
+
+The reusable pipeline gates the deploy job on AWS credentials being present
+(via the `check-aws-credentials` job) — same defensive pattern Send uses.
+
+### Path edits applied
+
+| File | Change |
+|------|--------|
+| `sgraph_ai_website__deploy/website__run-locally.sh` | `WEBSITE_DIR="$REPO_ROOT/sgraph_ai_website"`; comment block points to new location |
+| `sgraph_ai_website__deploy/generate_i18n_pages.py` | `WEBSITE_DIR = Path(__file__).parent.parent / 'sgraph_ai_website'`; `--output-dir` help text updated |
+| `sgraph_ai_website__deploy/generate_sitemap.py` | same `WEBSITE_DIR` rewrite; `--output` help text updated |
+| `sgraph_ai_website__deploy/deploy_static_site.py` | `--version-file` help text: `Typically: sgraph_ai_website/version` |
+| `sgraph_ai_website__deploy/store_ci_artifacts.py` | unchanged |
+| `.gitignore` (root) | reduced to `.local-server-website/`, `__pycache__/`, `*.pyc`, `.DS_Store`, `.venv/`, `.env` |
+| `sgraph_ai_website/.gitignore` | new file — locale-folder ignores moved here so they remain relative to the website tree |
+| `README.md` | rewritten to describe the namespaced layout and CI pipeline trio |
+
+### Final repo root listing
+
+```
+.git/
+.github/
+  workflows/
+    ci-pipeline.yml
+    ci-pipeline__dev.yml
+    ci-pipeline__main.yml
+    ci-pipeline__prod.yml
+.gitignore
+LICENSE
+MIGRATION-REPORT.md
+README.md
+sgraph_ai_website/
+sgraph_ai_website__deploy/
+```
+
+### Open items added by the restructure
+
+- **Verify OSBot `git__increment-tag` writes the version file.** Send's
+  `version` file (`sgraph_ai_app_send/version`) is bumped automatically; if the
+  action only updates the git tag and the file update is a separate Send-side
+  step, we will need to add that step to `ci-pipeline.yml` (read latest tag →
+  write to `sgraph_ai_website/version`) before the first deploy. Watch the
+  first dev run.
+- **Update GitHub Environment names.** The original plan referenced
+  `production`; the new pipelines use `prod` to match the S3 path segment.
+  Three environments needed on the new repo: `dev`, `main`, `prod`.
+- **Send repo's dev pack** (v0.22.6) still references the flatten layout. If
+  the dev pack is treated as living documentation, it should be updated; if
+  it's a snapshot of the original plan, this addendum is the correction.
