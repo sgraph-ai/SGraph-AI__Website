@@ -2,13 +2,18 @@
 # ---------------------------------------------------------------------------
 # Local dev server for the main website (dev.sgraph.ai)
 #
-# In production, the CI deploy script flattens the versioned IFD structure:
-#   sgraph_ai_website/v0/v0.2/v0.2.0/en-gb/   →  latest/en-gb/
-#   sgraph_ai_website/v0/v0.2/v0.2.0/_common/  →  latest/_common/
+# Only the active IFD line (v0.2.x) participates in the live overlay. Older
+# generations of the site (v0.1.x and earlier) live alongside under
+# sgraph_ai_website/v0/ as historical archives — they are NOT replayed into
+# the live tree by this script or by CI.
 #
-# This script replicates that locally by copying content from the versioned
-# directory into a temporary directory that mirrors the production URL structure.
-# IFD overlay: v0.2.0 is the base; any v0.2.1+ patches overlay on top.
+# Active overlay (v0.2.x):
+#   sgraph_ai_website/v0/v0.2/v0.2.0/en-gb/   →  latest/en-gb/   (base)
+#   sgraph_ai_website/v0/v0.2/v0.2.1/en-gb/   →  latest/en-gb/   (overlay)
+#   ...
+#
+# This script replicates that locally by copying v0.2.x content into a
+# temporary directory that mirrors the production URL structure.
 #
 # No Web Crypto / secure-context requirement — 127.0.0.1 or localhost both work.
 # ---------------------------------------------------------------------------
@@ -18,7 +23,7 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 WEBSITE_DIR="$REPO_ROOT/sgraph_ai_website"
 SERVE_DIR="$REPO_ROOT/.local-server-website"
 
-# ─── Discover all v0.2.x versions (IFD overlay pattern) ─────────────────────
+# ─── Discover all v0.2.x versions (active IFD line) ─────────────────────────
 VERSIONS=$(ls -d "$WEBSITE_DIR/v0/v0.2"/v0.2.* 2>/dev/null | xargs -n1 basename | sort -t. -k3 -n)
 LATEST_VERSION=$(echo "$VERSIONS" | tail -1)
 
@@ -35,7 +40,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# ─── Build the local serve directory ──────────────────────────────────────────
+# ─── Build the local serve directory ────────────────────────────────────────
 # IFD overlay pattern: apply v0.2.0 base first, then overlay v0.2.1+ on top.
 # This mirrors what deploy_static_site.py does when pushing to S3 latest/.
 
@@ -68,7 +73,7 @@ for VERSION in $VERSIONS; do
     [ -f "$VERSION_DIR/index.html" ] && cp "$VERSION_DIR/index.html" "$SERVE_DIR/index.html"
 done
 
-# ─── Start server ─────────────────────────────────────────────────────────────
+# ─── Start server ───────────────────────────────────────────────────────────
 echo ""
 echo "Starting sgraph.ai local server ($LATEST_VERSION — IFD overlay: $VERSIONS)..."
 echo "  Root:     $SERVE_DIR"

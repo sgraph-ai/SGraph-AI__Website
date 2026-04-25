@@ -1,18 +1,19 @@
 # Generated locale pages (built by sgraph_ai_website__deploy/generate_i18n_pages.py)
-# These are build artifacts — generated in CI before deployment.
-/en-us/
-/pt-pt/
-/pt-br/
-/es-es/
-/es-ar/
-/es-mx/
-/fr-fr/
-/fr-ca/
-/de-de/
-/de-ch/
-/it-it/
-/pl-pl/
-/ro-ro/
-/nl-nl/
-/hr-hr/
-/tlh/
+# These are build artifacts — generated in CI before deployment, inside the
+# active IFD slot alongside the en-gb master.
+/v0/v0.2/v0.2.0/en-us/
+/v0/v0.2/v0.2.0/pt-pt/
+/v0/v0.2/v0.2.0/pt-br/
+/v0/v0.2/v0.2.0/es-es/
+/v0/v0.2/v0.2.0/es-ar/
+/v0/v0.2/v0.2.0/es-mx/
+/v0/v0.2/v0.2.0/fr-fr/
+/v0/v0.2/v0.2.0/fr-ca/
+/v0/v0.2/v0.2.0/de-de/
+/v0/v0.2/v0.2.0/de-ch/
+/v0/v0.2/v0.2.0/it-it/
+/v0/v0.2/v0.2.0/pl-pl/
+/v0/v0.2/v0.2.0/ro-ro/
+/v0/v0.2/v0.2.0/nl-nl/
+/v0/v0.2/v0.2.0/hr-hr/
+/v0/v0.2/v0.2.0/tlh/
