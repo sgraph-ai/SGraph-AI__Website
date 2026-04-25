@@ -113,8 +113,16 @@ jobs:
         id: version
         run: echo "version=$(cat sgraph_ai_website/version)" >> "$GITHUB_OUTPUT"
 
-      - name: Generate i18n locale pages
-        run: python sgraph_ai_website__deploy/generate_i18n_pages.py
+      # Locale generation is paused while the v0.2.x English content is still
+      # being finalised. The i18n/*.json translations were written for the v0.1
+      # route set (homepage / product / agents / pricing tiers / payment / etc.)
+      # and do not yet cover the v0.2 layout — running the generator now would
+      # produce partial / misleading localisations. The script, the translation
+      # JSON files, and the locale .gitignore entries all stay in the repo. To
+      # re-enable once v0.2 translations exist, uncomment the two lines below.
+      #
+      # - name: Generate i18n locale pages
+      #   run: python sgraph_ai_website__deploy/generate_i18n_pages.py
 
       - name: Resolve deployment environment
         id: env
