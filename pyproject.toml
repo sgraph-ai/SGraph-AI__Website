@@ -1,6 +1,6 @@
 [tool.poetry]
 name        = "sgraph_ai_website"
-version     = "v1.0.5"
+version     = "v1.0.6"
 description = "Static marketing website for https://sgraph.ai — extracted from SGraph-AI__App__Send"
 authors     = ["Dinis Cruz <dinis.cruz@owasp.org>"]
 license     = "Apache 2.0"
