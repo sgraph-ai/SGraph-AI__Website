@@ -1,0 +1,24 @@
+[tool.poetry]
+name        = "sgraph_ai_website"
+version     = "v0.1.0"
+description = "Static marketing website for https://sgraph.ai — extracted from SGraph-AI__App__Send"
+authors     = ["Dinis Cruz <dinis.cruz@owasp.org>"]
+license     = "Apache 2.0"
+readme      = "README.md"
+homepage    = "https://github.com/sgraph-ai/SGraph-AI__Website"
+repository  = "https://github.com/sgraph-ai/SGraph-AI__Website"
+
+# This repo is a static website, not a publishable Python package. The
+# pyproject.toml exists so the OSBot git__increment-tag action (used by the
+# CI pipelines, mirroring SGraph-AI__App__Send) can keep the project version
+# in lockstep with the git tag. The Python tooling under
+# sgraph_ai_website__deploy/ uses only the standard library.
+packages    = [ { include = "sgraph_ai_website"        },
+                { include = "sgraph_ai_website__deploy" }]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+[build-system]
+requires = ["poetry-core>=1.9.1"]
+build-backend = "poetry.core.masonry.api"

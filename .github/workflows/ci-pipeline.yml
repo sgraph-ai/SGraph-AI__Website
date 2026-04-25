@@ -42,6 +42,7 @@ env:
   AWS_REGION  : eu-west-2
   WEBSITE_DIR : sgraph_ai_website
   SITE_NAME   : sgraph-ai
+  PACKAGE_NAME: sgraph_ai_website
 
 jobs:
   increment-tag:
