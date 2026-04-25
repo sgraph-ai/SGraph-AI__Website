@@ -2,13 +2,16 @@
 # ---------------------------------------------------------------------------
 # Local dev server for the main website (dev.sgraph.ai)
 #
-# In production, the CI deploy script flattens the versioned IFD structure:
-#   sgraph_ai_website/v0/v0.2/v0.2.0/en-gb/   →  latest/en-gb/
-#   sgraph_ai_website/v0/v0.2/v0.2.0/_common/  →  latest/_common/
+# IFD overlay model: every v0/v0.X/v0.X.Y/ tree is a snapshot of the site at
+# that version. The live site is the union of all of them, replayed in semver
+# order — earlier versions are the base, later versions overlay on top.
 #
-# This script replicates that locally by copying content from the versioned
-# directory into a temporary directory that mirrors the production URL structure.
-# IFD overlay: v0.2.0 is the base; any v0.2.1+ patches overlay on top.
+# Example (with both v0.1.0 and v0.2.0 present):
+#   sgraph_ai_website/v0/v0.1/v0.1.0/en-gb/   →  latest/en-gb/   (base)
+#   sgraph_ai_website/v0/v0.2/v0.2.0/en-gb/   →  latest/en-gb/   (overlay)
+#
+# This script replicates that locally by copying every version's content into
+# a temporary directory that mirrors the production URL structure.
 #
 # No Web Crypto / secure-context requirement — 127.0.0.1 or localhost both work.
 # ---------------------------------------------------------------------------
@@ -18,14 +21,19 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 WEBSITE_DIR="$REPO_ROOT/sgraph_ai_website"
 SERVE_DIR="$REPO_ROOT/.local-server-website"
 
-# ─── Discover all v0.2.x versions (IFD overlay pattern) ─────────────────────
-VERSIONS=$(ls -d "$WEBSITE_DIR/v0/v0.2"/v0.2.* 2>/dev/null | xargs -n1 basename | sort -t. -k3 -n)
-LATEST_VERSION=$(echo "$VERSIONS" | tail -1)
+# ─── Discover every v0/v0.X/v0.X.Y version, sorted in semver order ──────────
+# Matches the IFD layout: $WEBSITE_DIR/v0/v0.<minor>/v0.<minor>.<patch>/
+# `sort -V` handles v0.1.0 < v0.2.0 < v0.10.0 correctly.
+VERSION_DIRS=$(find "$WEBSITE_DIR/v0" -mindepth 3 -maxdepth 3 -type d -name 'v0.*.*' 2>/dev/null | sort -V)
+LATEST_VERSION_DIR=$(echo "$VERSION_DIRS" | tail -1)
 
-if [ -z "$LATEST_VERSION" ]; then
-    echo "ERROR: No v0.2.x versions found in $WEBSITE_DIR/v0/v0.2/"
+if [ -z "$LATEST_VERSION_DIR" ]; then
+    echo "ERROR: No v0/v0.X/v0.X.Y versions found under $WEBSITE_DIR/v0/"
     exit 1
 fi
+
+VERSION_LABELS=$(echo "$VERSION_DIRS" | xargs -n1 basename | tr '\n' ' ')
+LATEST_VERSION=$(basename "$LATEST_VERSION_DIR")
 
 # Clean up on exit
 cleanup() {
@@ -35,21 +43,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# ─── Build the local serve directory ──────────────────────────────────────────
-# IFD overlay pattern: apply v0.2.0 base first, then overlay v0.2.1+ on top.
-# This mirrors what deploy_static_site.py does when pushing to S3 latest/.
+# ─── Build the local serve directory ────────────────────────────────────────
+# Replay each version in semver order; later versions overlay earlier ones.
 
-echo "Building local server directory (IFD overlay: $VERSIONS)..."
+echo "Building local server directory (IFD overlay: $VERSION_LABELS)..."
 rm -rf "$SERVE_DIR"
 mkdir -p "$SERVE_DIR"
 
-for VERSION in $VERSIONS; do
-    VERSION_DIR="$WEBSITE_DIR/v0/v0.2/$VERSION"
-    if [ ! -d "$VERSION_DIR" ]; then
-        echo "WARNING: $VERSION_DIR not found, skipping"
-        continue
-    fi
-
+while IFS= read -r VERSION_DIR; do
+    [ -z "$VERSION_DIR" ] && continue
+    VERSION=$(basename "$VERSION_DIR")
     echo "  Applying $VERSION ..."
 
     # _common/ (fonts, CSS, JS) — later versions overlay earlier ones
@@ -64,15 +67,18 @@ for VERSION in $VERSIONS; do
         cp -r "$VERSION_DIR/en-gb"/. "$SERVE_DIR/en-gb/"
     fi
 
-    # Root index.html (redirect)
+    # Root index.html (redirect / locale autodetect)
     [ -f "$VERSION_DIR/index.html" ] && cp "$VERSION_DIR/index.html" "$SERVE_DIR/index.html"
-done
 
-# ─── Start server ─────────────────────────────────────────────────────────────
+    # Root 404.html
+    [ -f "$VERSION_DIR/404.html" ] && cp "$VERSION_DIR/404.html" "$SERVE_DIR/404.html"
+done <<< "$VERSION_DIRS"
+
+# ─── Start server ───────────────────────────────────────────────────────────
 echo ""
-echo "Starting sgraph.ai local server ($LATEST_VERSION — IFD overlay: $VERSIONS)..."
+echo "Starting sgraph.ai local server ($LATEST_VERSION — IFD overlay: $VERSION_LABELS)..."
 echo "  Root:     $SERVE_DIR"
-echo "  Versions: $VERSIONS"
+echo "  Versions: $VERSION_LABELS"
 echo ""
 echo "  URLs:"
 echo "    Home:         http://localhost:$PORT/"

@@ -23,10 +23,11 @@ from pathlib import Path
 
 # ── Configuration ──────────────────────────────────────────────────────────
 
-WEBSITE_DIR = Path(__file__).parent.parent / 'sgraph_ai_website'
-SOURCE_DIR  = WEBSITE_DIR / 'en-gb'
-I18N_DIR    = WEBSITE_DIR / 'i18n'
-SITE_URL    = 'https://sgraph.ai'
+WEBSITE_DIR     = Path(__file__).parent.parent / 'sgraph_ai_website'
+IFD_VERSION_DIR = WEBSITE_DIR / 'v0' / 'v0.1' / 'v0.1.0'   # locale pages live in their IFD slot
+SOURCE_DIR      = IFD_VERSION_DIR / 'en-gb'
+I18N_DIR        = WEBSITE_DIR / 'i18n'                       # translation JSON stays at the website root
+SITE_URL        = 'https://sgraph.ai'
 
 # Locale code → URL slug → JSON file mapping
 LOCALES = [
@@ -256,14 +257,14 @@ def _escape_attr(text):
 def main():
     parser = argparse.ArgumentParser(description='Generate i18n locale pages for sgraph.ai')
     parser.add_argument('--output-dir', type=str, default=None,
-                        help='Output directory (default: sgraph_ai_website/)')
+                        help='Output directory (default: sgraph_ai_website/v0/v0.1/v0.1.0/)')
     parser.add_argument('--dry-run', action='store_true',
                         help='Show what would be generated without writing files')
     parser.add_argument('--update-english', action='store_true',
                         help='Add hreflang/canonical tags to English source pages')
     args = parser.parse_args()
 
-    output_dir = Path(args.output_dir) if args.output_dir else WEBSITE_DIR
+    output_dir = Path(args.output_dir) if args.output_dir else IFD_VERSION_DIR
 
     print(f"SGraph AI — i18n Page Generator")
     print(f"  Website dir: {WEBSITE_DIR}")
