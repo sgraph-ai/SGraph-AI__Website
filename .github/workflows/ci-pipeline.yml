@@ -31,7 +31,9 @@ on:
         required: false
       AWS_SECRET_ACCESS_KEY:
         required: false
-      WEBSITE_S3_BUCKET:
+      AWS_ACCOUNT_ID:
+        required: false
+      AWS_DEFAULT_REGION:
         required: false
       WEBSITE_CF_DIST:
         required: false
@@ -39,7 +41,6 @@ on:
         required: false
 
 env:
-  AWS_REGION  : eu-west-2
   WEBSITE_DIR : sgraph_ai_website
   SITE_NAME   : sgraph-ai
   PACKAGE_NAME: sgraph_ai_website
@@ -67,7 +68,8 @@ jobs:
         run: |
           if [[ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]] && \
              [[ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]] && \
-             [[ -n "${{ secrets.WEBSITE_S3_BUCKET }}" ]]; then
+             [[ -n "${{ secrets.AWS_ACCOUNT_ID }}" ]] && \
+             [[ -n "${{ secrets.AWS_DEFAULT_REGION }}" ]]; then
             echo "has-credentials=true" >> $GITHUB_OUTPUT
             echo "AWS credentials configured"
           else
@@ -102,7 +104,7 @@ jobs:
         with:
           aws-access-key-id     : ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region            : ${{ env.AWS_REGION }}
+          aws-region            : ${{ secrets.AWS_DEFAULT_REGION }}
 
       - name: Read version
         id: version
@@ -132,8 +134,8 @@ jobs:
             --site ${{ env.SITE_NAME }} \
             --version ${{ steps.version.outputs.version }} \
             --source-dir ${{ env.WEBSITE_DIR }} \
-            --bucket ${{ secrets.WEBSITE_S3_BUCKET }} \
-            --region ${{ env.AWS_REGION }} \
+            --account-id ${{ secrets.AWS_ACCOUNT_ID }} \
+            --region ${{ secrets.AWS_DEFAULT_REGION }} \
             --deploy-env ${{ steps.env.outputs.deploy_env }} \
             --cloudfront-distribution-id ${{ secrets.WEBSITE_CF_DIST }} ${{ secrets.WEBSITE_CF_DIST_MAIN }} \
             --smoke-test-url "https://sgraph.ai" \
@@ -143,6 +145,6 @@ jobs:
         run: |
           python sgraph_ai_website__deploy/store_ci_artifacts.py \
             --version ${{ steps.version.outputs.version }} \
-            --bucket ${{ secrets.WEBSITE_S3_BUCKET }} \
-            --region ${{ env.AWS_REGION }} \
+            --account-id ${{ secrets.AWS_ACCOUNT_ID }} \
+            --region ${{ secrets.AWS_DEFAULT_REGION }} \
             --site ${{ env.SITE_NAME }}
