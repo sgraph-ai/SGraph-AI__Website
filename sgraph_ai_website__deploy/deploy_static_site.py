@@ -530,9 +530,10 @@ def parse_args():
     )
     parser.add_argument(
         "--cloudfront-distribution-id",
-        nargs="+",
+        nargs="*",
         default=[],
-        help="CloudFront distribution ID(s) for cache invalidation. Multiple IDs can be provided.",
+        help="CloudFront distribution ID(s) for cache invalidation. Multiple IDs can be provided. "
+             "Pass zero IDs (or unset the corresponding secrets) to skip invalidation entirely.",
     )
     parser.add_argument(
         "--smoke-test-url",
