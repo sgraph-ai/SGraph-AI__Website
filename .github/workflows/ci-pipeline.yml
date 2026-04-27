@@ -1,0 +1,161 @@
+name: CI Pipeline (Base)
+
+# Reusable pipeline for sgraph.ai website. Mirrors the SGraph-AI__App__Send
+# pipeline pattern: one reusable workflow + per-branch dispatchers.
+#
+# Steps:
+#   1. increment-tag       — bumps the git tag (and version file) on dev/main
+#   2. check-aws-credentials — gates the deploy job on required secrets
+#   3. deploy              — runs sgraph_ai_website__deploy/deploy_static_site.py
+#                            against S3 + CloudFront for the target environment
+
+on:
+  workflow_call:
+    inputs:
+      git_branch:
+        required: true
+        type: string
+      release_type:
+        required: false
+        type: string
+        default: ""
+      should_increment_tag:
+        required: false
+        type: boolean
+        default: false
+      target_deploy:
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        required: false
+      AWS_ACCOUNT_ID:
+        required: false
+      AWS_DEFAULT_REGION:
+        required: false
+      WEBSITE_CF_DIST:
+        required: false
+      WEBSITE_CF_DIST_MAIN:
+        required: false
+
+env:
+  # latest/ on S3 mirrors the active IFD line (v0.2.x). Older versions under
+  # sgraph_ai_website/v0/ (e.g. v0.1.x) live in git as historical archives only
+  # and are NOT uploaded by this pipeline.
+  WEBSITE_DIR : sgraph_ai_website/v0/v0.2/v0.2.0
+  SITE_NAME   : sgraph-ai
+  PACKAGE_NAME: sgraph_ai_website
+
+jobs:
+  increment-tag:
+    name: Increment Tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Increment Tag
+        if: inputs.should_increment_tag
+        uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/git__increment-tag@dev
+        with:
+          release_type: ${{ inputs.release_type }}
+
+  check-aws-credentials:
+    name: Check AWS Credentials
+    runs-on: ubuntu-latest
+    outputs:
+      has-credentials: ${{ steps.check.outputs.has-credentials }}
+    steps:
+      - id: check
+        run: |
+          if [[ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]] && \
+             [[ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]] && \
+             [[ -n "${{ secrets.AWS_ACCOUNT_ID }}" ]] && \
+             [[ -n "${{ secrets.AWS_DEFAULT_REGION }}" ]]; then
+            echo "has-credentials=true" >> $GITHUB_OUTPUT
+            echo "AWS credentials configured"
+          else
+            echo "has-credentials=false" >> $GITHUB_OUTPUT
+            echo "AWS credentials missing — deploy job will be skipped"
+          fi
+
+  deploy:
+    if: needs.check-aws-credentials.outputs.has-credentials == 'true'
+    name: "Deploy to S3 + CloudFront (${{ inputs.target_deploy }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [increment-tag, check-aws-credentials]
+    environment: ${{ inputs.target_deploy }}
+    concurrency:
+      group: "website-deploy-${{ inputs.target_deploy }}"
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Git Update Current Branch
+        if: inputs.should_increment_tag
+        uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/git__update_branch@dev
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id     : ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key : ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region            : ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Read version
+        id: version
+        run: echo "version=$(cat sgraph_ai_website/version)" >> "$GITHUB_OUTPUT"
+
+      # Locale generation is paused while the v0.2.x English content is still
+      # being finalised. The i18n/*.json translations were written for the v0.1
+      # route set (homepage / product / agents / pricing tiers / payment / etc.)
+      # and do not yet cover the v0.2 layout — running the generator now would
+      # produce partial / misleading localisations. The script, the translation
+      # JSON files, and the locale .gitignore entries all stay in the repo. To
+      # re-enable once v0.2 translations exist, uncomment the two lines below.
+      #
+      # - name: Generate i18n locale pages
+      #   run: python sgraph_ai_website__deploy/generate_i18n_pages.py
+
+      - name: Resolve deployment environment
+        id: env
+        run: |
+          DEPLOY_ENV="${{ inputs.target_deploy }}"
+          if [ "$DEPLOY_ENV" == "prod" ] || [ "$DEPLOY_ENV" == "production" ]; then
+            echo "deploy_env=prod" >> $GITHUB_OUTPUT
+            echo "Deploying to PRODUCTION (sgraph.ai) → S3: websites/sgraph-ai/prod/"
+          elif [ "$DEPLOY_ENV" == "main" ]; then
+            echo "deploy_env=main" >> $GITHUB_OUTPUT
+            echo "Deploying to MAIN → S3: websites/sgraph-ai/main/"
+          else
+            echo "deploy_env=dev" >> $GITHUB_OUTPUT
+            echo "Deploying to DEV → S3: websites/sgraph-ai/dev/"
+          fi
+
+      - name: Deploy static site
+        run: |
+          python sgraph_ai_website__deploy/deploy_static_site.py \
+            --site ${{ env.SITE_NAME }} \
+            --version ${{ steps.version.outputs.version }} \
+            --source-dir ${{ env.WEBSITE_DIR }} \
+            --account-id ${{ secrets.AWS_ACCOUNT_ID }} \
+            --region ${{ secrets.AWS_DEFAULT_REGION }} \
+            --deploy-env ${{ steps.env.outputs.deploy_env }} \
+            --cloudfront-distribution-id ${{ secrets.WEBSITE_CF_DIST }} ${{ secrets.WEBSITE_CF_DIST_MAIN }} \
+            --smoke-test-url "https://sgraph.ai" \
+            --version-file sgraph_ai_website/version
+
+      - name: Store CI artifacts
+        run: |
+          python sgraph_ai_website__deploy/store_ci_artifacts.py \
+            --version ${{ steps.version.outputs.version }} \
+            --account-id ${{ secrets.AWS_ACCOUNT_ID }} \
+            --region ${{ secrets.AWS_DEFAULT_REGION }} \
+            --site ${{ env.SITE_NAME }}
