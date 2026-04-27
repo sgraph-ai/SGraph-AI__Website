@@ -78,7 +78,7 @@ const SITE_CONFIGS = {
         sitePrefix: '',
         homeUrl:    '/en-gb/',
         tokenBar:   true,
-        get tokenBarBase() { return xsite('', ENV) + '/en-gb/browse/' },
+        get tokenBarBase() { return xsite('send', ENV) + '/en-gb/browse/' },
         get navItems() {
             return [
                 { label: 'How it Works', href: '/en-gb/how-it-works/' },
@@ -278,7 +278,7 @@ class SgSiteHeader extends SgComponent {
     _onTbGo() {
         const token = this._tbInput.value.trim()
         if (!token) { this._tbInput.focus(); return }
-        const base = this.getAttribute('token-bar-base') || this._profile()?.tokenBarBase || xsite('send.sgraph.ai') + '/en-gb/browse/'
+        const base = this.getAttribute('token-bar-base') || this._profile()?.tokenBarBase || xsite('send', ENV) + '/en-gb/browse/'
         window.location.href = base + '#' + encodeURIComponent(token)
     }
 
