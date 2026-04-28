@@ -1,6 +1,3 @@
-# SGit vault clones
-atom-bulk-*/
-
 # Build artifacts
 .local-server-website/
 __pycache__/
