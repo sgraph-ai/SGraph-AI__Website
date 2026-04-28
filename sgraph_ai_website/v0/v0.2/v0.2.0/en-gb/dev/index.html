@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dev — sgraph.ai</title>
+  <link rel="icon"        href="../../_common/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet"  href="../../_common/fonts/fonts.css">
+  <link rel="stylesheet"  href="../../_common/css/style.css">
+
+  <!--
+    Cross-origin import map — rewrites bare /components/... paths to dev.tools.sgraph.ai.
+    Must appear before any type="module" script.
+    Production: replace every dev.tools.sgraph.ai with tools.sgraph.ai.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "/components/base/v1/v1.0/v1.0.0/sg-component.js":
+          "https://dev.tools.sgraph.ai/components/base/v1/v1.0/v1.0.0/sg-component.js",
+      "/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js":
+          "https://dev.tools.sgraph.ai/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js",
+      "/core/markdown/v1/v1.0/v1.0.0/sg-markdown.js":
+          "https://dev.tools.sgraph.ai/core/markdown/v1/v1.0/v1.0.0/sg-markdown.js",
+      "/components/vault-embed/sg-vault-key/v0/v0.1/v0.1.0/events.js":
+          "https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-key/v0/v0.1/v0.1.0/events.js",
+      "/components/vault-embed/sg-vault-key/v0/v0.1/v0.1.0/sg-vault-key.js":
+          "https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-key/v0/v0.1/v0.1.0/sg-vault-key.js",
+      "/components/vault-embed/sg-vault-fetch/v0/v0.1/v0.1.0/sg-vault-fetch.js":
+          "https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-fetch/v0/v0.1/v0.1.0/sg-vault-fetch.js",
+      "/components/vault-embed/sg-vault-trace/v0/v0.1/v0.1.0/sg-vault-trace.js":
+          "https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-trace/v0/v0.1/v0.1.0/sg-vault-trace.js",
+      "/components/content/sg-content-markdown/v0/v0.1/v0.1.0/sg-content-markdown.js":
+          "https://dev.tools.sgraph.ai/components/content/sg-content-markdown/v0/v0.1/v0.1.0/sg-content-markdown.js",
+      "/components/content/sg-content-image/v0/v0.1/v0.1.0/sg-content-image.js":
+          "https://dev.tools.sgraph.ai/components/content/sg-content-image/v0/v0.1/v0.1.0/sg-content-image.js",
+      "/components/content/sg-content-json/v0/v0.1/v0.1.0/sg-content-json.js":
+          "https://dev.tools.sgraph.ai/components/content/sg-content-json/v0/v0.1/v0.1.0/sg-content-json.js"
+    }
+  }
+  </script>
+
+  <script type="module"
+    src="https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-content/v0/v0.1/v0.1.0/sg-vault-content.js">
+  </script>
+
+  <style>
+    sg-vault-content { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════ -->
+<!-- Hidden page — no nav item highlighted, no locale picker -->
+<sg-site-header site="Send"></sg-site-header>
+
+<main>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 1: How this site is built
+       Conductor task: workstream-dev-section Task-2
+       vault: 598de26b97d2 · object: obj-cas-imm-047fb285798d
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="section">
+    <div class="container">
+      <sg-vault-content
+        object-id="obj-cas-imm-047fb285798d"
+        render="markdown"
+        inspect>
+      </sg-vault-content>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 2: Task communication format  [PENDING]
+       Conductor task: workstream-dev-section Task-3
+       object-id to be provided in follow-up vault commit
+       ═══════════════════════════════════════════════════════════
+  <section class="section section--alt">
+    <div class="container">
+      <sg-vault-content
+        object-id="PENDING"
+        render="markdown">
+      </sg-vault-content>
+    </div>
+  </section>
+  -->
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SECTION 3: How agents communicate  [PENDING]
+       Conductor task: workstream-dev-section Task-4
+       object-id to be provided in follow-up vault commit
+       ═══════════════════════════════════════════════════════════
+  <section class="section">
+    <div class="container">
+      <sg-vault-content
+        object-id="PENDING"
+        render="markdown">
+      </sg-vault-content>
+    </div>
+  </section>
+  -->
+
+</main>
+
+<sg-site-footer></sg-site-footer>
+
+<!--
+  Content vault credentials — two values to update if the vault rotates.
+  read-key is the public AES-GCM key for vault 598de26b97d2.
+  Decryption runs entirely in the browser; the server sees only ciphertext.
+-->
+<script type="module">
+  const VAULT_ID = '598de26b97d2';
+  const READ_KEY = 'A3Tc7ZxE5kfpStQi4WVLx1nBCd7KHn2psYUZTKcUbVA';
+
+  for (const el of document.querySelectorAll('sg-vault-content')) {
+    el.setAttribute('vault-id', VAULT_ID);
+    el.setAttribute('read-key', READ_KEY);
+  }
+</script>
+
+<script src="../../_common/js/nav.js"></script>
+<script type="module" src="../../_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
+<script type="module" src="../../_common/js/components/sg-site-footer/v1/v1.0/v1.0.0/sg-site-footer.js"></script>
+
+</body>
+</html>
