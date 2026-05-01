@@ -39,6 +39,8 @@ on:
         required: false
       WEBSITE_CF_DIST_MAIN:
         required: false
+      WEBSITE_CF_DIST_QA:
+        required: false
 
 env:
   # latest/ on S3 mirrors the active IFD line (v0.2.x). Older versions under
@@ -129,27 +131,50 @@ jobs:
         run: |
           DEPLOY_ENV="${{ inputs.target_deploy }}"
           if [ "$DEPLOY_ENV" == "prod" ] || [ "$DEPLOY_ENV" == "production" ]; then
-            echo "deploy_env=prod" >> $GITHUB_OUTPUT
+            echo "deploy_env=prod"           >> $GITHUB_OUTPUT
+            echo "smoke_url=https://sgraph.ai" >> $GITHUB_OUTPUT
             echo "Deploying to PRODUCTION (sgraph.ai) → S3: websites/sgraph-ai/prod/"
           elif [ "$DEPLOY_ENV" == "main" ]; then
-            echo "deploy_env=main" >> $GITHUB_OUTPUT
+            echo "deploy_env=main"                  >> $GITHUB_OUTPUT
+            echo "smoke_url=https://main.sgraph.ai" >> $GITHUB_OUTPUT
             echo "Deploying to MAIN → S3: websites/sgraph-ai/main/"
+          elif [ "$DEPLOY_ENV" == "qa" ]; then
+            echo "deploy_env=qa"                  >> $GITHUB_OUTPUT
+            echo "smoke_url=https://qa.sgraph.ai" >> $GITHUB_OUTPUT
+            echo "Deploying to QA → S3: websites/sgraph-ai/qa/"
           else
-            echo "deploy_env=dev" >> $GITHUB_OUTPUT
+            echo "deploy_env=dev"                  >> $GITHUB_OUTPUT
+            echo "smoke_url=https://dev.sgraph.ai" >> $GITHUB_OUTPUT
             echo "Deploying to DEV → S3: websites/sgraph-ai/dev/"
           fi
 
+      - name: Generate static API
+        run: |
+          python sgraph_ai_website__deploy/generate_static_api.py \
+            --source-dir  ${{ env.WEBSITE_DIR }} \
+            --deploy-env  ${{ steps.env.outputs.deploy_env }} \
+            --version     ${{ steps.version.outputs.version }} \
+            --commit-sha  ${{ github.sha }} \
+            --branch      ${{ github.ref_name }} \
+            --site        ${{ env.SITE_NAME }}
+
       - name: Deploy static site
         run: |
+          DEPLOY_ENV="${{ steps.env.outputs.deploy_env }}"
+          if [ "$DEPLOY_ENV" == "qa" ]; then
+            CF_ARGS="--cloudfront-distribution-id ${{ secrets.WEBSITE_CF_DIST_QA }}"
+          else
+            CF_ARGS="--cloudfront-distribution-id ${{ secrets.WEBSITE_CF_DIST }} ${{ secrets.WEBSITE_CF_DIST_MAIN }}"
+          fi
           python sgraph_ai_website__deploy/deploy_static_site.py \
-            --site ${{ env.SITE_NAME }} \
-            --version ${{ steps.version.outputs.version }} \
-            --source-dir ${{ env.WEBSITE_DIR }} \
-            --account-id ${{ secrets.AWS_ACCOUNT_ID }} \
-            --region ${{ secrets.AWS_DEFAULT_REGION }} \
-            --deploy-env ${{ steps.env.outputs.deploy_env }} \
-            --cloudfront-distribution-id ${{ secrets.WEBSITE_CF_DIST }} ${{ secrets.WEBSITE_CF_DIST_MAIN }} \
-            --smoke-test-url "https://sgraph.ai" \
+            --site        ${{ env.SITE_NAME }} \
+            --version     ${{ steps.version.outputs.version }} \
+            --source-dir  ${{ env.WEBSITE_DIR }} \
+            --account-id  ${{ secrets.AWS_ACCOUNT_ID }} \
+            --region      ${{ secrets.AWS_DEFAULT_REGION }} \
+            --deploy-env  ${{ steps.env.outputs.deploy_env }} \
+            $CF_ARGS \
+            --smoke-test-url "${{ steps.env.outputs.smoke_url }}" \
             --version-file sgraph_ai_website/version
 
       - name: Store CI artifacts

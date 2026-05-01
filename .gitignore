@@ -1,5 +1,8 @@
 # Build artifacts
 .local-server-website/
+
+# Generated at deploy time — not committed
+sgraph_ai_website/**/api/
 __pycache__/
 *.pyc
 .DS_Store

@@ -1,0 +1,20 @@
+name: CI Pipeline - QA
+
+# QA is the pre-dev gate for agent-authored changes. Agents push to qa;
+# a human or review agent promotes to dev after inspection.
+# No tag increment — QA uses whatever version is on the branch tip.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - qa
+
+jobs:
+  deploy-qa:
+    uses: ./.github/workflows/ci-pipeline.yml
+    with:
+      git_branch          : 'qa'
+      target_deploy       : 'qa'
+      should_increment_tag: false
+    secrets: inherit
