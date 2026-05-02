@@ -266,7 +266,7 @@
 
   function buildNav(data) {
     const navEl   = document.getElementById('lib-nav');
-    const sections = data.sections ?? [];
+    const sections = (data.library ?? data).sections ?? [];
     navEl.innerHTML = '';
 
     if (!sections.length) {
