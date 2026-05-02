@@ -43,80 +43,101 @@
   <script type="module"
     src="https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-content/v0/v0.1/v0.1.0/sg-vault-content.js">
   </script>
-
-  <style>
-    sg-vault-content { display: block; }
-  </style>
 </head>
 <body>
 
-<!-- ═══ HEADER ═══════════════════════════════════════════════ -->
-<!-- Hidden page — no nav item highlighted, no locale picker -->
+<!-- ═══ PERSISTENT HEADER ════════════════════════════════════ -->
 <sg-site-header site="Send"></sg-site-header>
 
+<!-- ═══ DEV SUB-SITE NAV ══════════════════════════════════════ -->
+<!--
+  Nav JSON: /_common/data/dev-nav.json (local, no vault)
+  cross_links loaded from dev-nav.json: dev.cross_links
+-->
+<sg-sub-nav
+  site-title="Dev"
+  src="../../_common/data/dev-nav.json">
+</sg-sub-nav>
+
 <main>
+  <!--
+    Sub-site shell: sg-side-nav (left) + article viewer (right)
+    Nav source: local dev-nav.json — no vault credentials needed.
+    auto-select fires nav:select immediately on first render.
+  -->
+  <div class="sub-site">
 
-  <!-- ═══════════════════════════════════════════════════════════
-       SECTION 1: How this site is built
-       Conductor task: workstream-dev-section Task-2
-       ═══════════════════════════════════════════════════════════ -->
-  <section class="section">
-    <div class="container">
-      <sg-vault-content
-        object-id="obj-cas-imm-8a1b1a7a7eab"
-        render="markdown">
-      </sg-vault-content>
-    </div>
-  </section>
+    <sg-side-nav
+      src="../../_common/data/dev-nav.json"
+      auto-select>
+    </sg-side-nav>
 
-  <!-- ═══════════════════════════════════════════════════════════
-       SECTION 2: Task communication format
-       Conductor task: workstream-dev-section Task-3
-       ═══════════════════════════════════════════════════════════ -->
-  <section class="section section--alt">
-    <div class="container">
-      <sg-vault-content
-        object-id="obj-cas-imm-72c473faee5d"
-        render="markdown">
-      </sg-vault-content>
-    </div>
-  </section>
+    <div class="sub-site__content" id="article-content"></div>
 
-  <!-- ═══════════════════════════════════════════════════════════
-       SECTION 3: How agents communicate
-       Conductor task: workstream-dev-section Task-4
-       ═══════════════════════════════════════════════════════════ -->
-  <section class="section">
-    <div class="container">
-      <sg-vault-content
-        object-id="obj-cas-imm-8d2f4948842a"
-        render="markdown">
-      </sg-vault-content>
-    </div>
-  </section>
-
+  </div>
 </main>
 
 <sg-site-footer></sg-site-footer>
 
 <!--
-  Content vault credentials — two values to update if the vault rotates.
-  read-key is the public AES-GCM key for vault 598de26b97d2.
-  Decryption runs entirely in the browser; the server sees only ciphertext.
+  SPA routing + article loader
+  URL pattern: /en-gb/dev/{slug}/
+  CloudFront rewrites slug paths to this index.html (url-rewrite.js),
+  except for known real sub-pages listed in DEV_REAL_PAGES.
 -->
 <script type="module">
   const VAULT_ID = 'bf31a13c78c9';
   const READ_KEY = 's68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA';
 
-  for (const el of document.querySelectorAll('sg-vault-content')) {
+  function slugFromPath() {
+    const segments = location.pathname.split('/').filter(Boolean);
+    // /en-gb/dev/ → 2 segments → no slug
+    // /en-gb/dev/issues-fs/ → 3rd segment is slug
+    return segments.length > 2 ? segments[2] : '';
+  }
+
+  const sideNav = document.querySelector('sg-side-nav');
+
+  const initialSlug = slugFromPath();
+  if (initialSlug) sideNav.setAttribute('active-slug', initialSlug);
+
+  document.addEventListener('nav:select', e => {
+    const { slug, content_object_id, render } = e.detail;
+    const targetPath = slug ? `/en-gb/dev/${slug}/` : '/en-gb/dev/';
+    if (location.pathname !== targetPath) {
+      history.pushState({ slug }, '', targetPath);
+    }
+    loadArticle(content_object_id, render ?? 'markdown');
+  });
+
+  window.addEventListener('popstate', () => {
+    const slug = slugFromPath();
+    const btn = sideNav.querySelector(`.sg-side-nav__item[data-slug="${CSS.escape(slug)}"]`);
+    if (btn) {
+      btn.click();
+    } else {
+      sideNav.setAttribute('active-slug', slug);
+    }
+  });
+
+  function loadArticle(objectId, render) {
+    const content = document.getElementById('article-content');
+    content.innerHTML = '';
+    content.setAttribute('data-object-id', objectId);
+    const el = document.createElement('sg-vault-content');
     el.setAttribute('vault-id', VAULT_ID);
     el.setAttribute('read-key', READ_KEY);
+    el.setAttribute('object-id', objectId);
+    el.setAttribute('render', render);
+    content.appendChild(el);
   }
 </script>
 
 <script src="../../_common/js/nav.js"></script>
 <script type="module" src="../../_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
 <script type="module" src="../../_common/js/components/sg-site-footer/v1/v1.0/v1.0.0/sg-site-footer.js"></script>
+<script type="module" src="../../_common/js/components/sg-sub-nav/v0/v0.1/v0.1.0/sg-sub-nav.js"></script>
+<script type="module" src="../../_common/js/components/sg-side-nav/v0/v0.1/v0.1.0/sg-side-nav.js"></script>
 
 </body>
 </html>

@@ -1,0 +1,44 @@
+{
+  "dev": {
+    "title": "Dev",
+    "version": "1.0",
+    "cross_links": [
+      { "title": "Library", "href": "/en-gb/library/" }
+    ],
+    "sections": [
+      {
+        "title": "How It Works",
+        "articles": [
+          {
+            "title": "Two-Agent Operating Model",
+            "slug": "two-agent-operating-model",
+            "content_object_id": "obj-cas-imm-8a1b1a7a7eab",
+            "render": "markdown"
+          },
+          {
+            "title": "Issues-FS",
+            "slug": "issues-fs",
+            "content_object_id": "obj-cas-imm-72c473faee5d",
+            "render": "markdown"
+          },
+          {
+            "title": "Vault as Comms Channel",
+            "slug": "vault-as-comms-channel",
+            "content_object_id": "obj-cas-imm-8d2f4948842a",
+            "render": "markdown"
+          }
+        ]
+      },
+      {
+        "title": "Tools",
+        "articles": [
+          {
+            "title": "Vault Peek — Content Vault",
+            "slug": "vault-peek",
+            "href": "/en-gb/dev/vault-peek/"
+          }
+        ]
+      }
+    ]
+  }
+}
