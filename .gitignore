@@ -8,3 +8,4 @@ __pycache__/
 .DS_Store
 .venv/
 .env
+tests/e2e/screenshots/
