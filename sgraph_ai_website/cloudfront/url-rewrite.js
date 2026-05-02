@@ -20,15 +20,15 @@
 //
 // Deploy via AWS Console or CLI:
 //   aws cloudfront create-function \
-//     --name url-rewrite-index-html \
+//     --name url-rewrite-for__sgraph-ai \
 //     --function-config '{"Comment":"Append index.html to directory URIs","Runtime":"cloudfront-js-2.0"}' \
 //     --function-code fileb://url-rewrite.js
 //
 //   aws cloudfront publish-function \
-//     --name url-rewrite-index-html \
+//     --name url-rewrite-for__sgraph-ai \
 //     --if-match <ETag>
 //
-//   Then associate with distribution E2YZA5CZTJE62H as Viewer Request.
+//   Then associate with distribution as Viewer Request.
 
 function handler(event) {
     var request = event.request;
