@@ -48,7 +48,6 @@
     sg-vault-content { display: block; }
 
     /* ── Library articles: nav + reader ── */
-    .lib-section { border-top: 1px solid var(--border-color); }
 
     .lib-eyebrow {
       font-size: 0.7rem;
@@ -142,76 +141,15 @@
 
 <main>
 
-  <!-- ═══ HERO ══════════════════════════════════════════════════
-       Static copy — page identity only.
-       All dependency card content below comes from vault blobs.
-       ══════════════════════════════════════════════════════════ -->
-  <section class="hero hero--small">
-    <div class="container">
-      <h1 class="display">Technology &amp; Dependencies</h1>
-      <p class="lead">The open source components and protocols that sgraph.ai is built on.</p>
-    </div>
-  </section>
-
-  <!-- ═══════════════════════════════════════════════════════════
-       CARD: Issues-FS
-       Conductor task: workstream-library-v1 Task-8
-       ═══════════════════════════════════════════════════════════ -->
-  <section class="section">
-    <div class="container">
-      <sg-vault-content
-        object-id="obj-cas-imm-72c473faee5d"
-        render="markdown">
-      </sg-vault-content>
-    </div>
-  </section>
-
-  <!-- ═══════════════════════════════════════════════════════════
-       CARD: sgit
-       Conductor task: workstream-library-v1 Task-9
-       ═══════════════════════════════════════════════════════════ -->
-  <section class="section section--alt">
-    <div class="container">
-      <sg-vault-content
-        object-id="obj-cas-imm-4f64b9b45690"
-        render="markdown">
-      </sg-vault-content>
-    </div>
-  </section>
-
-  <!-- ═══════════════════════════════════════════════════════════
-       CARD: vault-embed web components
-       Conductor task: workstream-library-v1 Task-10
-       ═══════════════════════════════════════════════════════════ -->
-  <section class="section">
-    <div class="container">
-      <sg-vault-content
-        object-id="obj-cas-imm-7915f369814c"
-        render="markdown">
-      </sg-vault-content>
-    </div>
-  </section>
-
-  <!-- ═══════════════════════════════════════════════════════════
-       CARD: Web Crypto API
-       Conductor task: workstream-library-v1 Task-11
-       ═══════════════════════════════════════════════════════════ -->
-  <section class="section section--alt">
-    <div class="container">
-      <sg-vault-content
-        object-id="obj-cas-imm-d1d8fb768542"
-        render="markdown">
-      </sg-vault-content>
-    </div>
-  </section>
-
   <!-- ═══════════════════════════════════════════════════════════
        ARTICLES: Vault-driven nav + reader
        Nav JSON object-id set via NAV_OBJECT_ID constant below.
        Adding articles requires only a vault update — no redeploy.
        Conductor task: workstream-library-v1
        ═══════════════════════════════════════════════════════════ -->
-  <section class="section lib-section">
+  <section class="section lib-section"
+           data-vault-id="bf31a13c78c9"
+           data-nav-object-id="obj-cas-imm-6f633eaebed4">
     <div class="container">
       <p class="lib-eyebrow">How It Works</p>
 
@@ -237,16 +175,10 @@
   import { importReadKey, readObject }
     from '/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js';
 
-  const VAULT_ID     = 'bf31a13c78c9';
-  const READ_KEY     = 's68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA';
+  const VAULT_ID      = 'bf31a13c78c9';
+  const READ_KEY      = 's68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA';
   const NAV_OBJECT_ID = 'obj-cas-imm-6f633eaebed4';
-  const API_BASE     = 'https://send.sgraph.ai';
-
-  // Set credentials on all static tech-dep card elements
-  for (const el of document.querySelectorAll('sg-vault-content')) {
-    el.setAttribute('vault-id', VAULT_ID);
-    el.setAttribute('read-key', READ_KEY);
-  }
+  const API_BASE      = 'https://send.sgraph.ai';
 
   // Fetch nav JSON directly via vault client, then build nav
   async function initNav() {
@@ -311,6 +243,7 @@
   function loadArticle(objectId) {
     const viewer = document.getElementById('lib-article');
     viewer.innerHTML = '';
+    viewer.setAttribute('data-object-id', objectId);
     const el = document.createElement('sg-vault-content');
     el.setAttribute('vault-id', VAULT_ID);
     el.setAttribute('read-key', READ_KEY);
