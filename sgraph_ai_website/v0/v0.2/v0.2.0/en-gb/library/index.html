@@ -43,219 +43,111 @@
   <script type="module"
     src="https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-content/v0/v0.1/v0.1.0/sg-vault-content.js">
   </script>
-
-  <style>
-    sg-vault-content { display: block; }
-
-    /* ── Library articles: nav + reader ── */
-
-    .lib-eyebrow {
-      font-size: 0.7rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin: 0 0 1.5rem;
-    }
-
-    .lib-layout {
-      display: grid;
-      grid-template-columns: 200px 1fr;
-      gap: 3rem;
-      align-items: start;
-    }
-
-    .lib-nav {
-      position: sticky;
-      top: 5.5rem;
-    }
-
-    .lib-nav__section {
-      font-size: 0.68rem;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-secondary);
-      margin: 1.25rem 0 0.4rem;
-    }
-
-    .lib-nav__section:first-child { margin-top: 0; }
-
-    .lib-nav__list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-
-    .lib-nav__list li + li { margin-top: 2px; }
-
-    .lib-nav__item {
-      display: block;
-      width: 100%;
-      text-align: left;
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 0.4rem 0.75rem;
-      border-radius: 6px;
-      font-size: 0.875rem;
-      line-height: 1.4;
-      color: var(--text-primary);
-      font-family: var(--font-body);
-      transition: background 0.15s, color 0.15s;
-    }
-
-    .lib-nav__item:hover { background: rgba(78, 205, 196, 0.08); }
-
-    .lib-nav__item--active {
-      background: rgba(78, 205, 196, 0.14);
-      color: var(--accent);
-      font-weight: 500;
-    }
-
-    .lib-nav__loading,
-    .lib-nav__empty {
-      color: var(--text-secondary);
-      font-size: 0.875rem;
-      margin: 0;
-    }
-
-    .lib-article { min-height: 20rem; }
-    .lib-article sg-vault-content { display: block; }
-
-    @media (max-width: 700px) {
-      .lib-layout {
-        grid-template-columns: 1fr;
-        gap: 2rem;
-      }
-      .lib-nav { position: static; }
-    }
-  </style>
 </head>
 <body>
 
-<!-- ═══ HEADER ═══════════════════════════════════════════════ -->
+<!-- ═══ PERSISTENT HEADER ════════════════════════════════════ -->
 <sg-site-header site="Send">
   <div slot="locale" id="locale-picker"></div>
 </sg-site-header>
 
+<!-- ═══ LIBRARY SUB-SITE NAV ════════════════════════════════ -->
+<!--
+  Vault: bf31a13c78c9  |  nav object: obj-cas-imm-6f633eaebed4
+  cross_links currently hardcoded; switch to vault src once nav JSON has cross_links key.
+-->
+<sg-sub-nav
+  site-title="Library"
+  links='[{"title":"Dev","href":"/en-gb/dev/"}]'>
+</sg-sub-nav>
+
 <main>
+  <!--
+    Sub-site shell: sg-side-nav (left) + article viewer (right)
+    vault-id / nav-object-id set here for debug visibility.
+    auto-select fires nav:select immediately on first render.
+  -->
+  <div class="sub-site"
+       data-vault-id="bf31a13c78c9"
+       data-nav-object-id="obj-cas-imm-6f633eaebed4">
 
-  <!-- ═══════════════════════════════════════════════════════════
-       ARTICLES: Vault-driven nav + reader
-       Nav JSON object-id set via NAV_OBJECT_ID constant below.
-       Adding articles requires only a vault update — no redeploy.
-       Conductor task: workstream-library-v1
-       ═══════════════════════════════════════════════════════════ -->
-  <section class="section lib-section"
-           data-vault-id="bf31a13c78c9"
-           data-nav-object-id="obj-cas-imm-6f633eaebed4">
-    <div class="container">
-      <p class="lib-eyebrow">How It Works</p>
+    <sg-side-nav
+      vault-id="bf31a13c78c9"
+      read-key="s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA"
+      nav-object-id="obj-cas-imm-6f633eaebed4"
+      auto-select>
+    </sg-side-nav>
 
-      <div class="lib-layout">
-        <nav class="lib-nav" id="lib-nav" aria-label="Library articles">
-          <p class="lib-nav__loading">Loading…</p>
-        </nav>
-        <div class="lib-article" id="lib-article"></div>
-      </div>
-    </div>
-  </section>
+    <div class="sub-site__content" id="article-content"></div>
 
+  </div>
 </main>
 
 <sg-site-footer></sg-site-footer>
 
 <!--
-  Content vault credentials — two values to update if the vault rotates.
-  read-key is the public AES-GCM key for vault bf31a13c78c9.
-  Decryption runs entirely in the browser; the server sees only ciphertext.
+  SPA routing + article loader
+  URL pattern: /en-gb/library/{slug}/
+  CloudFront rewrites any slug path to this index.html (url-rewrite.js).
+  Slug is extracted from location.pathname and passed to sg-side-nav as active-slug.
 -->
 <script type="module">
-  import { importReadKey, readObject }
-    from '/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js';
+  const VAULT_ID = 'bf31a13c78c9';
+  const READ_KEY = 's68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA';
 
-  const VAULT_ID      = 'bf31a13c78c9';
-  const READ_KEY      = 's68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA';
-  const NAV_OBJECT_ID = 'obj-cas-imm-6f633eaebed4';
-  const API_BASE      = 'https://send.sgraph.ai';
-
-  // Fetch nav JSON directly via vault client, then build nav
-  async function initNav() {
-    try {
-      const cryptoKey = await importReadKey(READ_KEY);
-      const buffer    = await readObject(API_BASE, VAULT_ID, NAV_OBJECT_ID, cryptoKey);
-      const data      = JSON.parse(new TextDecoder().decode(buffer));
-      buildNav(data);
-    } catch (err) {
-      console.error('Library nav error:', err);
-      document.getElementById('lib-nav').innerHTML =
-        '<p class="lib-nav__empty">Failed to load navigation.</p>';
-    }
+  function slugFromPath() {
+    const segments = location.pathname.split('/').filter(Boolean);
+    // /en-gb/library/ → 2 segments → no slug
+    // /en-gb/library/two-agent-model/ → 3rd segment is slug
+    return segments.length > 2 ? segments[2] : '';
   }
 
-  initNav();
+  const sideNav = document.querySelector('sg-side-nav');
 
-  function buildNav(data) {
-    const navEl   = document.getElementById('lib-nav');
-    const sections = (data.library ?? data).sections ?? [];
-    navEl.innerHTML = '';
+  // Seed active-slug from URL before nav renders so auto-select picks the right article
+  const initialSlug = slugFromPath();
+  if (initialSlug) sideNav.setAttribute('active-slug', initialSlug);
 
-    if (!sections.length) {
-      navEl.innerHTML = '<p class="lib-nav__empty">No articles yet.</p>';
-      return;
+  // Load article and update URL when nav item is selected (includes auto-select on load)
+  document.addEventListener('nav:select', e => {
+    const { slug, content_object_id, render } = e.detail;
+    const targetPath = slug ? `/en-gb/library/${slug}/` : '/en-gb/library/';
+    if (location.pathname !== targetPath) {
+      history.pushState({ slug }, '', targetPath);
     }
+    loadArticle(content_object_id, render ?? 'markdown');
+  });
 
-    for (const section of sections) {
-      const label = document.createElement('p');
-      label.className = 'lib-nav__section';
-      label.textContent = section.title;
-      navEl.appendChild(label);
-
-      const ul = document.createElement('ul');
-      ul.className = 'lib-nav__list';
-
-      for (const article of section.articles ?? []) {
-        const li  = document.createElement('li');
-        const btn = document.createElement('button');
-        btn.className   = 'lib-nav__item';
-        btn.textContent = article.title;
-        btn.addEventListener('click', () => {
-          navEl.querySelectorAll('.lib-nav__item')
-               .forEach(b => b.classList.remove('lib-nav__item--active'));
-          btn.classList.add('lib-nav__item--active');
-          loadArticle(article.content_object_id);
-        });
-        li.appendChild(btn);
-        ul.appendChild(li);
-      }
-      navEl.appendChild(ul);
+  // Restore article when browser navigates back/forward
+  window.addEventListener('popstate', () => {
+    const slug = slugFromPath();
+    const btn = sideNav.querySelector(`.sg-side-nav__item[data-slug="${CSS.escape(slug)}"]`);
+    if (btn) {
+      btn.click();
+    } else {
+      // Nav not yet rendered; set active-slug so auto-select picks it up
+      sideNav.setAttribute('active-slug', slug);
     }
+  });
 
-    // Auto-load first article
-    const first = sections[0]?.articles?.[0];
-    if (first) {
-      navEl.querySelector('.lib-nav__item')?.classList.add('lib-nav__item--active');
-      loadArticle(first.content_object_id);
-    }
-  }
-
-  function loadArticle(objectId) {
-    const viewer = document.getElementById('lib-article');
-    viewer.innerHTML = '';
-    viewer.setAttribute('data-object-id', objectId);
+  function loadArticle(objectId, render) {
+    const content = document.getElementById('article-content');
+    content.innerHTML = '';
+    content.setAttribute('data-object-id', objectId);
     const el = document.createElement('sg-vault-content');
     el.setAttribute('vault-id', VAULT_ID);
     el.setAttribute('read-key', READ_KEY);
     el.setAttribute('object-id', objectId);
-    el.setAttribute('render', 'markdown');
-    viewer.appendChild(el);
+    el.setAttribute('render', render);
+    content.appendChild(el);
   }
 </script>
 
 <script src="../../_common/js/nav.js"></script>
 <script type="module" src="../../_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
 <script type="module" src="../../_common/js/components/sg-site-footer/v1/v1.0/v1.0.0/sg-site-footer.js"></script>
+<script type="module" src="../../_common/js/components/sg-sub-nav/v0/v0.1/v0.1.0/sg-sub-nav.js"></script>
+<script type="module" src="../../_common/js/components/sg-side-nav/v0/v0.1/v0.1.0/sg-side-nav.js"></script>
 
 </body>
 </html>
