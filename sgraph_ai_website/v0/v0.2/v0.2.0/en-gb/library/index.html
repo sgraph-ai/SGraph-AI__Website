@@ -46,6 +46,91 @@
 
   <style>
     sg-vault-content { display: block; }
+
+    /* ── Library articles: nav + reader ── */
+    .lib-section { border-top: 1px solid var(--border-color); }
+
+    .lib-eyebrow {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 1.5rem;
+    }
+
+    .lib-layout {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      gap: 3rem;
+      align-items: start;
+    }
+
+    .lib-nav {
+      position: sticky;
+      top: 5.5rem;
+    }
+
+    .lib-nav__section {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin: 1.25rem 0 0.4rem;
+    }
+
+    .lib-nav__section:first-child { margin-top: 0; }
+
+    .lib-nav__list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .lib-nav__list li + li { margin-top: 2px; }
+
+    .lib-nav__item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      line-height: 1.4;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .lib-nav__item:hover { background: rgba(78, 205, 196, 0.08); }
+
+    .lib-nav__item--active {
+      background: rgba(78, 205, 196, 0.14);
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .lib-nav__loading,
+    .lib-nav__empty {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      margin: 0;
+    }
+
+    .lib-article { min-height: 20rem; }
+    .lib-article sg-vault-content { display: block; }
+
+    @media (max-width: 700px) {
+      .lib-layout {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+      .lib-nav { position: static; }
+    }
   </style>
 </head>
 <body>
@@ -120,22 +205,122 @@
     </div>
   </section>
 
+  <!-- ═══════════════════════════════════════════════════════════
+       ARTICLES: Vault-driven nav + reader
+       Nav JSON object-id set via NAV_OBJECT_ID constant below.
+       Adding articles requires only a vault update — no redeploy.
+       Conductor task: workstream-library-v1
+       ═══════════════════════════════════════════════════════════ -->
+  <section class="section lib-section">
+    <div class="container">
+      <p class="lib-eyebrow">How It Works</p>
+
+      <!--
+        Hidden fetcher — loads the nav JSON from the vault.
+        JS below observes mutations, parses the JSON, and builds the nav.
+      -->
+      <sg-vault-content id="sg-lib-nav-data" render="json" style="display:none">
+      </sg-vault-content>
+
+      <div class="lib-layout">
+        <nav class="lib-nav" id="lib-nav" aria-label="Library articles">
+          <p class="lib-nav__loading">Loading…</p>
+        </nav>
+        <div class="lib-article" id="lib-article"></div>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <sg-site-footer></sg-site-footer>
 
 <!--
   Content vault credentials — two values to update if the vault rotates.
-  read-key is the public AES-GCM key for vault 598de26b97d2.
+  read-key is the public AES-GCM key for vault bf31a13c78c9.
   Decryption runs entirely in the browser; the server sees only ciphertext.
 -->
 <script type="module">
   const VAULT_ID = 'bf31a13c78c9';
   const READ_KEY = 's68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA';
+  const NAV_OBJECT_ID = 'obj-cas-imm-6f633eaebed4';
 
-  for (const el of document.querySelectorAll('sg-vault-content')) {
+  // Set credentials on static tech-dep card elements
+  for (const el of document.querySelectorAll('sg-vault-content:not(#sg-lib-nav-data)')) {
     el.setAttribute('vault-id', VAULT_ID);
     el.setAttribute('read-key', READ_KEY);
+  }
+
+  // Kick off nav JSON fetch
+  const navData = document.getElementById('sg-lib-nav-data');
+  navData.setAttribute('vault-id', VAULT_ID);
+  navData.setAttribute('read-key', READ_KEY);
+  navData.setAttribute('object-id', NAV_OBJECT_ID);
+
+  // When the JSON renders, parse and build nav
+  const obs = new MutationObserver(() => {
+    const text = navData.textContent.trim();
+    if (!text) return;
+    try {
+      buildNav(JSON.parse(text));
+      obs.disconnect();
+    } catch (_) { /* not ready yet */ }
+  });
+  obs.observe(navData, { childList: true, subtree: true, characterData: true });
+
+  function buildNav(data) {
+    const navEl = document.getElementById('lib-nav');
+    const sections = data.sections ?? [];
+    navEl.innerHTML = '';
+
+    if (!sections.length) {
+      navEl.innerHTML = '<p class="lib-nav__empty">No articles yet.</p>';
+      return;
+    }
+
+    for (const section of sections) {
+      const label = document.createElement('p');
+      label.className = 'lib-nav__section';
+      label.textContent = section.title;
+      navEl.appendChild(label);
+
+      const ul = document.createElement('ul');
+      ul.className = 'lib-nav__list';
+
+      for (const article of section.articles ?? []) {
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.className = 'lib-nav__item';
+        btn.textContent = article.title;
+        btn.addEventListener('click', () => {
+          navEl.querySelectorAll('.lib-nav__item')
+               .forEach(b => b.classList.remove('lib-nav__item--active'));
+          btn.classList.add('lib-nav__item--active');
+          loadArticle(article.content_object_id);
+        });
+        li.appendChild(btn);
+        ul.appendChild(li);
+      }
+      navEl.appendChild(ul);
+    }
+
+    // Auto-load first article
+    const first = sections[0]?.articles?.[0];
+    if (first) {
+      navEl.querySelector('.lib-nav__item')?.classList.add('lib-nav__item--active');
+      loadArticle(first.content_object_id);
+    }
+  }
+
+  function loadArticle(objectId) {
+    const viewer = document.getElementById('lib-article');
+    viewer.innerHTML = '';
+    const el = document.createElement('sg-vault-content');
+    el.setAttribute('vault-id', VAULT_ID);
+    el.setAttribute('read-key', READ_KEY);
+    el.setAttribute('object-id', objectId);
+    el.setAttribute('render', 'markdown');
+    viewer.appendChild(el);
   }
 </script>
 
