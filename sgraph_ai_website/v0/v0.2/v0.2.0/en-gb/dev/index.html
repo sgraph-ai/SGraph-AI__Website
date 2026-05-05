@@ -52,28 +52,44 @@
 
 <!-- ═══ DEV SUB-SITE NAV ══════════════════════════════════════ -->
 <!--
-  Nav JSON: /_common/data/dev-nav.json (local, no vault)
-  cross_links loaded from dev-nav.json: dev.cross_links
+  Vault: bf31a13c78c9  |  nav object: obj-cas-imm-e22bf6650c54 (dev nav v2.0 — vault-hosted)
+  cross_links loaded from vault nav JSON (Dev ↔ Library tab in sg-sub-nav).
 -->
 <sg-sub-nav
   site-title="Dev"
-  src="../../_common/data/dev-nav.json">
+  vault-id="bf31a13c78c9"
+  read-key="s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA"
+  nav-object-id="obj-cas-imm-e22bf6650c54">
 </sg-sub-nav>
 
 <main>
   <!--
-    Sub-site shell: sg-side-nav (left) + article viewer (right)
-    Nav source: local dev-nav.json — no vault credentials needed.
-    auto-select fires nav:select immediately on first render.
+    Sub-site shell: sg-side-nav (col 1) + landing or article (col 2).
+    Only one of landing/article-content is visible at a time — the hidden attribute
+    removes them from grid flow so the two-column layout is always correct.
+    Non-SPA sub-pages (vault-peek, workstreams, agents, decisions) have href in the nav
+    JSON so they render as <a> tags and navigate normally without firing nav:select.
   -->
   <div class="sub-site">
 
     <sg-side-nav
-      src="../../_common/data/dev-nav.json"
+      vault-id="bf31a13c78c9"
+      read-key="s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA"
+      nav-object-id="obj-cas-imm-e22bf6650c54"
+      version="v0.2.0"
       auto-select>
     </sg-side-nav>
 
-    <div class="sub-site__content" id="article-content"></div>
+    <!-- Landing page — shown at /en-gb/dev/ (no article selected) -->
+    <div class="sub-site__landing" id="landing" hidden>
+      <p class="sub-site__landing-eyebrow">sgraph.ai</p>
+      <h1 class="sub-site__landing-title">Dev</h1>
+      <p class="sub-site__landing-desc">Developer documentation — the two-agent operating model, Email-FS protocol, vault architecture, and agent onboarding guides.</p>
+      <div class="sub-site__section-cards" id="landing-sections"></div>
+    </div>
+
+    <!-- Article content — shown when an article is selected from the sidebar -->
+    <div class="sub-site__content" id="article-content" hidden></div>
 
   </div>
 </main>
@@ -85,6 +101,8 @@
   URL pattern: /en-gb/dev/{slug}/
   CloudFront rewrites slug paths to this index.html (url-rewrite.js),
   except for known real sub-pages listed in DEV_REAL_PAGES.
+  nav:loaded → build landing cards; show landing if no slug in URL.
+  nav:select → hide landing, show article, update breadcrumb in sub-nav.
 -->
 <script type="module">
   const VAULT_ID = 'bf31a13c78c9';
@@ -93,44 +111,98 @@
   function slugFromPath() {
     const segments = location.pathname.split('/').filter(Boolean);
     // /en-gb/dev/ → 2 segments → no slug
-    // /en-gb/dev/issues-fs/ → 3rd segment is slug
+    // /en-gb/dev/two-agent-operating-model/ → 3rd segment is slug
     return segments.length > 2 ? segments[2] : '';
   }
 
-  const sideNav = document.querySelector('sg-side-nav');
+  const subNav    = document.querySelector('sg-sub-nav');
+  const sideNav   = document.querySelector('sg-side-nav');
+  const landing   = document.getElementById('landing');
+  const articleEl = document.getElementById('article-content');
 
+  // Seed active-slug from URL before nav renders so auto-select picks the right article
   const initialSlug = slugFromPath();
   if (initialSlug) sideNav.setAttribute('active-slug', initialSlug);
 
+  // First data load: build section cards; show landing when no slug in URL
+  document.addEventListener('nav:loaded', e => {
+    buildLandingCards(e.detail.sections);
+    if (!slugFromPath()) showLanding();
+  });
+
+  // Article selected: hide landing, load content, update breadcrumb and URL
   document.addEventListener('nav:select', e => {
-    const { slug, content_object_id, render } = e.detail;
-    const targetPath = slug ? `/en-gb/dev/${slug}/` : '/en-gb/dev/';
+    const { title, slug, content_object_id, render } = e.detail;
+    const targetPath = `/en-gb/dev/${slug}/`;
     if (location.pathname !== targetPath) {
       history.pushState({ slug }, '', targetPath);
     }
-    loadArticle(content_object_id, render ?? 'markdown');
+    subNav.setAttribute('current-context', title);
+    showArticle(content_object_id, render ?? 'markdown');
   });
 
+  // Restore correct view on browser back/forward
   window.addEventListener('popstate', () => {
     const slug = slugFromPath();
-    const btn = sideNav.querySelector(`.sg-side-nav__item[data-slug="${CSS.escape(slug)}"]`);
-    if (btn) {
-      btn.click();
-    } else {
-      sideNav.setAttribute('active-slug', slug);
+    if (!slug) {
+      showLanding();
+      subNav.setAttribute('current-context', '');
+      return;
     }
+    const btn = sideNav.querySelector(`.sg-side-nav__item[data-slug="${CSS.escape(slug)}"]`);
+    if (btn) btn.click();
+    else sideNav.setAttribute('active-slug', slug);
   });
 
-  function loadArticle(objectId, render) {
-    const content = document.getElementById('article-content');
-    content.innerHTML = '';
-    content.setAttribute('data-object-id', objectId);
+  function showLanding() {
+    articleEl.hidden = true;
+    landing.hidden   = false;
+  }
+
+  function showArticle(objectId, render) {
+    landing.hidden   = true;
+    articleEl.hidden = false;
+    articleEl.innerHTML = '';
     const el = document.createElement('sg-vault-content');
-    el.setAttribute('vault-id', VAULT_ID);
-    el.setAttribute('read-key', READ_KEY);
+    el.setAttribute('vault-id',  VAULT_ID);
+    el.setAttribute('read-key',  READ_KEY);
     el.setAttribute('object-id', objectId);
-    el.setAttribute('render', render);
-    content.appendChild(el);
+    el.setAttribute('render',    render);
+    articleEl.appendChild(el);
+  }
+
+  function buildLandingCards(sections) {
+    const container = document.getElementById('landing-sections');
+    container.innerHTML = sections.map(section => {
+      const articles = section.articles ?? [];
+      const shown    = articles.slice(0, 4);
+      const overflow = articles.length - shown.length;
+      return `
+        <div class="section-card">
+          <div class="section-card__header">
+            <span class="section-card__title">${section.title}</span>
+            <span class="section-card__count">${articles.length}</span>
+          </div>
+          <ul class="section-card__articles">
+            ${shown.map(a => a.href
+              ? `<li><a class="section-card__article" href="${a.href}">${a.title}</a></li>`
+              : `<li><button class="section-card__article"
+                             data-slug="${a.slug ?? ''}">${a.title}</button></li>`
+            ).join('')}
+            ${overflow > 0 ? `<li><span class="section-card__more">+${overflow} more</span></li>` : ''}
+          </ul>
+        </div>`;
+    }).join('');
+
+    // Wire article title clicks in cards to the sidebar nav items
+    container.querySelectorAll('.section-card__article[data-slug]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slug = btn.dataset.slug;
+        if (!slug) return;
+        const navBtn = sideNav.querySelector(`.sg-side-nav__item[data-slug="${CSS.escape(slug)}"]`);
+        navBtn?.click();
+      });
+    });
   }
 </script>
 
