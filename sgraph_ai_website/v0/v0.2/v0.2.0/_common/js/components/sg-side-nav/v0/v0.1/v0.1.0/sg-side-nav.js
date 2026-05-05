@@ -1,37 +1,40 @@
 /**
- * sg-side-nav — vault-driven left sidebar navigation tree
+ * sg-side-nav v3 — file-tree style sidebar navigation (two-tone paper design)
  *
  * Attributes:
  *   src              — URL of a nav JSON file (local or absolute)
- *   vault-id         — content vault id (used when nav JSON is in vault)
- *   read-key         — base64url AES-256-GCM read key (for vault source)
+ *   vault-id         — content vault id
+ *   read-key         — base64url AES-256-GCM read key
  *   nav-object-id    — vault object-id of the nav JSON
  *   active-slug      — slug of the currently active article
- *   auto-select      — boolean; if present, fires nav:select for active/first article
- *                      on first render (enables SPA auto-load on page load)
+ *   auto-select      — boolean; fires nav:select for active-slug article on first
+ *                      data load. Does NOT auto-select when active-slug is empty
+ *                      (page shows landing overview instead).
+ *   tree-label       — label for sidebar header (default: "Contents")
+ *   version          — version string shown in footer (e.g. "v0.2.0")
  *
- * Nav JSON shape:
- *   { "library": { "sections": [{ "title", "articles": [{ "title", "slug",
- *     "content_object_id", "render", "href" }] }] } }
- *   OR { "dev": { "sections": [...] } }
- *   OR flat: { "sections": [...] }
+ * Nav JSON shapes handled:
+ *   { "library": { "sections": [...] } }
+ *   { "dev":     { "sections": [...] } }
+ *   { "sections": [...] }
  *
- * Articles with an "href" field are rendered as <a> tags (external/page nav).
- * Articles with "content_object_id" are rendered as <button> tags (SPA nav).
+ * Articles:
+ *   href field            → rendered as <a> (link-out, not SPA)
+ *   content_object_id     → rendered as <button> (fires nav:select)
  *
  * Fires:
- *   nav:select — detail: { title, slug, content_object_id, render }
- *                (only fired from button-type nav items, not href-type)
+ *   nav:loaded  — detail: { sections, totalArticles } — once on first data load
+ *   nav:select  — detail: { title, slug, content_object_id, render, sectionTitle }
  */
 class SgSideNav extends HTMLElement {
   static get observedAttributes() {
-    return ['src', 'vault-id', 'read-key', 'nav-object-id', 'active-slug', 'auto-select'];
+    return ['src', 'vault-id', 'read-key', 'nav-object-id',
+            'active-slug', 'auto-select', 'tree-label', 'version'];
   }
 
   connectedCallback() { this._load(); }
 
   attributeChangedCallback(name) {
-    // Reset _dataLoaded so auto-select fires again if vault/src changes
     if (name !== 'active-slug') this._dataLoaded = false;
     this._load();
   }
@@ -56,6 +59,7 @@ class SgSideNav extends HTMLElement {
       } else {
         return;
       }
+      this._lastSync = Date.now();
       this._render((data.library ?? data.dev ?? data).sections ?? []);
     } catch (err) {
       this.innerHTML = `<p class="sg-side-nav__error">Nav failed to load.</p>`;
@@ -64,46 +68,106 @@ class SgSideNav extends HTMLElement {
   }
 
   _render(sections) {
-    const activeSlug = this.getAttribute('active-slug') ?? '';
+    const activeSlug  = this.getAttribute('active-slug') ?? '';
+    const version     = this.getAttribute('version') ?? '';
+    const treeLabel   = this.getAttribute('tree-label') ?? 'Contents';
+    if (!this._collapsed) this._collapsed = new Set();
 
-    const html = sections.map(section => `
-      <div class="sg-side-nav__section">
-        <p class="sg-side-nav__section-label">${section.title}</p>
-        <ul class="sg-side-nav__list">
-          ${(section.articles ?? []).map(article => {
-            const isActive = article.slug === activeSlug;
-            const cls = `sg-side-nav__item${isActive ? ' sg-side-nav__item--active' : ''}`;
-            if (article.href) {
-              return `<li>
-                <a class="${cls}"
-                   href="${article.href}"
-                   data-slug="${article.slug ?? ''}">
-                  ${article.title}
-                </a>
-              </li>`;
-            }
-            return `<li>
-              <button class="${cls}"
-                      data-slug="${article.slug ?? ''}"
-                      data-object-id="${article.content_object_id ?? ''}"
-                      data-render="${article.render ?? 'markdown'}"
-                      data-title="${article.title}">
-                ${article.title}
-              </button>
-            </li>`;
-          }).join('')}
-        </ul>
-      </div>`).join('');
+    const totalArticles = sections.reduce((n, s) => n + (s.articles?.length ?? 0), 0);
 
-    this.innerHTML = html || '<p class="sg-side-nav__empty">No articles yet.</p>';
+    const env = location.hostname.startsWith('qa.') ? 'qa'
+              : location.hostname.startsWith('dev.') ? 'dev'
+              : location.hostname === 'localhost' ? 'local'
+              : 'prod';
 
-    this.querySelectorAll('.sg-side-nav__item[data-object-id]').forEach(btn => {
+    const folderIcon = `<svg class="sg-side-nav__folder-icon" width="13" height="13"
+        viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M2 5a1.5 1.5 0 011.5-1.5h3.086a1 1 0 01.707.293L8.5 5H12.5A1.5 1.5 0 0114 6.5v5A1.5 1.5 0 0112.5 13h-9A1.5 1.5 0 012 11.5V5z"
+            fill="currentColor"/>
+    </svg>`;
+
+    const docIcon = `<svg class="sg-side-nav__doc-icon" width="12" height="12"
+        viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <rect x="3" y="1.5" width="10" height="13" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/>
+      <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+    </svg>`;
+
+    const chevronSvg = `<svg width="7" height="7" viewBox="0 0 7 7" fill="none" aria-hidden="true">
+      <path d="M1.5 2L3.5 4L5.5 2" stroke="currentColor" stroke-width="1.3"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+
+    const tree = sections.map((section, i) => {
+      const collapsed = this._collapsed.has(i);
+      const articles  = section.articles ?? [];
+
+      const docs = articles.map(article => {
+        const isActive = article.slug === activeSlug;
+        const cls = `sg-side-nav__doc${isActive ? ' sg-side-nav__doc--active' : ''}`;
+
+        if (article.href) {
+          return `<a class="${cls}" href="${article.href}"
+                     data-slug="${article.slug ?? ''}">
+                   ${docIcon}
+                   <span class="sg-side-nav__doc-label">${article.title}</span>
+                 </a>`;
+        }
+        return `<button class="${cls}"
+                         data-slug="${article.slug ?? ''}"
+                         data-object-id="${article.content_object_id ?? ''}"
+                         data-render="${article.render ?? 'markdown'}"
+                         data-title="${article.title}"
+                         data-section="${section.title}">
+                  ${docIcon}
+                  <span class="sg-side-nav__doc-label">${article.title}</span>
+                </button>`;
+      }).join('');
+
+      return `
+        <div class="sg-side-nav__section" data-section-index="${i}">
+          <div class="sg-side-nav__folder" data-index="${i}">
+            <span class="sg-side-nav__chev${collapsed ? '' : ' sg-side-nav__chev--open'}">
+              ${chevronSvg}
+            </span>
+            ${folderIcon}
+            <span class="sg-side-nav__folder-label">${section.title}</span>
+          </div>
+          ${collapsed ? '' : `
+            <div class="sg-side-nav__children">${docs}</div>
+          `}
+        </div>`;
+    }).join('');
+
+    const footer = version ? `
+      <div class="sg-side-nav__footer">
+        <span class="sg-side-nav__version">${version} · ${env}</span>
+      </div>` : '';
+
+    this.innerHTML = `
+      <div class="sg-side-nav__header">
+        ${treeLabel.toUpperCase()} TREE
+        <span class="sg-side-nav__count">${totalArticles}</span>
+      </div>
+      ${tree || '<p class="sg-side-nav__empty">No articles yet.</p>'}
+      ${footer}`;
+
+    // Folder expand/collapse
+    this.querySelectorAll('.sg-side-nav__folder').forEach(folder => {
+      folder.addEventListener('click', () => {
+        const idx = parseInt(folder.dataset.index, 10);
+        if (this._collapsed.has(idx)) this._collapsed.delete(idx);
+        else this._collapsed.add(idx);
+        this._render(sections);
+      });
+    });
+
+    // Article clicks (buttons only — <a> tags navigate normally)
+    this.querySelectorAll('.sg-side-nav__doc[data-object-id]').forEach(btn => {
       btn.addEventListener('click', () => {
-        this.querySelectorAll('.sg-side-nav__item')
-            .forEach(b => b.classList.remove('sg-side-nav__item--active'));
-        btn.classList.add('sg-side-nav__item--active');
+        this.querySelectorAll('.sg-side-nav__doc')
+            .forEach(b => b.classList.remove('sg-side-nav__doc--active'));
+        btn.classList.add('sg-side-nav__doc--active');
         this.setAttribute('active-slug', btn.dataset.slug);
-
         this.dispatchEvent(new CustomEvent('nav:select', {
           bubbles: true,
           detail: {
@@ -111,30 +175,41 @@ class SgSideNav extends HTMLElement {
             slug:              btn.dataset.slug,
             content_object_id: btn.dataset.objectId,
             render:            btn.dataset.render,
+            sectionTitle:      btn.dataset.section ?? '',
           },
         }));
       });
     });
 
-    // Auto-select: fire nav:select for the active/first article on first data load
+    // First-load behaviour
     if (this.hasAttribute('auto-select') && !this._dataLoaded) {
       this._dataLoaded = true;
-      const target = activeSlug
-        ? this.querySelector(`.sg-side-nav__item[data-slug="${CSS.escape(activeSlug)}"]`)
-        : this.querySelector('.sg-side-nav__item[data-object-id]');
-      if (target) {
-        this.querySelectorAll('.sg-side-nav__item')
-            .forEach(b => b.classList.remove('sg-side-nav__item--active'));
-        target.classList.add('sg-side-nav__item--active');
-        this.dispatchEvent(new CustomEvent('nav:select', {
-          bubbles: true,
-          detail: {
-            title:             target.dataset.title,
-            slug:              target.dataset.slug,
-            content_object_id: target.dataset.objectId,
-            render:            target.dataset.render,
-          },
-        }));
+
+      this.dispatchEvent(new CustomEvent('nav:loaded', {
+        bubbles: true,
+        detail: { sections, totalArticles },
+      }));
+
+      // Only auto-select when a specific slug was requested
+      if (activeSlug) {
+        const target = this.querySelector(
+          `.sg-side-nav__doc[data-slug="${CSS.escape(activeSlug)}"]`
+        );
+        if (target) {
+          this.querySelectorAll('.sg-side-nav__doc')
+              .forEach(b => b.classList.remove('sg-side-nav__doc--active'));
+          target.classList.add('sg-side-nav__doc--active');
+          this.dispatchEvent(new CustomEvent('nav:select', {
+            bubbles: true,
+            detail: {
+              title:             target.dataset.title,
+              slug:              target.dataset.slug,
+              content_object_id: target.dataset.objectId,
+              render:            target.dataset.render,
+              sectionTitle:      target.dataset.section ?? '',
+            },
+          }));
+        }
       }
     }
   }
