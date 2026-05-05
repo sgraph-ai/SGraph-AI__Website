@@ -5,15 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dev — sgraph.ai</title>
   <base href="/en-gb/dev/">
-  <link rel="icon"        href="../../_common/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet"  href="../../_common/fonts/fonts.css">
-  <link rel="stylesheet"  href="../../_common/css/style.css">
+  <link rel="icon"       href="../../_common/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap">
+  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../_common/css/style.css">
 
-  <!--
-    Cross-origin import map — rewrites bare /components/... paths to dev.tools.sgraph.ai.
-    Must appear before any type="module" script.
-    Production: replace every dev.tools.sgraph.ai with tools.sgraph.ai.
-  -->
   <script type="importmap">
   {
     "imports": {
@@ -45,80 +43,90 @@
     src="https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-content/v0/v0.1/v0.1.0/sg-vault-content.js">
   </script>
 </head>
-<body>
+<body class="sub-site-page">
 
 <!-- ═══ PERSISTENT HEADER ════════════════════════════════════ -->
 <sg-site-header site="Send"></sg-site-header>
 
-<!-- ═══ DEV SUB-SITE NAV ══════════════════════════════════════ -->
+<!-- Gap between dark site header and light sub-site shell -->
+<div class="sub-site-gap"></div>
+
+<!-- ═══ DEV SUB-SITE BAND ════════════════════════════════════ -->
 <!--
-  Vault: bf31a13c78c9  |  nav object: obj-cas-imm-e22bf6650c54 (dev nav v2.0 — vault-hosted)
-  cross_links loaded from vault nav JSON (Dev ↔ Library tab in sg-sub-nav).
+  Vault: bf31a13c78c9  |  nav object: obj-cas-imm-4cb7740ea1f2 (dev nav v2.1)
 -->
 <sg-sub-nav
   site-title="Dev"
+  site-description="Developer documentation — the two-agent operating model, Email-FS protocol, vault architecture, and agent onboarding guides."
   vault-id="bf31a13c78c9"
   read-key="s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA"
-  nav-object-id="obj-cas-imm-e22bf6650c54">
+  nav-object-id="obj-cas-imm-4cb7740ea1f2">
 </sg-sub-nav>
 
-<main>
-  <!--
-    Sub-site shell: sg-side-nav (col 1) + landing or article (col 2).
-    Only one of landing/article-content is visible at a time — the hidden attribute
-    removes them from grid flow so the two-column layout is always correct.
-    Non-SPA sub-pages (vault-peek, workstreams, agents, decisions) have href in the nav
-    JSON so they render as <a> tags and navigate normally without firing nav:select.
-  -->
-  <div class="sub-site">
+<!-- ═══ THREE-COLUMN SHELL ════════════════════════════════════ -->
+<!--
+  Col 1: sg-side-nav (sticky file-tree)
+  Col 2: landing page OR article content
+  Col 3: article TOC (hidden on landing, shown with .with-toc class when article has headings)
+  Non-SPA sub-pages (vault-peek, workstreams, agents, decisions) have href in the nav
+  JSON so they render as <a> tags and navigate directly without firing nav:select.
+-->
+<div class="sub-site" id="sub-site-shell">
 
-    <sg-side-nav
-      vault-id="bf31a13c78c9"
-      read-key="s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA"
-      nav-object-id="obj-cas-imm-e22bf6650c54"
-      version="v0.2.0"
-      auto-select>
-    </sg-side-nav>
+  <sg-side-nav
+    vault-id="bf31a13c78c9"
+    read-key="s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA"
+    nav-object-id="obj-cas-imm-4cb7740ea1f2"
+    tree-label="Dev"
+    version="v0.2.0"
+    auto-select>
+  </sg-side-nav>
 
-    <!-- Landing page — shown at /en-gb/dev/ (no article selected) -->
-    <div class="sub-site__landing" id="landing" hidden>
-      <p class="sub-site__landing-eyebrow">sgraph.ai</p>
-      <h1 class="sub-site__landing-title">Dev</h1>
-      <p class="sub-site__landing-desc">Developer documentation — the two-agent operating model, Email-FS protocol, vault architecture, and agent onboarding guides.</p>
-      <div class="sub-site__section-cards" id="landing-sections"></div>
-    </div>
-
-    <!-- Article content — shown when an article is selected from the sidebar -->
-    <div class="sub-site__content" id="article-content" hidden></div>
-
+  <!-- Landing page — shown at /en-gb/dev/ (no article selected) -->
+  <div class="sub-site__landing" id="landing" hidden>
+    <p class="sub-site__landing-eyebrow">sgraph.ai / Dev</p>
+    <h1 class="sub-site__landing-title">Dev</h1>
+    <p class="sub-site__landing-desc">Developer documentation — the two-agent operating model, Email-FS protocol, vault architecture, and agent onboarding guides.</p>
+    <div class="sub-site__section-cards" id="landing-sections"></div>
   </div>
-</main>
+
+  <!-- Article content — shown when an article is selected -->
+  <div class="sub-site__content" id="article-content" hidden>
+    <div class="sub-site__crumbs" id="article-crumbs"></div>
+    <div id="article-render"></div>
+    <div class="sub-site__next-prev" id="next-prev"></div>
+  </div>
+
+  <!-- Right TOC — built from rendered article headings, hidden until populated -->
+  <div class="sub-site__toc" id="article-toc" hidden>
+    <div class="sub-site__toc-label">On this page</div>
+    <ul class="sub-site__toc-list" id="toc-list"></ul>
+  </div>
+
+</div>
 
 <sg-site-footer></sg-site-footer>
 
-<!--
-  SPA routing + article loader
-  URL pattern: /en-gb/dev/{slug}/
-  CloudFront rewrites slug paths to this index.html (url-rewrite.js),
-  except for known real sub-pages listed in DEV_REAL_PAGES.
-  nav:loaded → build landing cards; show landing if no slug in URL.
-  nav:select → hide landing, show article, update breadcrumb in sub-nav.
--->
 <script type="module">
   const VAULT_ID = 'bf31a13c78c9';
   const READ_KEY = 's68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA';
 
   function slugFromPath() {
     const segments = location.pathname.split('/').filter(Boolean);
-    // /en-gb/dev/ → 2 segments → no slug
-    // /en-gb/dev/two-agent-operating-model/ → 3rd segment is slug
     return segments.length > 2 ? segments[2] : '';
   }
 
-  const subNav    = document.querySelector('sg-sub-nav');
-  const sideNav   = document.querySelector('sg-side-nav');
-  const landing   = document.getElementById('landing');
-  const articleEl = document.getElementById('article-content');
+  const shell      = document.getElementById('sub-site-shell');
+  const sideNav    = document.querySelector('sg-side-nav');
+  const landing    = document.getElementById('landing');
+  const articleEl  = document.getElementById('article-content');
+  const articleToc = document.getElementById('article-toc');
+
+  // Flat article list built from nav:loaded — used for next/prev navigation
+  let allArticles = [];
+
+  // Active heading observer — cleaned up on each article load
+  let headingObserver = null;
 
   // Seed active-slug from URL before nav renders so auto-select picks the right article
   const initialSlug = slugFromPath();
@@ -126,49 +134,109 @@
 
   // First data load: build section cards; show landing when no slug in URL
   document.addEventListener('nav:loaded', e => {
-    buildLandingCards(e.detail.sections);
+    const { sections } = e.detail;
+    allArticles = sections.flatMap(s =>
+      (s.articles ?? []).filter(a => a.content_object_id) // only SPA articles
+                        .map(a => ({ ...a, sectionTitle: s.title }))
+    );
+    buildLandingCards(sections);
     if (!slugFromPath()) showLanding();
   });
 
-  // Article selected: hide landing, load content, update breadcrumb and URL
+  // Article selected: show article, update breadcrumbs, URL, next/prev
   document.addEventListener('nav:select', e => {
-    const { title, slug, content_object_id, render } = e.detail;
+    const { title, slug, sectionTitle, content_object_id, render } = e.detail;
     const targetPath = `/en-gb/dev/${slug}/`;
     if (location.pathname !== targetPath) {
       history.pushState({ slug }, '', targetPath);
     }
-    subNav.setAttribute('current-context', title);
+    setBreadcrumbs('Dev', sectionTitle, title);
     showArticle(content_object_id, render ?? 'markdown');
+    buildNextPrev(slug);
   });
 
-  // Restore correct view on browser back/forward
+  // Browser back/forward
   window.addEventListener('popstate', () => {
     const slug = slugFromPath();
     if (!slug) {
       showLanding();
-      subNav.setAttribute('current-context', '');
       return;
     }
-    const btn = sideNav.querySelector(`.sg-side-nav__item[data-slug="${CSS.escape(slug)}"]`);
+    const btn = sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`);
     if (btn) btn.click();
     else sideNav.setAttribute('active-slug', slug);
   });
 
   function showLanding() {
     articleEl.hidden = true;
-    landing.hidden   = false;
+    articleToc.hidden = true;
+    shell.classList.remove('with-toc');
+    landing.hidden = false;
   }
 
   function showArticle(objectId, render) {
-    landing.hidden   = true;
+    landing.hidden = true;
     articleEl.hidden = false;
-    articleEl.innerHTML = '';
+
+    const renderEl = document.getElementById('article-render');
+    renderEl.innerHTML = '';
+
     const el = document.createElement('sg-vault-content');
     el.setAttribute('vault-id',  VAULT_ID);
     el.setAttribute('read-key',  READ_KEY);
     el.setAttribute('object-id', objectId);
     el.setAttribute('render',    render);
-    articleEl.appendChild(el);
+    renderEl.appendChild(el);
+
+    // Build TOC once content renders
+    if (headingObserver) headingObserver.disconnect();
+    articleToc.hidden = true;
+    shell.classList.remove('with-toc');
+    document.getElementById('toc-list').innerHTML = '';
+
+    headingObserver = new MutationObserver(() => {
+      clearTimeout(headingObserver._t);
+      headingObserver._t = setTimeout(() => buildToc(renderEl), 150);
+    });
+    headingObserver.observe(renderEl, { childList: true, subtree: true });
+  }
+
+  function setBreadcrumbs(site, section, article) {
+    const el = document.getElementById('article-crumbs');
+    const parts = [site, section, article].filter(Boolean);
+    el.innerHTML = parts.map((p, i) =>
+      i < parts.length - 1
+        ? `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`
+        : `<span class="sub-site__crumbs-here">${p}</span>`
+    ).join('');
+  }
+
+  function buildToc(container) {
+    const headings = Array.from(container.querySelectorAll('h2, h3'));
+    if (headings.length < 2) return;
+
+    headings.forEach((h, i) => { if (!h.id) h.id = `h-${i}`; });
+
+    const tocList = document.getElementById('toc-list');
+    tocList.innerHTML = headings.map(h => `
+      <li class="${h.tagName === 'H3' ? 'h3' : ''}">
+        <a class="sub-site__toc-link" href="#${h.id}">${h.textContent}</a>
+      </li>`).join('');
+
+    shell.classList.add('with-toc');
+    articleToc.hidden = false;
+
+    const links = Array.from(tocList.querySelectorAll('.sub-site__toc-link'));
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          links.forEach(l => l.classList.remove('active'));
+          tocList.querySelector(`a[href="#${entry.target.id}"]`)
+                 ?.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-15% 0 -70% 0' });
+    headings.forEach(h => io.observe(h));
   }
 
   function buildLandingCards(sections) {
@@ -194,15 +262,47 @@
         </div>`;
     }).join('');
 
-    // Wire article title clicks in cards to the sidebar nav items
     container.querySelectorAll('.section-card__article[data-slug]').forEach(btn => {
       btn.addEventListener('click', () => {
         const slug = btn.dataset.slug;
         if (!slug) return;
-        const navBtn = sideNav.querySelector(`.sg-side-nav__item[data-slug="${CSS.escape(slug)}"]`);
-        navBtn?.click();
+        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`)?.click();
       });
     });
+  }
+
+  function buildNextPrev(currentSlug) {
+    const container = document.getElementById('next-prev');
+    const idx  = allArticles.findIndex(a => a.slug === currentSlug);
+    const prev = idx > 0 ? allArticles[idx - 1] : null;
+    const next = idx >= 0 && idx < allArticles.length - 1 ? allArticles[idx + 1] : null;
+
+    if (!prev && !next) { container.innerHTML = ''; return; }
+
+    container.innerHTML = `
+      <div class="sub-site__nav-card sub-site__nav-card--prev${prev ? '' : ' sub-site__nav-card--empty'}"
+           ${prev ? '' : 'aria-hidden="true"'}>
+        ${prev ? `<div class="sub-site__nav-label">← Previous</div>
+                  <div class="sub-site__nav-title">${prev.title}</div>` : ''}
+      </div>
+      <div class="sub-site__nav-card sub-site__nav-card--next${next ? '' : ' sub-site__nav-card--empty'}"
+           ${next ? '' : 'aria-hidden="true"'}>
+        ${next ? `<div class="sub-site__nav-label">Next →</div>
+                  <div class="sub-site__nav-title">${next.title}</div>` : ''}
+      </div>`;
+
+    if (prev) {
+      container.querySelector('.sub-site__nav-card--prev')
+               .addEventListener('click', () => {
+        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(prev.slug)}"]`)?.click();
+      });
+    }
+    if (next) {
+      container.querySelector('.sub-site__nav-card--next')
+               .addEventListener('click', () => {
+        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(next.slug)}"]`)?.click();
+      });
+    }
   }
 </script>
 
