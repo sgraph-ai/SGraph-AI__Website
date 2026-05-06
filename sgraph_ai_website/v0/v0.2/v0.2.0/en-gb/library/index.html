@@ -35,14 +35,14 @@
 
 <!-- ═══ LIBRARY SUB-SITE BAND ════════════════════════════════ -->
 <!--
-  Vault: bf31a13c78c9  |  nav object: obj-cas-imm-00ace0596531 (v1.1 — includes cross_links)
+  Vault: 4wrqg006  |  nav object: obj-cas-imm-6144cbe0c6bd (v2.0 — Use Cases section)
 -->
 <sg-sub-nav
   site-title="Library"
   site-description="A growing public knowledge base. How sgraph.ai delivers content from encrypted vaults — the cryptography, the components, and the trust boundaries."
-  vault-id="bf31a13c78c9"
-  read-key="s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA"
-  nav-object-id="obj-cas-imm-00ace0596531">
+  vault-id="4wrqg006"
+  read-key="1814ee917a34b6bcfd756779a79aaa0bae0bc3ea11b0f84e3a2cfd6697b07708"
+  nav-object-id="obj-cas-imm-6144cbe0c6bd">
 </sg-sub-nav>
 
 <!-- ═══ THREE-COLUMN SHELL ════════════════════════════════════ -->
@@ -54,9 +54,9 @@
 <div class="sub-site" id="sub-site-shell">
 
   <sg-side-nav
-    vault-id="bf31a13c78c9"
-    read-key="s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA"
-    nav-object-id="obj-cas-imm-00ace0596531"
+    vault-id="4wrqg006"
+    read-key="1814ee917a34b6bcfd756779a79aaa0bae0bc3ea11b0f84e3a2cfd6697b07708"
+    nav-object-id="obj-cas-imm-6144cbe0c6bd"
     tree-label="Library"
     version="v0.2.0"
     auto-select>
@@ -88,12 +88,12 @@
 <sg-site-footer></sg-site-footer>
 
 <script type="module">
-  const VAULT_ID = 'bf31a13c78c9';
-  const READ_KEY = 's68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA';
+  const VAULT_ID = '4wrqg006';
+  const READ_KEY = '1814ee917a34b6bcfd756779a79aaa0bae0bc3ea11b0f84e3a2cfd6697b07708';
 
   function slugFromPath() {
     const segments = location.pathname.split('/').filter(Boolean);
-    return segments.length > 2 ? segments[2] : '';
+    return segments.length > 2 ? segments.slice(2).join('/') : '';
   }
 
   const shell      = document.getElementById('sub-site-shell');
