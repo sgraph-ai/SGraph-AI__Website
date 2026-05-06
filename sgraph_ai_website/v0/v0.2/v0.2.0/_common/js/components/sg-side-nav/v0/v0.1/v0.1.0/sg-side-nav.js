@@ -117,7 +117,9 @@ class SgSideNav extends HTMLElement {
                          data-object-id="${article.content_object_id ?? ''}"
                          data-render="${article.render ?? 'markdown'}"
                          data-title="${article.title}"
-                         data-section="${section.title}">
+                         data-section="${section.title}"
+                         data-vault-id="${article.vault_id ?? ''}"
+                         data-read-key="${article.read_key ?? ''}">
                   ${docIcon}
                   <span class="sg-side-nav__doc-label">${article.title}</span>
                 </button>`;
@@ -176,6 +178,8 @@ class SgSideNav extends HTMLElement {
             content_object_id: btn.dataset.objectId,
             render:            btn.dataset.render,
             sectionTitle:      btn.dataset.section ?? '',
+            vault_id:          btn.dataset.vaultId  || null,
+            read_key:          btn.dataset.readKey  || null,
           },
         }));
       });
@@ -207,6 +211,8 @@ class SgSideNav extends HTMLElement {
               content_object_id: target.dataset.objectId,
               render:            target.dataset.render,
               sectionTitle:      target.dataset.section ?? '',
+              vault_id:          target.dataset.vaultId || null,
+              read_key:          target.dataset.readKey || null,
             },
           }));
         }

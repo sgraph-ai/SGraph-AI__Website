@@ -125,13 +125,13 @@
 
   // Article selected: show article, update breadcrumbs, URL, next/prev
   document.addEventListener('nav:select', e => {
-    const { title, slug, sectionTitle, content_object_id, render } = e.detail;
+    const { title, slug, sectionTitle, content_object_id, render, vault_id, read_key } = e.detail;
     const targetPath = `/en-gb/dev/${slug}/`;
     if (location.pathname !== targetPath) {
       history.pushState({ slug }, '', targetPath);
     }
     setBreadcrumbs('Dev', sectionTitle, title);
-    showArticle(content_object_id, render ?? 'markdown');
+    showArticle(content_object_id, render ?? 'markdown', vault_id, read_key);
     buildNextPrev(slug);
   });
 
@@ -154,7 +154,7 @@
     landing.hidden = false;
   }
 
-  function showArticle(objectId, render) {
+  function showArticle(objectId, render, vaultId, readKey) {
     landing.hidden = true;
     articleEl.hidden = false;
 
@@ -162,8 +162,8 @@
     renderEl.innerHTML = '';
 
     const el = document.createElement('sg-article-viewer');
-    el.setAttribute('vault-id',  VAULT_ID);
-    el.setAttribute('read-key',  READ_KEY);
+    el.setAttribute('vault-id',  vaultId  || VAULT_ID);
+    el.setAttribute('read-key',  readKey  || READ_KEY);
     el.setAttribute('object-id', objectId);
     renderEl.appendChild(el);
 
