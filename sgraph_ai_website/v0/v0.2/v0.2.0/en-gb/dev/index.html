@@ -15,33 +15,13 @@
   <script type="importmap">
   {
     "imports": {
-      "/components/base/v1/v1.0/v1.0.0/sg-component.js":
-          "https://dev.tools.sgraph.ai/components/base/v1/v1.0/v1.0.0/sg-component.js",
       "/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js":
-          "https://dev.tools.sgraph.ai/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js",
-      "/core/markdown/v1/v1.0/v1.0.0/sg-markdown.js":
-          "https://dev.tools.sgraph.ai/core/markdown/v1/v1.0/v1.0.0/sg-markdown.js",
-      "/components/vault-embed/sg-vault-key/v0/v0.1/v0.1.0/events.js":
-          "https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-key/v0/v0.1/v0.1.0/events.js",
-      "/components/vault-embed/sg-vault-key/v0/v0.1/v0.1.0/sg-vault-key.js":
-          "https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-key/v0/v0.1/v0.1.0/sg-vault-key.js",
-      "/components/vault-embed/sg-vault-fetch/v0/v0.1/v0.1.0/sg-vault-fetch.js":
-          "https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-fetch/v0/v0.1/v0.1.0/sg-vault-fetch.js",
-      "/components/vault-embed/sg-vault-trace/v0/v0.1/v0.1.0/sg-vault-trace.js":
-          "https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-trace/v0/v0.1/v0.1.0/sg-vault-trace.js",
-      "/components/content/sg-content-markdown/v0/v0.1/v0.1.0/sg-content-markdown.js":
-          "https://dev.tools.sgraph.ai/components/content/sg-content-markdown/v0/v0.1/v0.1.0/sg-content-markdown.js",
-      "/components/content/sg-content-image/v0/v0.1/v0.1.0/sg-content-image.js":
-          "https://dev.tools.sgraph.ai/components/content/sg-content-image/v0/v0.1/v0.1.0/sg-content-image.js",
-      "/components/content/sg-content-json/v0/v0.1/v0.1.0/sg-content-json.js":
-          "https://dev.tools.sgraph.ai/components/content/sg-content-json/v0/v0.1/v0.1.0/sg-content-json.js"
+          "https://dev.tools.sgraph.ai/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js"
     }
   }
   </script>
 
-  <script type="module"
-    src="https://dev.tools.sgraph.ai/components/vault-embed/sg-vault-content/v0/v0.1/v0.1.0/sg-vault-content.js">
-  </script>
+  <script type="module" src="../../_common/js/components/sg-article-viewer/v0/v0.1/v0.1.0/sg-article-viewer.js"></script>
 </head>
 <body class="sub-site-page">
 
@@ -181,11 +161,10 @@
     const renderEl = document.getElementById('article-render');
     renderEl.innerHTML = '';
 
-    const el = document.createElement('sg-vault-content');
+    const el = document.createElement('sg-article-viewer');
     el.setAttribute('vault-id',  VAULT_ID);
     el.setAttribute('read-key',  READ_KEY);
     el.setAttribute('object-id', objectId);
-    el.setAttribute('render',    render);
     renderEl.appendChild(el);
 
     // Build TOC once content renders

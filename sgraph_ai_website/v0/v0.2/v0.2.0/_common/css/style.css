@@ -2431,3 +2431,122 @@ sg-side-nav {
   .sub-site__next-prev { grid-template-columns: 1fr; }
 }
 
+/* ── 29b. sg-article-viewer ─────────────────────────────────────────────── */
+
+sg-article-viewer { display: block; }
+
+.article-loading {
+  padding: 48px 0;
+  text-align: center;
+  color: var(--ss-fg-faint);
+  font-size: 0.875rem;
+}
+
+.article-error {
+  padding: 24px;
+  color: #c0392b;
+  background: #fdf0ee;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+/* Meta strip */
+.article-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 28px;
+  font-size: 0.8125rem;
+  color: var(--ss-fg-soft);
+}
+
+.article-meta__sep {
+  color: var(--ss-border);
+  user-select: none;
+}
+
+.article-meta__author { font-weight: 500; }
+
+.article-meta__date { font-variant-numeric: tabular-nums; }
+
+.article-meta__status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.article-meta__status--draft      { background: #FEF3C7; color: #92400E; }
+.article-meta__status--published  { background: #D1FAE5; color: #065F46; }
+.article-meta__status--archived   { background: var(--ss-border); color: var(--ss-fg-soft); }
+
+.article-meta__tags { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.article-meta__tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--ss-sidebar-bg);
+  border: 1px solid var(--ss-border);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  color: var(--ss-fg-soft);
+}
+
+/* Vault images */
+.article-figure {
+  margin: 28px 0;
+  display: block;
+}
+
+.article-img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid var(--ss-border);
+  display: block;
+}
+
+.article-img--loading {
+  min-height: 120px;
+  background: var(--ss-sidebar-bg);
+  position: relative;
+}
+
+.article-img--loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.4) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+
+.article-img--error {
+  background: #fdf0ee;
+  border-color: #f5c6c0;
+  padding: 16px;
+  color: #c0392b;
+  font-size: 0.8125rem;
+}
+
+.article-figcaption {
+  margin-top: 8px;
+  font-size: 0.8125rem;
+  color: var(--ss-fg-faint);
+  font-style: italic;
+  text-align: center;
+}
+
