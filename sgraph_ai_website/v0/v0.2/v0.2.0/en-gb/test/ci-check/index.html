@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CI Check — sgraph.ai</title>
+  <link rel="icon" href="../../../_common/favicon.svg" type="image/svg+xml">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 2.5rem 3rem;
+      max-width: 520px;
+      width: 100%;
+    }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #3fb950;
+      flex-shrink: 0;
+    }
+    .status-text {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #3fb950;
+    }
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin: 0 0 0.5rem;
+      color: #f0f6fc;
+    }
+    p {
+      color: #8b949e;
+      font-size: 0.9rem;
+      margin: 0 0 1.5rem;
+      line-height: 1.6;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    td {
+      padding: 0.4rem 0;
+      border-bottom: 1px solid #21262d;
+    }
+    td:first-child {
+      color: #8b949e;
+      width: 40%;
+    }
+    td:last-child {
+      color: #e6edf3;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.8rem;
+    }
+    tr:last-child td {
+      border-bottom: none;
+    }
+    .back {
+      display: inline-block;
+      margin-top: 1.5rem;
+      color: #388bfd;
+      text-decoration: none;
+      font-size: 0.85rem;
+    }
+    .back:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="status">
+      <div class="dot"></div>
+      <span class="status-text">CI pipeline operational</span>
+    </div>
+    <h1>sgraph.ai — CI Deployment Check</h1>
+    <p>This page confirms the CI pipeline successfully deployed to this environment.
+       It is served from S3 via CloudFront with no build step.</p>
+    <table id="info">
+      <tr><td>Page</td><td>/en-gb/test/ci-check/</td></tr>
+      <tr><td>Environment</td><td id="env">—</td></tr>
+      <tr><td>Loaded at</td><td id="ts">—</td></tr>
+    </table>
+    <a class="back" href="/en-gb/">← Back to site</a>
+  </div>
+  <script>
+    const host = location.hostname;
+    const env  = host.startsWith('qa.')   ? 'qa (qa.sgraph.ai)'
+               : host.startsWith('dev.')  ? 'dev (dev.sgraph.ai)'
+               : host.startsWith('main.') ? 'main (main.sgraph.ai)'
+               : host === 'sgraph.ai'     ? 'prod (sgraph.ai)'
+               : host;
+    document.getElementById('env').textContent = env;
+    document.getElementById('ts').textContent  = new Date().toISOString();
+  </script>
+</body>
+</html>
