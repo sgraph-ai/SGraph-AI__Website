@@ -59,6 +59,7 @@
     nav-object-id="obj-cas-imm-c7eb33ac130f"
     tree-label="Library"
     version="v0.2.0"
+    home-href="/en-gb/library/"
     auto-select>
   </sg-side-nav>
 
@@ -79,13 +80,17 @@
 
   <!-- Right TOC — built from rendered article headings, hidden until populated -->
   <div class="sub-site__toc" id="article-toc" hidden>
+    <button class="sub-site__toc-toggle" id="toc-toggle" title="Toggle table of contents"></button>
     <div class="sub-site__toc-label">On this page</div>
     <ul class="sub-site__toc-list" id="toc-list"></ul>
   </div>
 
 </div>
 
-<sg-site-footer></sg-site-footer>
+<footer class="sub-site-footer">
+  <span class="sub-site-footer__copy">© 2026 SGraph AI Ltd.</span>
+  <span class="sub-site-footer__meta">sgraph.ai/library · v0.2.0</span>
+</footer>
 
 <script type="module">
   const VAULT_ID = '4wrqg006';
@@ -96,33 +101,52 @@
     return segments.length > 2 ? segments.slice(2).join('/') : '';
   }
 
+  function toSlug(title) {
+    return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
+  }
+
   const shell      = document.getElementById('sub-site-shell');
   const sideNav    = document.querySelector('sg-side-nav');
   const landing    = document.getElementById('landing');
   const articleEl  = document.getElementById('article-content');
   const articleToc = document.getElementById('article-toc');
 
-  // Flat article list built from nav:loaded — used for next/prev navigation
-  let allArticles = [];
+  // Restore panel collapse states immediately (before nav loads)
+  if (localStorage.getItem('sg-nav-collapsed') === 'true') shell.classList.add('nav-collapsed');
+  if (localStorage.getItem('sg-toc-collapsed') === 'true') shell.classList.add('toc-collapsed');
 
-  // Active heading observer — cleaned up on each article load
+  document.getElementById('toc-toggle')?.addEventListener('click', () => {
+    const collapsed = shell.classList.toggle('toc-collapsed');
+    localStorage.setItem('sg-toc-collapsed', collapsed);
+  });
+
+  let allArticles = [];
+  let allSections = [];
   let headingObserver = null;
 
-  // Seed active-slug from URL before nav renders so auto-select picks the right article
   const initialSlug = slugFromPath();
   if (initialSlug) sideNav.setAttribute('active-slug', initialSlug);
 
-  // First data load: build section cards; show landing when no slug in URL
   document.addEventListener('nav:loaded', e => {
     const { sections } = e.detail;
+    allSections = sections;
     allArticles = sections.flatMap(s =>
       (s.articles ?? []).map(a => ({ ...a, sectionTitle: s.title }))
     );
     buildLandingCards(sections);
-    if (!slugFromPath()) showLanding();
+
+    const slug = slugFromPath();
+    if (!slug) {
+      showLanding();
+    } else {
+      // If slug matches a section title (not an article), show section index
+      const matchedSection = sections.find(s => toSlug(s.title) === slug);
+      if (matchedSection) showSectionIndex(matchedSection);
+      // else: auto-select on sg-side-nav handles it
+    }
   });
 
-  // Article selected: show article, update breadcrumbs, URL, next/prev
+  // Article selected via sidebar
   document.addEventListener('nav:select', e => {
     const { title, slug, sectionTitle, content_object_id, render, vault_id, read_key } = e.detail;
     const targetPath = `/en-gb/library/${slug}/`;
@@ -134,13 +158,25 @@
     buildNextPrev(slug);
   });
 
+  // Section folder label clicked — show section index page
+  document.addEventListener('nav:section', e => {
+    const { title, sectionSlug } = e.detail;
+    const targetPath = `/en-gb/library/${sectionSlug}/`;
+    if (location.pathname !== targetPath) {
+      history.pushState({ sectionSlug }, '', targetPath);
+    }
+    const section = allSections.find(s => s.title === title);
+    if (section) showSectionIndex(section);
+  });
+
   // Browser back/forward
   window.addEventListener('popstate', () => {
     const slug = slugFromPath();
-    if (!slug) {
-      showLanding();
-      return;
-    }
+    if (!slug) { showLanding(); return; }
+
+    const matchedSection = allSections.find(s => toSlug(s.title) === slug);
+    if (matchedSection) { showSectionIndex(matchedSection); return; }
+
     const btn = sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`);
     if (btn) btn.click();
     else sideNav.setAttribute('active-slug', slug);
@@ -151,6 +187,43 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     landing.hidden = false;
+  }
+
+  function showSectionIndex(section) {
+    landing.hidden = true;
+    articleToc.hidden = true;
+    shell.classList.remove('with-toc');
+    articleEl.hidden = false;
+
+    setBreadcrumbs('Library', section.title, null);
+
+    const articles = section.articles ?? [];
+    document.getElementById('article-render').innerHTML = `
+      <div class="article-viewer">
+        <div class="article-body">
+          <h1>${section.title}</h1>
+          ${section.description ? `<p class="section-index-desc">${section.description}</p>` : ''}
+          <ul class="section-index-list">
+            ${articles.map(a => `
+              <li class="section-index-list__item">
+                <button class="section-index-list__link" data-slug="${a.slug ?? ''}">
+                  <span class="section-index-list__title">${a.title}</span>
+                  ${a.description ? `<span class="section-index-list__desc">${a.description}</span>` : ''}
+                </button>
+              </li>`).join('')}
+          </ul>
+        </div>
+      </div>`;
+
+    document.getElementById('next-prev').innerHTML = '';
+
+    document.querySelectorAll('.section-index-list__link').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slug = btn.dataset.slug;
+        if (!slug) return;
+        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`)?.click();
+      });
+    });
   }
 
   function showArticle(objectId, render, vaultId, readKey) {
@@ -164,6 +237,7 @@
     el.setAttribute('vault-id',  vaultId  || VAULT_ID);
     el.setAttribute('read-key',  readKey  || READ_KEY);
     el.setAttribute('object-id', objectId);
+    el.setAttribute('render',    render   || 'markdown');
     renderEl.appendChild(el);
 
     // Build TOC once content renders
@@ -180,13 +254,16 @@
   }
 
   function setBreadcrumbs(site, section, article) {
+    const siteHref    = '/en-gb/library/';
+    const sectionHref = section ? `/en-gb/library/${toSlug(section)}/` : null;
     const el = document.getElementById('article-crumbs');
     const parts = [site, section, article].filter(Boolean);
-    el.innerHTML = parts.map((p, i) =>
-      i < parts.length - 1
-        ? `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`
-        : `<span class="sub-site__crumbs-here">${p}</span>`
-    ).join('');
+    el.innerHTML = parts.map((p, i) => {
+      if (i === 0) return `<a class="sub-site__crumbs-link" href="${siteHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
+      if (i === 1 && parts.length > 2) return `<a class="sub-site__crumbs-link" href="${sectionHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
+      if (i < parts.length - 1) return `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`;
+      return `<span class="sub-site__crumbs-here">${p}</span>`;
+    }).join('');
   }
 
   function buildToc(container) {
@@ -214,7 +291,7 @@
                  ?.classList.add('active');
         }
       });
-    }, { rootMargin: '-15% 0 -70% 0' });
+    }, { rootMargin: '-15% 0px -70% 0px' });
     headings.forEach(h => io.observe(h));
   }
 
@@ -227,9 +304,10 @@
       return `
         <div class="section-card">
           <div class="section-card__header">
-            <span class="section-card__title">${section.title}</span>
+            <button class="section-card__title" data-section="${section.title}">${section.title}</button>
             <span class="section-card__count">${articles.length}</span>
           </div>
+          ${section.description ? `<p class="section-card__desc">${section.description}</p>` : ''}
           <ul class="section-card__articles">
             ${shown.map(a => `
               <li><button class="section-card__article"
@@ -239,6 +317,16 @@
           </ul>
         </div>`;
     }).join('');
+
+    container.querySelectorAll('.section-card__title[data-section]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sectionTitle = btn.dataset.section;
+        const sectionSlug  = toSlug(sectionTitle);
+        history.pushState({ sectionSlug }, '', `/en-gb/library/${sectionSlug}/`);
+        const section = allSections.find(s => s.title === sectionTitle);
+        if (section) showSectionIndex(section);
+      });
+    });
 
     container.querySelectorAll('.section-card__article[data-slug]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -286,7 +374,6 @@
 
 <script src="../../_common/js/nav.js"></script>
 <script type="module" src="../../_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
-<script type="module" src="../../_common/js/components/sg-site-footer/v1/v1.0/v1.0.0/sg-site-footer.js"></script>
 <script type="module" src="../../_common/js/components/sg-sub-nav/v0/v0.1/v0.1.0/sg-sub-nav.js"></script>
 <script type="module" src="../../_common/js/components/sg-side-nav/v0/v0.1/v0.1.0/sg-side-nav.js"></script>
 

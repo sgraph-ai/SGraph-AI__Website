@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Open Vaults — Dev — sgraph.ai</title>
+  <base href="/en-gb/dev/">
+  <link rel="icon"       href="../../_common/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap">
+  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../_common/css/style.css">
+
+  <script type="importmap">
+  {
+    "imports": {
+      "/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js":
+          "https://dev.tools.sgraph.ai/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js"
+    }
+  }
+  </script>
+</head>
+<body class="sub-site-page">
+
+<sg-site-header site="Send"></sg-site-header>
+
+<div class="sub-site-gap"></div>
+
+<!--
+  Vault: bf31a13c78c9  |  nav object: obj-cas-imm-23a4cac1cd36 (dev nav v2.1)
+-->
+<sg-sub-nav
+  site-title="Dev"
+  site-description="Developer documentation — the two-agent operating model, Email-FS protocol, vault architecture, and agent onboarding guides."
+  vault-id="bf31a13c78c9"
+  read-key="s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA"
+  nav-object-id="obj-cas-imm-23a4cac1cd36">
+</sg-sub-nav>
+
+<div class="sub-site" id="sub-site-shell">
+
+  <sg-side-nav
+    vault-id="bf31a13c78c9"
+    read-key="s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA"
+    nav-object-id="obj-cas-imm-23a4cac1cd36"
+    active-slug="vaults"
+    tree-label="Dev"
+    version="v0.2.0"
+    extra-links='[{"section":"Tools","title":"Open Vaults Directory","href":"/en-gb/dev/vaults/","slug":"vaults"}]'>
+  </sg-side-nav>
+
+  <div class="sub-site__content" style="display:block;">
+    <div class="sub-site__crumbs">
+      <span>Dev</span><span class="sub-site__crumbs-sep">/</span>
+      <span>Tools</span><span class="sub-site__crumbs-sep">/</span>
+      <span class="sub-site__crumbs-here">Open Vaults</span>
+    </div>
+
+    <div class="article-viewer">
+      <div class="article-body">
+        <h1>Open Vaults</h1>
+        <p>Vaults currently exposed with a public read key. These can be opened
+        by any client that supports the SGit vault protocol.</p>
+
+        <h2>Content Vault</h2>
+        <table class="vaults-table">
+          <tbody>
+            <tr>
+              <th>Vault ID</th>
+              <td><code>4wrqg006</code></td>
+            </tr>
+            <tr>
+              <th>Read key (base64url)</th>
+              <td><code class="vaults-table__key">GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg</code></td>
+            </tr>
+            <tr>
+              <th>Purpose</th>
+              <td>Library articles, use-case pages, nav JSON</td>
+            </tr>
+            <tr>
+              <th>Owner</th>
+              <td>@Content</td>
+            </tr>
+            <tr>
+              <th>Current nav object</th>
+              <td><code>obj-cas-imm-825c5a468d59</code> <span class="vaults-table__note">(_nav.json v2.4)</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Status Vault</h2>
+        <table class="vaults-table">
+          <tbody>
+            <tr>
+              <th>Vault ID</th>
+              <td><code>1lfehfjh</code></td>
+            </tr>
+            <tr>
+              <th>Read key (base64url)</th>
+              <td><code class="vaults-table__key">gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs</code></td>
+            </tr>
+            <tr>
+              <th>Purpose</th>
+              <td>Live project status — workstreams, issues, agents</td>
+            </tr>
+            <tr>
+              <th>Owner</th>
+              <td>@Content</td>
+            </tr>
+            <tr>
+              <th>Objects</th>
+              <td>
+                <code>obj-cas-imm-32aa32595ec4</code> <span class="vaults-table__note">workstreams.json (project-workstreams-v2)</span><br>
+                <code>obj-cas-imm-da66557cad10</code> <span class="vaults-table__note">issues.json (project-issues-v1)</span><br>
+                <code>obj-cas-imm-652a31e21300</code> <span class="vaults-table__note">agents.json (project-agents-v2)</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p class="vaults-note">The collaboration vault (<code>iqjele6l</code>) has no public read key
+        and is not listed here.</p>
+
+      </div>
+    </div>
+  </div>
+
+  <div class="sub-site__toc" hidden></div>
+
+</div>
+
+<sg-site-footer></sg-site-footer>
+
+<script src="../../_common/js/nav.js"></script>
+<script type="module" src="../../_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
+<script type="module" src="../../_common/js/components/sg-site-footer/v1/v1.0/v1.0.0/sg-site-footer.js"></script>
+<script type="module" src="../../_common/js/components/sg-sub-nav/v0/v0.1/v0.1.0/sg-sub-nav.js"></script>
+<script type="module" src="../../_common/js/components/sg-side-nav/v0/v0.1/v0.1.0/sg-side-nav.js"></script>
+
+</body>
+</html>
