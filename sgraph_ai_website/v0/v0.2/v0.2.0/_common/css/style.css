@@ -124,6 +124,22 @@ a:hover {
   text-decoration: underline;
 }
 
+/* Article prose links use --link-color so they can be tuned independently
+   of the decorative --accent used for UI chrome. */
+:root { --link-color: #0d9488; --link-color-hover: #0f766e; }
+
+.article-body a {
+  color: var(--link-color);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition: text-decoration-color 0.15s, color 0.15s;
+}
+.article-body a:hover {
+  color: var(--link-color-hover);
+  text-decoration-color: currentColor;
+}
+
 ul, ol {
   list-style: none;
 }
