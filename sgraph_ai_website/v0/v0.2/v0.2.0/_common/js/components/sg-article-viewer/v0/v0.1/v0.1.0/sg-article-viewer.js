@@ -1,5 +1,5 @@
 /**
- * sg-article-viewer v0.1.3
+ * sg-article-viewer v0.1.5
  *
  * Full content pipeline: vault fetch → frontmatter parse → viewer render.
  *
@@ -67,6 +67,19 @@ class SgArticleViewer extends HTMLElement {
     const { marked } = await import('https://cdn.jsdelivr.net/npm/marked@9/+esm');
 
     const renderer = new marked.Renderer();
+
+    renderer.link = function (href, title, text) {
+      if (typeof href === 'object' && href !== null) {
+        title = href.title;
+        text  = href.text;
+        href  = href.href;
+      }
+      const isExternal = href && /^https?:\/\//i.test(href);
+      const titleAttr  = title ? ` title="${escHtml(title)}"` : '';
+      const target     = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
+      return `<a href="${escHtml(href)}"${titleAttr}${target}>${text}</a>`;
+    };
+
     const origImage = renderer.image.bind(renderer);
     renderer.image = function (href, title, text) {
       if (typeof href === 'object' && href !== null) {
