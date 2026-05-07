@@ -2042,13 +2042,13 @@ sg-sub-nav {
 .sg-sub-nav__tab {
   font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em;
   text-transform: uppercase; padding: 6px 14px; border-radius: 6px;
-  color: rgba(250,247,242,0.55); font-weight: 500;
+  color: rgba(250,247,242,0.55); font-weight: 700;
   text-decoration: none; transition: color 0.12s;
   white-space: nowrap;
 }
 
 .sg-sub-nav__tab--active {
-  background: var(--accent); color: var(--ss-fg); font-weight: 700;
+  background: var(--accent); color: var(--ss-fg);
 }
 
 .sg-sub-nav__tab:hover:not(.sg-sub-nav__tab--active) {
