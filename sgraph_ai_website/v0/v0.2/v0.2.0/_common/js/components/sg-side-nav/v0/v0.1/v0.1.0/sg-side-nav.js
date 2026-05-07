@@ -29,7 +29,7 @@
 class SgSideNav extends HTMLElement {
   static get observedAttributes() {
     return ['src', 'vault-id', 'read-key', 'nav-object-id',
-            'active-slug', 'auto-select', 'tree-label', 'version'];
+            'active-slug', 'auto-select', 'tree-label', 'version', 'extra-links'];
   }
 
   connectedCallback() { this._load(); }
@@ -60,10 +60,30 @@ class SgSideNav extends HTMLElement {
         return;
       }
       this._lastSync = Date.now();
-      this._render((data.library ?? data.dev ?? data).sections ?? []);
+      const sections = (data.library ?? data.dev ?? data).sections ?? [];
+      this._injectExtraLinks(sections);
+      this._render(sections);
     } catch (err) {
       this.innerHTML = `<p class="sg-side-nav__error">Nav failed to load.</p>`;
       console.error('sg-side-nav:', err);
+    }
+  }
+
+  _injectExtraLinks(sections) {
+    const raw = this.getAttribute('extra-links');
+    if (!raw) return;
+    let extras;
+    try { extras = JSON.parse(raw); } catch { return; }
+    for (const item of extras) {
+      const section = sections.find(s => s.title === item.section);
+      const entry = { title: item.title, href: item.href, slug: item.slug ?? '' };
+      if (section) {
+        if (!(section.articles ?? []).some(a => a.slug === entry.slug)) {
+          section.articles = [...(section.articles ?? []), entry];
+        }
+      } else {
+        sections.push({ title: item.section, articles: [entry] });
+      }
     }
   }
 

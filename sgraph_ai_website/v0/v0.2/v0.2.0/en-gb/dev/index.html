@@ -59,6 +59,7 @@
     nav-object-id="obj-cas-imm-23a4cac1cd36"
     tree-label="Dev"
     version="v0.2.0"
+    extra-links='[{"section":"Tools","title":"Open Vaults Directory","href":"/en-gb/dev/vaults/","slug":"vaults"}]'
     auto-select>
   </sg-side-nav>
 
@@ -182,13 +183,14 @@
   }
 
   function setBreadcrumbs(site, section, article) {
+    const siteHref = '/en-gb/dev/';
     const el = document.getElementById('article-crumbs');
     const parts = [site, section, article].filter(Boolean);
-    el.innerHTML = parts.map((p, i) =>
-      i < parts.length - 1
-        ? `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`
-        : `<span class="sub-site__crumbs-here">${p}</span>`
-    ).join('');
+    el.innerHTML = parts.map((p, i) => {
+      if (i === 0) return `<a class="sub-site__crumbs-link" href="${siteHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
+      if (i < parts.length - 1) return `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`;
+      return `<span class="sub-site__crumbs-here">${p}</span>`;
+    }).join('');
   }
 
   function buildToc(container) {

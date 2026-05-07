@@ -77,13 +77,12 @@ class SgSubNav extends HTMLElement {
 
         <div class="sg-sub-nav__controls">
           <div class="sg-sub-nav__tabs" role="tablist">
-            <span class="sg-sub-nav__tab sg-sub-nav__tab--active"
-                  role="tab" aria-selected="true">${title.toUpperCase()}</span>
-            ${crossLinks.map(l => `
-              <a class="sg-sub-nav__tab"
-                 href="${l.href}"
-                 role="tab"
-                 aria-selected="false">${l.title.toUpperCase()}</a>`).join('')}
+            ${[{ title, active: true }, ...crossLinks.map(l => ({ title: l.title, href: l.href, active: false }))]
+              .sort((a, b) => a.title.localeCompare(b.title))
+              .map(t => t.active
+                ? `<span class="sg-sub-nav__tab sg-sub-nav__tab--active" role="tab" aria-selected="true">${t.title.toUpperCase()}</span>`
+                : `<a class="sg-sub-nav__tab" href="${t.href}" role="tab" aria-selected="false">${t.title.toUpperCase()}</a>`)
+              .join('')}
           </div>
 
           <div class="sg-sub-nav__search-wrap">
