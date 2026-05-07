@@ -2134,28 +2134,29 @@ sg-side-nav {
 }
 
 .sg-side-nav__children {
-  margin-left: 16px;
-  border-left: 1px dashed var(--ss-border);
-  padding-bottom: 4px;
+  margin-left: 20px;
+  border-left: 2px solid var(--ss-border);
+  padding-bottom: 6px;
+  padding-top: 2px;
 }
 
 .sg-side-nav__doc {
   display: flex; align-items: center; gap: 6px;
   width: 100%; text-align: left;
-  padding: 4px 12px 4px 8px;
+  padding: 5px 12px 5px 10px;
   cursor: pointer;
-  font-family: var(--font-mono); font-size: 12px;
-  color: var(--ss-fg-soft);
+  font-family: var(--font-mono); font-size: 11.5px;
+  color: var(--ss-fg-faint);
   background: none; border: none;
   text-decoration: none;
   transition: background 0.1s, color 0.1s;
-  line-height: 1.35;
+  line-height: 1.4;
   position: relative;
 }
 
 .sg-side-nav__doc:hover {
   background: rgba(0,0,0,0.04);
-  color: var(--ss-fg);
+  color: var(--ss-fg-soft);
 }
 
 .sg-side-nav__doc--active {
@@ -2942,3 +2943,166 @@ sg-article-viewer { display: block; }
 }
 
 
+
+/* ── Kanban board (project-workstreams-v2) ────────────────── */
+
+.kanban-legend {
+  display: flex; flex-wrap: wrap; gap: 8px 16px;
+  margin-bottom: 20px;
+}
+
+.kanban-legend__item {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 0.8125rem; color: var(--ss-fg-soft, #555);
+}
+
+.kanban-legend__dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.kanban-col {
+  background: var(--ss-bg-alt, #f7f7f5);
+  border: 1px solid var(--ss-border, #e5e5e3);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.kanban-col__header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 14px;
+  background: var(--ss-bg, #fff);
+  border-bottom: 1px solid var(--ss-border, #e5e5e3);
+  font-size: 0.75rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--ss-fg-soft, #555);
+}
+
+.kanban-col__icon { font-size: 1rem; }
+
+.kanban-col__label { flex: 1; }
+
+.kanban-col__count {
+  background: var(--ss-border, #e5e5e3);
+  color: var(--ss-fg-faint, #888);
+  font-size: 0.6875rem; font-weight: 600;
+  padding: 1px 6px; border-radius: 10px;
+}
+
+.kanban-col__cards {
+  padding: 10px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.kanban-col__empty {
+  font-size: 0.8125rem; color: var(--ss-fg-faint, #aaa);
+  text-align: center; padding: 8px 0;
+}
+
+.kanban-card {
+  background: var(--ss-bg, #fff);
+  border: 1px solid var(--ss-border, #e5e5e3);
+  border-left: 3px solid var(--ws-color, #6366f1);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.kanban-card__ws {
+  font-size: 0.6875rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--ws-color, #6366f1);
+  margin-bottom: 4px;
+}
+
+.kanban-card__title {
+  font-size: 0.8125rem;
+  color: var(--ss-fg, #222);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.kanban-card__owner {
+  font-size: 0.75rem;
+  color: var(--ss-fg-faint, #888);
+  font-family: var(--font-mono, monospace);
+}
+
+.kanban-card__notes {
+  font-size: 0.75rem;
+  color: var(--ss-fg-faint, #888);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+/* ── Issues list (project-issues-v1) ──────────────────────── */
+
+.issues-summary {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 0.875rem; margin-bottom: 20px;
+  color: var(--ss-fg-soft, #555);
+}
+
+.issues-summary__sep { color: var(--ss-fg-faint, #aaa); }
+
+.issues-summary__stat--muted { color: var(--ss-fg-faint, #aaa); }
+
+.issues-list {
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+.issue-row {
+  border: 1px solid var(--ss-border, #e5e5e3);
+  border-radius: 8px; padding: 14px 16px;
+  background: var(--ss-bg, #fff);
+}
+
+.issue-row--closed { opacity: 0.6; }
+
+.issue-row__header {
+  display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap; margin-bottom: 6px;
+}
+
+.issue-row__id {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem; color: var(--ss-fg-faint, #888);
+}
+
+.issue-priority {
+  font-size: 0.6875rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  padding: 1px 7px; border-radius: 4px;
+}
+
+.issue-priority--critical { background: #fee2e2; color: #b91c1c; }
+.issue-priority--high     { background: #ffedd5; color: #c2410c; }
+.issue-priority--medium   { background: #fef9c3; color: #854d0e; }
+.issue-priority--low      { background: #f0fdf4; color: #166534; }
+
+.issue-row__status {
+  font-size: 0.75rem; color: var(--ss-fg-soft, #555);
+  margin-left: auto;
+}
+
+.issue-row__owner {
+  font-size: 0.75rem; font-family: var(--font-mono, monospace);
+  color: var(--ss-fg-faint, #888);
+}
+
+.issue-row__title {
+  font-size: 0.9375rem; font-weight: 500;
+  color: var(--ss-fg, #222); margin-bottom: 4px;
+}
+
+.issue-row__desc {
+  font-size: 0.8125rem;
+  color: var(--ss-fg-soft, #555);
+  line-height: 1.5;
+}

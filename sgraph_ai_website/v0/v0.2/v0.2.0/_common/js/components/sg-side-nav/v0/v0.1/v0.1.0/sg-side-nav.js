@@ -76,7 +76,15 @@ class SgSideNav extends HTMLElement {
     try { extras = JSON.parse(raw); } catch { return; }
     for (const item of extras) {
       const section = sections.find(s => s.title === item.section);
-      const entry = { title: item.title, href: item.href, slug: item.slug ?? '' };
+      // Items with object_id become vault-backed buttons; items with href become links
+      const entry = item.object_id
+        ? { title:              item.title,
+            slug:               item.slug ?? '',
+            content_object_id:  item.object_id,
+            vault_id:           item.vault_id  ?? undefined,
+            read_key:           item.read_key  ?? undefined,
+            render:             item.render    ?? 'markdown' }
+        : { title: item.title, href: item.href, slug: item.slug ?? '' };
       if (section) {
         if (!(section.articles ?? []).some(a => a.slug === entry.slug)) {
           section.articles = [...(section.articles ?? []), entry];
@@ -91,7 +99,18 @@ class SgSideNav extends HTMLElement {
     const activeSlug  = this.getAttribute('active-slug') ?? '';
     const version     = this.getAttribute('version') ?? '';
     const treeLabel   = this.getAttribute('tree-label') ?? 'Contents';
-    if (!this._collapsed) this._collapsed = new Set();
+    // Initialise collapsed state: all sections collapsed by default on first render
+    if (!this._collapsed) {
+      this._collapsed = new Set(sections.map((_, i) => i));
+    }
+    // Always ensure the section containing the active article is expanded
+    if (activeSlug) {
+      sections.forEach((s, i) => {
+        if ((s.articles ?? []).some(a => a.slug === activeSlug)) {
+          this._collapsed.delete(i);
+        }
+      });
+    }
 
     const totalArticles = sections.reduce((n, s) => n + (s.articles?.length ?? 0), 0);
 
