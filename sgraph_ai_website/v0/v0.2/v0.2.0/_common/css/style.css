@@ -1687,6 +1687,41 @@ body.i18n-loading {
   max-width: 280px;
 }
 
+/* Article-embedded screenshot placeholder (token replacement) */
+.article-body .screenshot-placeholder {
+  min-height: 160px;
+  margin: var(--sp-6) 0;
+  text-align: center;
+}
+
+.screenshot-placeholder__header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.screenshot-placeholder__icon {
+  font-size: 1.25rem;
+}
+
+.screenshot-placeholder__title {
+  font-size: 0.95rem;
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+}
+
+.screenshot-placeholder__badge {
+  font-size: 0.75rem;
+  font-weight: var(--fw-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin-top: var(--sp-1);
+}
+
 /* ------------------------------------------------------------
    25. Pricing Zones
    ------------------------------------------------------------ */
