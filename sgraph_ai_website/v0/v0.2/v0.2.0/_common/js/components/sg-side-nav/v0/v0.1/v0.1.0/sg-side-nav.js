@@ -29,7 +29,7 @@
 class SgSideNav extends HTMLElement {
   static get observedAttributes() {
     return ['src', 'vault-id', 'read-key', 'nav-object-id',
-            'active-slug', 'auto-select', 'tree-label', 'version', 'extra-links'];
+            'active-slug', 'auto-select', 'tree-label', 'version', 'extra-links', 'home-href'];
   }
 
   connectedCallback() { this._load(); }
@@ -137,8 +137,9 @@ class SgSideNav extends HTMLElement {
     </svg>`;
 
     const tree = sections.map((section, i) => {
-      const collapsed = this._collapsed.has(i);
-      const articles  = section.articles ?? [];
+      const collapsed    = this._collapsed.has(i);
+      const articles     = section.articles ?? [];
+      const sectionSlug  = section.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
 
       const docs = articles.map(article => {
         const isActive = article.slug === activeSlug;
@@ -167,11 +168,13 @@ class SgSideNav extends HTMLElement {
       return `
         <div class="sg-side-nav__section" data-section-index="${i}">
           <div class="sg-side-nav__folder" data-index="${i}">
-            <span class="sg-side-nav__chev${collapsed ? '' : ' sg-side-nav__chev--open'}">
+            <span class="sg-side-nav__chev${collapsed ? '' : ' sg-side-nav__chev--open'}" data-chev="${i}">
               ${chevronSvg}
             </span>
             ${folderIcon}
-            <span class="sg-side-nav__folder-label">${section.title}</span>
+            <span class="sg-side-nav__folder-label"
+                  data-section-title="${section.title}"
+                  data-section-slug="${sectionSlug}">${section.title}</span>
           </div>
           ${collapsed ? '' : `
             <div class="sg-side-nav__children">${docs}</div>
@@ -184,7 +187,14 @@ class SgSideNav extends HTMLElement {
         <span class="sg-side-nav__version">${version} · ${env}</span>
       </div>` : '';
 
+    const homeHref  = this.getAttribute('home-href') ?? '';
+    const homeLabel = treeLabel || 'Home';
+    const homeLink  = homeHref
+      ? `<a class="sg-side-nav__home" href="${homeHref}">← ${homeLabel}</a>`
+      : '';
+
     this.innerHTML = `
+      ${homeLink}
       <div class="sg-side-nav__header">
         ${treeLabel.toUpperCase()} TREE
         <span class="sg-side-nav__count">${totalArticles}</span>
@@ -192,13 +202,27 @@ class SgSideNav extends HTMLElement {
       ${tree || '<p class="sg-side-nav__empty">No articles yet.</p>'}
       ${footer}`;
 
-    // Folder expand/collapse
-    this.querySelectorAll('.sg-side-nav__folder').forEach(folder => {
-      folder.addEventListener('click', () => {
-        const idx = parseInt(folder.dataset.index, 10);
+    // Chevron: toggle expand/collapse only
+    this.querySelectorAll('[data-chev]').forEach(chev => {
+      chev.addEventListener('click', e => {
+        e.stopPropagation();
+        const idx = parseInt(chev.dataset.chev, 10);
         if (this._collapsed.has(idx)) this._collapsed.delete(idx);
         else this._collapsed.add(idx);
         this._render(sections);
+      });
+    });
+
+    // Folder label: expand section AND fire nav:section for index page
+    this.querySelectorAll('.sg-side-nav__folder-label').forEach(label => {
+      label.addEventListener('click', () => {
+        const idx = sections.findIndex(s => s.title === label.dataset.sectionTitle);
+        if (idx >= 0) this._collapsed.delete(idx);
+        this._render(sections);
+        this.dispatchEvent(new CustomEvent('nav:section', {
+          bubbles: true,
+          detail: { title: label.dataset.sectionTitle, sectionSlug: label.dataset.sectionSlug },
+        }));
       });
     });
 
