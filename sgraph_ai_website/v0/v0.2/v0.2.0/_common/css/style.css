@@ -2855,3 +2855,49 @@ sg-article-viewer { display: block; }
 
 .task-notes { color: var(--ss-fg-faint, #888); }
 
+/* ── Vaults directory page ───────────────────────────────────────────────── */
+
+.vaults-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin: 16px 0 24px;
+}
+
+.vaults-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ss-fg-faint, #888);
+  padding: 8px 12px 8px 0;
+  width: 180px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--ss-bg-alt, #f5f5f4);
+}
+
+.vaults-table td {
+  padding: 8px 0;
+  color: var(--ss-fg, #222);
+  border-bottom: 1px solid var(--ss-bg-alt, #f5f5f4);
+  word-break: break-all;
+}
+
+.vaults-table__key {
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
+}
+
+.vaults-table__note {
+  font-size: 0.8125rem;
+  color: var(--ss-fg-faint, #888);
+  margin-left: 6px;
+}
+
+.vaults-note {
+  font-size: 0.875rem;
+  color: var(--ss-fg-faint, #888);
+  border-left: 3px solid var(--ss-border, #e5e5e3);
+  padding-left: 12px;
+  margin-top: 8px;
+}
+
+
