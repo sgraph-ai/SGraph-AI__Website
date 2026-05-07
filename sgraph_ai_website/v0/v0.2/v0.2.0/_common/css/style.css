@@ -2098,11 +2098,32 @@ sg-sub-nav {
   overflow: clip; /* clip not hidden: allows sticky children, clips border-radius */
   min-height: 70vh;
   align-items: start;
+  transition: grid-template-columns 0.2s ease;
 }
 
 .sub-site.with-toc {
   grid-template-columns: var(--ss-sidebar-w) 1fr var(--ss-toc-w);
 }
+
+/* ── Panel collapse states ───────────────────────────────── */
+
+:root { --ss-panel-collapsed-w: 36px; }
+
+.sub-site.nav-collapsed                      { grid-template-columns: var(--ss-panel-collapsed-w) 1fr; }
+.sub-site.nav-collapsed.with-toc             { grid-template-columns: var(--ss-panel-collapsed-w) 1fr var(--ss-toc-w); }
+.sub-site.with-toc.toc-collapsed             { grid-template-columns: var(--ss-sidebar-w) 1fr var(--ss-panel-collapsed-w); }
+.sub-site.nav-collapsed.with-toc.toc-collapsed { grid-template-columns: var(--ss-panel-collapsed-w) 1fr var(--ss-panel-collapsed-w); }
+
+/* Hide sidebar content when collapsed — toggle button stays */
+.nav-collapsed sg-side-nav .sg-side-nav__home,
+.nav-collapsed sg-side-nav .sg-side-nav__header,
+.nav-collapsed sg-side-nav .sg-side-nav__section,
+.nav-collapsed sg-side-nav .sg-side-nav__footer,
+.nav-collapsed sg-side-nav .sg-side-nav__empty { display: none; }
+
+/* Hide TOC content when collapsed — toggle button stays */
+.toc-collapsed .sub-site__toc-label,
+.toc-collapsed .sub-site__toc-list { display: none; }
 
 /* ── Sidebar (sg-side-nav) ───────────────────────────────── */
 
@@ -2116,6 +2137,36 @@ sg-side-nav {
   overflow-y: auto;
   align-self: start;
 }
+
+/* Sidebar panel collapse toggle */
+.sg-side-nav__toggle {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 32px; padding: 0;
+  border: none; border-bottom: 1px solid var(--ss-border-soft);
+  background: var(--ss-sidebar-bg);
+  color: var(--ss-fg-faint);
+  cursor: pointer; font-size: 13px;
+  position: sticky; top: 0; z-index: 3;
+  transition: color 0.12s, background 0.12s;
+}
+.sg-side-nav__toggle:hover { color: var(--ss-fg); background: rgba(0,0,0,0.04); }
+.sg-side-nav__toggle::before { content: '‹'; }
+.nav-collapsed .sg-side-nav__toggle::before { content: '›'; }
+
+/* TOC panel collapse toggle */
+.sub-site__toc-toggle {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 32px; padding: 0; margin-bottom: 16px;
+  border: none; border-bottom: 1px solid var(--ss-border-soft);
+  background: transparent;
+  color: var(--ss-fg-faint);
+  cursor: pointer; font-size: 13px;
+  position: sticky; top: 0; z-index: 1;
+  transition: color 0.12s;
+}
+.sub-site__toc-toggle:hover { color: var(--ss-fg); }
+.sub-site__toc-toggle::before { content: '›'; }
+.toc-collapsed .sub-site__toc-toggle::before { content: '‹'; }
 
 /* Sidebar home link — shown above the section tree */
 .sg-side-nav__home {

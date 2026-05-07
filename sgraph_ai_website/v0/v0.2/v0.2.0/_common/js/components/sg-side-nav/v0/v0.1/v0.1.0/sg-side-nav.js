@@ -194,6 +194,7 @@ class SgSideNav extends HTMLElement {
       : '';
 
     this.innerHTML = `
+      <button class="sg-side-nav__toggle" title="Toggle sidebar" aria-label="Toggle sidebar"></button>
       ${homeLink}
       <div class="sg-side-nav__header">
         ${treeLabel.toUpperCase()} TREE
@@ -201,6 +202,14 @@ class SgSideNav extends HTMLElement {
       </div>
       ${tree || '<p class="sg-side-nav__empty">No articles yet.</p>'}
       ${footer}`;
+
+    // Sidebar panel toggle
+    this.querySelector('.sg-side-nav__toggle')?.addEventListener('click', () => {
+      const shell = this.closest('.sub-site');
+      if (!shell) return;
+      const collapsed = shell.classList.toggle('nav-collapsed');
+      localStorage.setItem('sg-nav-collapsed', collapsed);
+    });
 
     // Chevron: toggle expand/collapse only
     this.querySelectorAll('[data-chev]').forEach(chev => {

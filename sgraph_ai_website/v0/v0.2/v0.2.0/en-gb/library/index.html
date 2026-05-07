@@ -80,6 +80,7 @@
 
   <!-- Right TOC — built from rendered article headings, hidden until populated -->
   <div class="sub-site__toc" id="article-toc" hidden>
+    <button class="sub-site__toc-toggle" id="toc-toggle" title="Toggle table of contents"></button>
     <div class="sub-site__toc-label">On this page</div>
     <ul class="sub-site__toc-list" id="toc-list"></ul>
   </div>
@@ -109,6 +110,15 @@
   const landing    = document.getElementById('landing');
   const articleEl  = document.getElementById('article-content');
   const articleToc = document.getElementById('article-toc');
+
+  // Restore panel collapse states immediately (before nav loads)
+  if (localStorage.getItem('sg-nav-collapsed') === 'true') shell.classList.add('nav-collapsed');
+  if (localStorage.getItem('sg-toc-collapsed') === 'true') shell.classList.add('toc-collapsed');
+
+  document.getElementById('toc-toggle')?.addEventListener('click', () => {
+    const collapsed = shell.classList.toggle('toc-collapsed');
+    localStorage.setItem('sg-toc-collapsed', collapsed);
+  });
 
   let allArticles = [];
   let allSections = [];
