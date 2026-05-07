@@ -118,10 +118,14 @@ class SgArticleViewer extends HTMLElement {
 
     if (schema === 'project-decisions-v1') {
       renderedHtml = this._decisionsHtml(data);
-    } else if (schema === 'project-agents-v1') {
+    } else if (schema === 'project-agents-v1' || schema === 'project-agents-v2') {
       renderedHtml = this._agentsHtml(data);
     } else if (schema === 'project-workstreams-v1') {
       renderedHtml = this._workstreamsHtml(data);
+    } else if (schema === 'project-workstreams-v2') {
+      renderedHtml = this._kanbanHtml(data);
+    } else if (schema === 'project-issues-v1') {
+      renderedHtml = this._issuesHtml(data);
     } else {
       renderedHtml = `<pre class="article-json-raw">${escHtml(JSON.stringify(data, null, 2))}</pre>`;
     }
@@ -241,6 +245,99 @@ class SgArticleViewer extends HTMLElement {
           </div>`;
         }).join('')}
       </div>`;
+  }
+
+  _kanbanHtml(data) {
+    const workstreams = data.workstreams ?? [];
+    const columns = [
+      { key: 'queued',      label: 'Queued',      icon: '⏳' },
+      { key: 'next',        label: 'Up Next',     icon: '🔜' },
+      { key: 'in-progress', label: 'In Progress', icon: '🔄' },
+      { key: 'done',        label: 'Done',         icon: '✅' },
+    ];
+
+    // Collect all tasks across workstreams, tagged with workstream metadata
+    const allTasks = workstreams.flatMap(ws =>
+      (ws.tasks ?? []).map(t => ({
+        ...t,
+        _wsTitle: ws.title,
+        _wsColor: ws.color ?? '#6366f1',
+        _wsId:    ws.id ?? '',
+      }))
+    );
+
+    const colHtml = columns.map(col => {
+      const tasks = allTasks.filter(t =>
+        (t.status ?? '').toLowerCase().replace(/\s+/g, '-') === col.key
+      );
+      if (!tasks.length && col.key === 'next') return ''; // hide if empty
+      const cards = tasks.map(t => `
+        <div class="kanban-card" style="--ws-color:${escHtml(t._wsColor)}">
+          <div class="kanban-card__ws">${escHtml(t._wsTitle)}</div>
+          <div class="kanban-card__title">${escHtml(t.task ?? t.title ?? '')}</div>
+          ${t.owner ? `<div class="kanban-card__owner">${escHtml(t.owner)}</div>` : ''}
+          ${t.notes ? `<div class="kanban-card__notes">${escHtml(t.notes)}</div>` : ''}
+        </div>`).join('');
+      return `
+        <div class="kanban-col">
+          <div class="kanban-col__header">
+            <span class="kanban-col__icon">${col.icon}</span>
+            <span class="kanban-col__label">${col.label}</span>
+            <span class="kanban-col__count">${tasks.length}</span>
+          </div>
+          <div class="kanban-col__cards">${cards || '<div class="kanban-col__empty">—</div>'}</div>
+        </div>`;
+    }).filter(Boolean).join('');
+
+    const wsLegend = workstreams.map(ws => `
+      <span class="kanban-legend__item">
+        <span class="kanban-legend__dot" style="background:${escHtml(ws.color ?? '#6366f1')}"></span>
+        ${escHtml(ws.title)}
+      </span>`).join('');
+
+    return `
+      <h1>Workstreams</h1>
+      ${wsLegend ? `<div class="kanban-legend">${wsLegend}</div>` : ''}
+      <div class="kanban-board">${colHtml}</div>`;
+  }
+
+  _issuesHtml(data) {
+    const issues = data.issues ?? [];
+    const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+    const sorted = [...issues].sort((a, b) =>
+      (priorityOrder[a.priority?.toLowerCase()] ?? 9) -
+      (priorityOrder[b.priority?.toLowerCase()] ?? 9)
+    );
+
+    const priorityBadge = p => {
+      const cls = (p ?? '').toLowerCase();
+      return `<span class="issue-priority issue-priority--${escHtml(cls)}">${escHtml(p ?? '')}</span>`;
+    };
+    const statusIcon = s => ({ open: '🔴', 'in-progress': '🟡', closed: '🟢', blocked: '⛔' }[s?.toLowerCase()] ?? '·');
+
+    const rows = sorted.map(issue => `
+      <div class="issue-row issue-row--${escHtml((issue.status ?? '').toLowerCase())}">
+        <div class="issue-row__header">
+          <span class="issue-row__id">${escHtml(issue.id ?? '')}</span>
+          ${priorityBadge(issue.priority)}
+          <span class="issue-row__status">${statusIcon(issue.status)} ${escHtml(issue.status ?? '')}</span>
+          ${issue.owner ? `<span class="issue-row__owner">${escHtml(issue.owner)}</span>` : ''}
+        </div>
+        <div class="issue-row__title">${escHtml(issue.title ?? '')}</div>
+        ${issue.description ? `<div class="issue-row__desc">${escHtml(issue.description)}</div>` : ''}
+      </div>`).join('');
+
+    const open   = issues.filter(i => (i.status ?? '').toLowerCase() !== 'closed').length;
+    const closed = issues.length - open;
+
+    return `
+      <h1>Issues</h1>
+      <div class="issues-summary">
+        <span class="issues-summary__stat">${open} open</span>
+        <span class="issues-summary__sep">·</span>
+        <span class="issues-summary__stat issues-summary__stat--muted">${closed} closed</span>
+      </div>
+      <div class="issues-list">${rows || '<p>No issues.</p>'}</div>`;
   }
 
   _blobUrls = [];
