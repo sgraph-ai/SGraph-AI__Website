@@ -2568,6 +2568,21 @@ sg-side-nav {
     overflow-y: visible;
   }
 
+  /* When collapsed on mobile: sidebar shrinks to just the toggle bar */
+  .sub-site.nav-collapsed sg-side-nav {
+    border-bottom: 1px solid var(--ss-border);
+  }
+
+  /* Mobile toggle: full-width, left-aligned, with text label */
+  .sg-side-nav__toggle {
+    height: 44px;
+    justify-content: flex-start;
+    padding: 0 16px;
+    font-size: 14px;
+  }
+  .sg-side-nav__toggle::before { content: '‹  Hide navigation'; }
+  .nav-collapsed .sg-side-nav__toggle::before { content: '☰  Navigation'; }
+
   .sub-site__toc { display: none; }
 
   .sub-site__content,

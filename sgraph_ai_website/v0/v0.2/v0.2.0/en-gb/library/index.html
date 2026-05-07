@@ -112,7 +112,11 @@
   const articleToc = document.getElementById('article-toc');
 
   // Restore panel collapse states immediately (before nav loads)
-  if (localStorage.getItem('sg-nav-collapsed') === 'true') shell.classList.add('nav-collapsed');
+  // On mobile (≤900px) default to collapsed unless user has explicitly expanded
+  const _savedNav = localStorage.getItem('sg-nav-collapsed');
+  if (_savedNav === 'true' || (_savedNav === null && window.innerWidth <= 900)) {
+    shell.classList.add('nav-collapsed');
+  }
   if (localStorage.getItem('sg-toc-collapsed') === 'true') shell.classList.add('toc-collapsed');
 
   document.getElementById('toc-toggle')?.addEventListener('click', () => {

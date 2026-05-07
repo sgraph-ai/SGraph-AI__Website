@@ -107,6 +107,12 @@
   const articleEl  = document.getElementById('article-content');
   const articleToc = document.getElementById('article-toc');
 
+  // Restore panel collapse state — default collapsed on mobile (≤900px)
+  const _savedNav = localStorage.getItem('sg-nav-collapsed');
+  if (_savedNav === 'true' || (_savedNav === null && window.innerWidth <= 900)) {
+    shell.classList.add('nav-collapsed');
+  }
+
   let allArticles = [];
   let allSections = [];
   let headingObserver = null;
