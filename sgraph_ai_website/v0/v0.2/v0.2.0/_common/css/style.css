@@ -2426,7 +2426,12 @@ sg-side-nav {
 
 .section-card__title {
   font-size: 0.9rem; font-weight: 700; color: var(--ss-fg);
+  background: none; border: none; padding: 0;
+  cursor: pointer; text-align: left;
+  transition: color 0.12s;
 }
+
+.section-card__title:hover { color: var(--accent); }
 
 .section-card__count {
   font-family: var(--font-mono); font-size: 11px;
@@ -3175,4 +3180,23 @@ sg-article-viewer { display: block; }
   border-color: var(--accent);
   background: var(--ss-brand-soft, rgba(78,205,196,0.06));
   color: var(--ss-fg);
+}
+
+/* ── Sub-site minimal footer (replaces sg-site-footer) ──── */
+
+.sub-site-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 32px;
+  border-top: 1px solid var(--ss-border, #e5e5e3);
+  background: var(--ss-bg, #faf9f7);
+}
+
+.sub-site-footer__copy,
+.sub-site-footer__meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ss-fg-faint, #aaa);
+  letter-spacing: 0.04em;
 }

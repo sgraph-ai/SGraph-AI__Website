@@ -35,14 +35,14 @@
 
 <!-- ═══ LIBRARY SUB-SITE BAND ════════════════════════════════ -->
 <!--
-  Vault: 4wrqg006  |  nav object: obj-cas-imm-f5ca4affd6ba (v2.5 — claude-setup walkthrough added)
+  Vault: 4wrqg006  |  nav object: obj-cas-imm-74c63cd0b1c7 (v2.6 — JS Tool API use case added)
 -->
 <sg-sub-nav
   site-title="Library"
   site-description="A growing public knowledge base. How sgraph.ai delivers content from encrypted vaults — the cryptography, the components, and the trust boundaries."
   vault-id="4wrqg006"
   read-key="GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg"
-  nav-object-id="obj-cas-imm-f5ca4affd6ba">
+  nav-object-id="obj-cas-imm-74c63cd0b1c7">
 </sg-sub-nav>
 
 <!-- ═══ THREE-COLUMN SHELL ════════════════════════════════════ -->
@@ -56,7 +56,7 @@
   <sg-side-nav
     vault-id="4wrqg006"
     read-key="GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg"
-    nav-object-id="obj-cas-imm-f5ca4affd6ba"
+    nav-object-id="obj-cas-imm-74c63cd0b1c7"
     tree-label="Library"
     version="v0.2.0"
     home-href="/en-gb/library/"
@@ -86,7 +86,10 @@
 
 </div>
 
-<sg-site-footer></sg-site-footer>
+<footer class="sub-site-footer">
+  <span class="sub-site-footer__copy">© 2026 SGraph AI Ltd.</span>
+  <span class="sub-site-footer__meta">sgraph.ai/library · v0.2.0</span>
+</footer>
 
 <script type="module">
   const VAULT_ID = '4wrqg006';
@@ -289,7 +292,7 @@
       return `
         <div class="section-card">
           <div class="section-card__header">
-            <span class="section-card__title">${section.title}</span>
+            <button class="section-card__title" data-section="${section.title}">${section.title}</button>
             <span class="section-card__count">${articles.length}</span>
           </div>
           <ul class="section-card__articles">
@@ -301,6 +304,16 @@
           </ul>
         </div>`;
     }).join('');
+
+    container.querySelectorAll('.section-card__title[data-section]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sectionTitle = btn.dataset.section;
+        const sectionSlug  = toSlug(sectionTitle);
+        history.pushState({ sectionSlug }, '', `/en-gb/library/${sectionSlug}/`);
+        const section = allSections.find(s => s.title === sectionTitle);
+        if (section) showSectionIndex(section);
+      });
+    });
 
     container.querySelectorAll('.section-card__article[data-slug]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -348,7 +361,6 @@
 
 <script src="../../_common/js/nav.js"></script>
 <script type="module" src="../../_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
-<script type="module" src="../../_common/js/components/sg-site-footer/v1/v1.0/v1.0.0/sg-site-footer.js"></script>
 <script type="module" src="../../_common/js/components/sg-sub-nav/v0/v0.1/v0.1.0/sg-sub-nav.js"></script>
 <script type="module" src="../../_common/js/components/sg-side-nav/v0/v0.1/v0.1.0/sg-side-nav.js"></script>
 
