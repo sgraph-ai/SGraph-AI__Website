@@ -35,14 +35,14 @@
 
 <!-- ═══ LIBRARY SUB-SITE BAND ════════════════════════════════ -->
 <!--
-  Vault: 4wrqg006  |  nav object: obj-cas-imm-f574afae73e5 (v2.7 — JS Tool API articles with real images)
+  Vault: 4wrqg006  |  nav object: obj-cas-imm-c38fa5b01d23 (v2.9 — section+article descriptions, dev panel screenshots)
 -->
 <sg-sub-nav
   site-title="Library"
   site-description="A growing public knowledge base. How sgraph.ai delivers content from encrypted vaults — the cryptography, the components, and the trust boundaries."
   vault-id="4wrqg006"
   read-key="GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg"
-  nav-object-id="obj-cas-imm-f574afae73e5">
+  nav-object-id="obj-cas-imm-c38fa5b01d23">
 </sg-sub-nav>
 
 <!-- ═══ THREE-COLUMN SHELL ════════════════════════════════════ -->
@@ -56,7 +56,7 @@
   <sg-side-nav
     vault-id="4wrqg006"
     read-key="GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg"
-    nav-object-id="obj-cas-imm-f574afae73e5"
+    nav-object-id="obj-cas-imm-c38fa5b01d23"
     tree-label="Library"
     version="v0.2.0"
     home-href="/en-gb/library/"
@@ -192,11 +192,13 @@
       <div class="article-viewer">
         <div class="article-body">
           <h1>${section.title}</h1>
+          ${section.description ? `<p class="section-index-desc">${section.description}</p>` : ''}
           <ul class="section-index-list">
             ${articles.map(a => `
               <li class="section-index-list__item">
                 <button class="section-index-list__link" data-slug="${a.slug ?? ''}">
-                  ${a.title}
+                  <span class="section-index-list__title">${a.title}</span>
+                  ${a.description ? `<span class="section-index-list__desc">${a.description}</span>` : ''}
                 </button>
               </li>`).join('')}
           </ul>
@@ -295,6 +297,7 @@
             <button class="section-card__title" data-section="${section.title}">${section.title}</button>
             <span class="section-card__count">${articles.length}</span>
           </div>
+          ${section.description ? `<p class="section-card__desc">${section.description}</p>` : ''}
           <ul class="section-card__articles">
             ${shown.map(a => `
               <li><button class="section-card__article"
