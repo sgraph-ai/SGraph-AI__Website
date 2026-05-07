@@ -1,5 +1,5 @@
 /**
- * sg-article-viewer v0.1.1
+ * sg-article-viewer v0.1.2
  *
  * Full content pipeline: vault fetch → frontmatter parse → viewer render.
  *
@@ -104,42 +104,139 @@ class SgArticleViewer extends HTMLElement {
   _renderJson(text) {
     let data;
     try { data = JSON.parse(text); }
-    catch { this.innerHTML = `<pre class="article-json-raw">${escHtml(text)}</pre>`; return; }
-
-    const schema = data.schema ?? '';
-
-    if (schema === 'project-decisions-v1') {
-      const decisions = data.decisions ?? [];
-      this.innerHTML = `
-        <div class="article-viewer">
-          <div class="article-body">
-            <h1>Decision Log</h1>
-            <div class="decisions-log">
-              ${decisions.map(d => `
-                <div class="decision-entry">
-                  <div class="decision-entry__header">
-                    <span class="decision-entry__id">${escHtml(d.id ?? '')}</span>
-                    <span class="decision-entry__date">${escHtml(d.date ?? '')}</span>
-                    <span class="decision-entry__status decision-entry__status--${escHtml((d.status ?? '').toLowerCase())}">${escHtml(d.status ?? '')}</span>
-                    <span class="decision-entry__by">${escHtml(d.decided_by ?? '')}</span>
-                  </div>
-                  <div class="decision-entry__topic">${escHtml(d.topic ?? '')}</div>
-                  <div class="decision-entry__text">${escHtml(d.decision ?? '')}</div>
-                  ${d.detail ? `<div class="decision-entry__detail">${escHtml(d.detail)}</div>` : ''}
-                </div>`).join('')}
-            </div>
-          </div>
-        </div>`;
-    } else {
-      this.innerHTML = `
-        <div class="article-viewer">
-          <div class="article-body">
-            <pre class="article-json-raw">${escHtml(JSON.stringify(data, null, 2))}</pre>
-          </div>
-        </div>`;
+    catch {
+      this.innerHTML = `<div class="article-viewer"><div class="article-body"><pre class="article-json-raw">${escHtml(text)}</pre></div></div>`;
+      return;
     }
 
+    const schema = data.schema ?? '';
+    let renderedHtml;
+
+    if (schema === 'project-decisions-v1') {
+      renderedHtml = this._decisionsHtml(data);
+    } else if (schema === 'project-agents-v1') {
+      renderedHtml = this._agentsHtml(data);
+    } else if (schema === 'project-workstreams-v1') {
+      renderedHtml = this._workstreamsHtml(data);
+    } else {
+      renderedHtml = `<pre class="article-json-raw">${escHtml(JSON.stringify(data, null, 2))}</pre>`;
+    }
+
+    const rawHtml = escHtml(JSON.stringify(data, null, 2));
+
+    this.innerHTML = `
+      <div class="article-viewer">
+        <div class="article-body">
+          <div class="json-view-toggle">
+            <button class="json-view-btn json-view-btn--active" data-view="rendered">Formatted</button>
+            <button class="json-view-btn" data-view="raw">{ } Raw</button>
+          </div>
+          <div class="json-rendered-view">${renderedHtml}</div>
+          <div class="json-raw-view" hidden><pre class="article-json-raw">${rawHtml}</pre></div>
+        </div>
+      </div>`;
+
+    this.querySelectorAll('.json-view-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const view = btn.dataset.view;
+        this.querySelectorAll('.json-view-btn').forEach(b =>
+          b.classList.toggle('json-view-btn--active', b === btn)
+        );
+        this.querySelector('.json-rendered-view').hidden = view === 'raw';
+        this.querySelector('.json-raw-view').hidden      = view === 'rendered';
+      });
+    });
+
     document.dispatchEvent(new CustomEvent('viewer:rendered', { detail: { meta: {} } }));
+  }
+
+  _decisionsHtml(data) {
+    const decisions = data.decisions ?? [];
+    return `
+      <h1>Decision Log</h1>
+      <div class="decisions-log">
+        ${decisions.map(d => `
+          <div class="decision-entry">
+            <div class="decision-entry__header">
+              <span class="decision-entry__id">${escHtml(d.id ?? '')}</span>
+              <span class="decision-entry__date">${escHtml(d.date ?? '')}</span>
+              <span class="decision-entry__status decision-entry__status--${escHtml((d.status ?? '').toLowerCase())}">${escHtml(d.status ?? '')}</span>
+              <span class="decision-entry__by">${escHtml(d.decided_by ?? '')}</span>
+            </div>
+            <div class="decision-entry__topic">${escHtml(d.topic ?? '')}</div>
+            <div class="decision-entry__text">${escHtml(d.decision ?? '')}</div>
+            ${d.detail ? `<div class="decision-entry__detail">${escHtml(d.detail)}</div>` : ''}
+          </div>`).join('')}
+      </div>`;
+  }
+
+  _agentsHtml(data) {
+    const agents = data.agents ?? [];
+    return `
+      <h1>Agents</h1>
+      <div class="agents-list">
+        ${agents.map(a => {
+          const owns  = Array.isArray(a.owns)  ? a.owns  : (a.owns  ? [a.owns]  : []);
+          const tools = Array.isArray(a.tools) ? a.tools : (a.tools ? [a.tools] : []);
+          const statusClass = (a.session_status ?? '').toLowerCase().replace(/\s+/g, '-');
+          return `
+          <div class="agent-entry">
+            <div class="agent-entry__header">
+              <span class="agent-entry__alias">${escHtml(a.alias ?? '')}</span>
+              ${a.session_status ? `<span class="agent-entry__status agent-entry__status--${escHtml(statusClass)}">${escHtml(a.session_status)}</span>` : ''}
+              <span class="agent-entry__role">${escHtml(a.role ?? '')}</span>
+              <span class="agent-entry__model">${escHtml(a.model ?? '')}</span>
+            </div>
+            <div class="agent-entry__name">${escHtml(a.full_name ?? '')}</div>
+            ${a.location ? `<div class="agent-entry__location">${escHtml(a.location)}</div>` : ''}
+            ${owns.length ? `
+              <div class="agent-entry__section-label">Owns</div>
+              <ul class="agent-entry__list">
+                ${owns.map(o => `<li>${escHtml(o)}</li>`).join('')}
+              </ul>` : ''}
+            ${tools.length ? `
+              <div class="agent-entry__section-label">Tools</div>
+              <ul class="agent-entry__list">
+                ${tools.map(t => `<li>${escHtml(t)}</li>`).join('')}
+              </ul>` : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
+  }
+
+  _workstreamsHtml(data) {
+    const workstreams = data.workstreams ?? [];
+    const statusIcon = s => ({ done: '✅', 'in-progress': '🔄', next: '🔄', queued: '⏳', pending: '⏳' }[s?.toLowerCase()] ?? '·');
+    return `
+      <h1>Workstreams</h1>
+      <div class="workstreams-list">
+        ${workstreams.map(ws => {
+          const tasks = ws.tasks ?? [];
+          return `
+          <div class="workstream-entry">
+            <div class="workstream-entry__header">
+              <span class="workstream-entry__id">${escHtml(ws.id ?? '')}</span>
+              <span class="workstream-entry__title">${escHtml(ws.title ?? '')}</span>
+              ${ws.status ? `<span class="workstream-entry__status workstream-entry__status--${escHtml((ws.status ?? '').toLowerCase())}">${escHtml(ws.status)}</span>` : ''}
+            </div>
+            ${ws.goal  ? `<div class="workstream-entry__goal">${escHtml(ws.goal)}</div>` : ''}
+            ${ws.owner ? `<div class="workstream-entry__owner">Owner: ${escHtml(ws.owner)}</div>` : ''}
+            ${tasks.length ? `
+              <table class="workstream-tasks">
+                <thead><tr><th>Task</th><th>Owner</th><th>Status</th><th>Notes</th></tr></thead>
+                <tbody>
+                  ${tasks.map(t => `
+                    <tr class="workstream-task workstream-task--${escHtml((t.status ?? '').toLowerCase())}">
+                      <td>${escHtml(t.task ?? t.title ?? '')}</td>
+                      <td>${escHtml(t.owner ?? '')}</td>
+                      <td><span class="task-status">${statusIcon(t.status)} ${escHtml(t.status ?? '')}</span></td>
+                      <td class="task-notes">${escHtml(t.notes ?? '')}</td>
+                    </tr>`).join('')}
+                </tbody>
+              </table>` : ''}
+          </div>`;
+        }).join('')}
+      </div>`;
   }
 
   _blobUrls = [];
