@@ -59,6 +59,7 @@
     nav-object-id="obj-cas-imm-f5ca4affd6ba"
     tree-label="Library"
     version="v0.2.0"
+    home-href="/en-gb/library/"
     auto-select>
   </sg-side-nav>
 
@@ -96,33 +97,43 @@
     return segments.length > 2 ? segments.slice(2).join('/') : '';
   }
 
+  function toSlug(title) {
+    return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
+  }
+
   const shell      = document.getElementById('sub-site-shell');
   const sideNav    = document.querySelector('sg-side-nav');
   const landing    = document.getElementById('landing');
   const articleEl  = document.getElementById('article-content');
   const articleToc = document.getElementById('article-toc');
 
-  // Flat article list built from nav:loaded — used for next/prev navigation
   let allArticles = [];
-
-  // Active heading observer — cleaned up on each article load
+  let allSections = [];
   let headingObserver = null;
 
-  // Seed active-slug from URL before nav renders so auto-select picks the right article
   const initialSlug = slugFromPath();
   if (initialSlug) sideNav.setAttribute('active-slug', initialSlug);
 
-  // First data load: build section cards; show landing when no slug in URL
   document.addEventListener('nav:loaded', e => {
     const { sections } = e.detail;
+    allSections = sections;
     allArticles = sections.flatMap(s =>
       (s.articles ?? []).map(a => ({ ...a, sectionTitle: s.title }))
     );
     buildLandingCards(sections);
-    if (!slugFromPath()) showLanding();
+
+    const slug = slugFromPath();
+    if (!slug) {
+      showLanding();
+    } else {
+      // If slug matches a section title (not an article), show section index
+      const matchedSection = sections.find(s => toSlug(s.title) === slug);
+      if (matchedSection) showSectionIndex(matchedSection);
+      // else: auto-select on sg-side-nav handles it
+    }
   });
 
-  // Article selected: show article, update breadcrumbs, URL, next/prev
+  // Article selected via sidebar
   document.addEventListener('nav:select', e => {
     const { title, slug, sectionTitle, content_object_id, render, vault_id, read_key } = e.detail;
     const targetPath = `/en-gb/library/${slug}/`;
@@ -134,13 +145,25 @@
     buildNextPrev(slug);
   });
 
+  // Section folder label clicked — show section index page
+  document.addEventListener('nav:section', e => {
+    const { title, sectionSlug } = e.detail;
+    const targetPath = `/en-gb/library/${sectionSlug}/`;
+    if (location.pathname !== targetPath) {
+      history.pushState({ sectionSlug }, '', targetPath);
+    }
+    const section = allSections.find(s => s.title === title);
+    if (section) showSectionIndex(section);
+  });
+
   // Browser back/forward
   window.addEventListener('popstate', () => {
     const slug = slugFromPath();
-    if (!slug) {
-      showLanding();
-      return;
-    }
+    if (!slug) { showLanding(); return; }
+
+    const matchedSection = allSections.find(s => toSlug(s.title) === slug);
+    if (matchedSection) { showSectionIndex(matchedSection); return; }
+
     const btn = sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`);
     if (btn) btn.click();
     else sideNav.setAttribute('active-slug', slug);
@@ -151,6 +174,41 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     landing.hidden = false;
+  }
+
+  function showSectionIndex(section) {
+    landing.hidden = true;
+    articleToc.hidden = true;
+    shell.classList.remove('with-toc');
+    articleEl.hidden = false;
+
+    setBreadcrumbs('Library', section.title, null);
+
+    const articles = section.articles ?? [];
+    document.getElementById('article-render').innerHTML = `
+      <div class="article-viewer">
+        <div class="article-body">
+          <h1>${section.title}</h1>
+          <ul class="section-index-list">
+            ${articles.map(a => `
+              <li class="section-index-list__item">
+                <button class="section-index-list__link" data-slug="${a.slug ?? ''}">
+                  ${a.title}
+                </button>
+              </li>`).join('')}
+          </ul>
+        </div>
+      </div>`;
+
+    document.getElementById('next-prev').innerHTML = '';
+
+    document.querySelectorAll('.section-index-list__link').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slug = btn.dataset.slug;
+        if (!slug) return;
+        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`)?.click();
+      });
+    });
   }
 
   function showArticle(objectId, render, vaultId, readKey) {
@@ -181,11 +239,13 @@
   }
 
   function setBreadcrumbs(site, section, article) {
-    const siteHref = '/en-gb/library/';
+    const siteHref    = '/en-gb/library/';
+    const sectionHref = section ? `/en-gb/library/${toSlug(section)}/` : null;
     const el = document.getElementById('article-crumbs');
     const parts = [site, section, article].filter(Boolean);
     el.innerHTML = parts.map((p, i) => {
       if (i === 0) return `<a class="sub-site__crumbs-link" href="${siteHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
+      if (i === 1 && parts.length > 2) return `<a class="sub-site__crumbs-link" href="${sectionHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
       if (i < parts.length - 1) return `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`;
       return `<span class="sub-site__crumbs-here">${p}</span>`;
     }).join('');

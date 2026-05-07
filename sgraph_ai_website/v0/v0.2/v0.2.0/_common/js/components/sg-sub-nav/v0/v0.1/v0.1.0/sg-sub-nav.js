@@ -64,16 +64,19 @@ class SgSubNav extends HTMLElement {
       } catch (_) {}
     }
 
+    const homeHref = `/en-gb/${title.toLowerCase()}/`;
+
     this.innerHTML = `
       <div class="sg-sub-nav__band" aria-label="${title} sub-site">
 
-        <div class="sg-sub-nav__monogram" aria-hidden="true">${letter}</div>
-
-        <div class="sg-sub-nav__text">
-          <div class="sg-sub-nav__eyebrow">Sub-site · sgraph.ai/${title.toLowerCase()}</div>
-          <div class="sg-sub-nav__title">${title}</div>
-          ${description ? `<p class="sg-sub-nav__intro">${description}</p>` : ''}
-        </div>
+        <a class="sg-sub-nav__home-link" href="${homeHref}" aria-label="${title} home">
+          <div class="sg-sub-nav__monogram">${letter}</div>
+          <div class="sg-sub-nav__text">
+            <div class="sg-sub-nav__eyebrow">Sub-site · sgraph.ai/${title.toLowerCase()}</div>
+            <div class="sg-sub-nav__title">${title}</div>
+            ${description ? `<p class="sg-sub-nav__intro">${description}</p>` : ''}
+          </div>
+        </a>
 
         <div class="sg-sub-nav__controls">
           <div class="sg-sub-nav__tabs" role="tablist">
