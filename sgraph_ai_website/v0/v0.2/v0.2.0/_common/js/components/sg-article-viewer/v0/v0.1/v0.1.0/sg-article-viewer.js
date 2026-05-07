@@ -1,5 +1,5 @@
 /**
- * sg-article-viewer v0.1.5
+ * sg-article-viewer v0.1.6
  *
  * Full content pipeline: vault fetch → frontmatter parse → viewer render.
  *
@@ -64,7 +64,10 @@ class SgArticleViewer extends HTMLElement {
   }
 
   async _renderArticle(meta, body, vaultId, readKey) {
-    const { marked } = await import('https://cdn.jsdelivr.net/npm/marked@9/+esm');
+    const [{ marked }, yamlLoad] = await Promise.all([
+      import('https://cdn.jsdelivr.net/npm/marked@9/+esm'),
+      _loadYaml(),
+    ]);
 
     const renderer = new marked.Renderer();
 
@@ -103,7 +106,7 @@ class SgArticleViewer extends HTMLElement {
     marked.use({ renderer });
 
     const metaHtml  = renderMetaStrip(meta);
-    const bodyHtml  = marked.parse(applyTokens(body));
+    const bodyHtml  = marked.parse(applyFencedBlocks(applyTokens(body), yamlLoad));
 
     this.innerHTML = `
       <div class="article-viewer">
@@ -479,6 +482,180 @@ function applyTokens(body) {
              `</div>`;
     }
   );
+}
+
+// ── YAML loader (cached) ──────────────────────────────────────────────────────
+let _yamlCache = null;
+async function _loadYaml() {
+  if (!_yamlCache) {
+    const mod = await import('https://esm.sh/js-yaml@4');
+    _yamlCache = mod.load ?? mod.default?.load;
+  }
+  return _yamlCache;
+}
+
+// ── Fenced-block pre-processor ────────────────────────────────────────────────
+const FENCED_TYPES = new Set([
+  'comparison', 'feature-cards', 'code-comparison', 'timeline',
+  'checklist', 'skill-cards', 'component-gallery', 'component-table', 'proposal-card',
+]);
+
+function applyFencedBlocks(body, yamlLoad) {
+  return body.replace(
+    /^```([\w-]+)\n([\s\S]*?)^```/gm,
+    (match, type, content) => {
+      if (!FENCED_TYPES.has(type)) return match;
+      let data;
+      try { data = yamlLoad(content); } catch { return match; }
+      try {
+        if (type === 'comparison')         return renderComparison(data);
+        if (type === 'feature-cards')      return renderFeatureCards(data);
+        if (type === 'code-comparison')    return renderCodeComparison(data);
+        if (type === 'timeline')           return renderTimeline(data);
+        if (type === 'checklist')          return renderChecklist(data);
+        if (type === 'skill-cards')        return renderSkillCards(data);
+        if (type === 'component-gallery')  return renderComponentGallery(data);
+        if (type === 'component-table')    return renderComponentTable(data);
+        if (type === 'proposal-card')      return renderProposalCard(data);
+      } catch { return match; }
+      return match;
+    }
+  );
+}
+
+function renderComparison(data) {
+  const col = side => {
+    if (!side) return '';
+    const colorCls = `cmp-col--${escHtml(side.color ?? 'neutral')}`;
+    const items = (side.items ?? []).map(item => `
+      <div class="cmp-item">
+        <dt class="cmp-item__label">${escHtml(item.label ?? '')}</dt>
+        <dd class="cmp-item__value">${escHtml(item.value ?? '')}</dd>
+      </div>`).join('');
+    return `<div class="cmp-col ${colorCls}">
+      <div class="cmp-col__header">
+        <div class="cmp-col__title">${escHtml(side.title ?? '')}</div>
+        <div class="cmp-col__subtitle">${escHtml(side.subtitle ?? '')}</div>
+      </div>
+      <dl class="cmp-col__items">${items}</dl>
+    </div>`;
+  };
+  return `<div class="cmp-card">${col(data.left)}<div class="cmp-sep"></div>${col(data.right)}</div>`;
+}
+
+function renderFeatureCards(data) {
+  const cards = (data.cards ?? []).map(c => `
+    <div class="feat-card">
+      <div class="feat-card__icon">${escHtml(c.icon ?? '')}</div>
+      <div class="feat-card__title">${escHtml(c.title ?? '')}</div>
+      <div class="feat-card__body">${escHtml(c.body ?? '')}</div>
+    </div>`).join('');
+  return `<div class="feat-cards">${cards}</div>`;
+}
+
+function renderCodeComparison(data) {
+  const panel = side => {
+    if (!side) return '';
+    return `<div class="code-cmp__panel">
+      <div class="code-cmp__title">${escHtml(side.title ?? '')}</div>
+      <pre class="code-cmp__pre"><code>${escHtml(side.code ?? '')}</code></pre>
+    </div>`;
+  };
+  return `<div class="code-cmp">${panel(data.left)}${panel(data.right)}</div>`;
+}
+
+function renderTimeline(data) {
+  const nodes = (data.events ?? []).map(ev => {
+    const cls = `tl-node--${escHtml((ev.result ?? 'partial').toLowerCase())}`;
+    return `<div class="tl-node ${cls}">
+      <div class="tl-node__label">${escHtml(ev.label ?? '')}</div>
+      <div class="tl-node__dot"></div>
+      <div class="tl-node__meta">
+        <span class="tl-node__dur">${escHtml(ev.duration ?? '')}</span>
+        <span class="tl-node__badge">${escHtml(ev.result ?? '')}</span>
+      </div>
+      ${ev.detail ? `<div class="tl-node__detail">${escHtml(ev.detail)}</div>` : ''}
+    </div>`;
+  }).join('');
+  return `<div class="tl-track">${nodes}</div>`;
+}
+
+function renderChecklist(data) {
+  const items = (data.items ?? []).map(item => {
+    const done = item.done === true;
+    return `<li class="check-item ${done ? 'check-item--done' : 'check-item--todo'}">
+      <span class="check-item__icon">${done ? '✅' : '⬜'}</span>
+      <div class="check-item__body">
+        <div class="check-item__label">${escHtml(item.label ?? '')}</div>
+        ${item.detail ? `<div class="check-item__detail">${escHtml(item.detail)}</div>` : ''}
+      </div>
+    </li>`;
+  }).join('');
+  return `<ul class="check-list">${items}</ul>`;
+}
+
+function renderSkillCards(data) {
+  const keyColor = { human: 'blue', browser: 'teal', api: 'purple' };
+  const cards = (data.skills ?? []).map(skill => {
+    const color = keyColor[skill.key ?? ''] ?? 'neutral';
+    const contains = (skill.contains ?? []).map(c => `<li>${escHtml(c)}</li>`).join('');
+    return `<div class="skill-card skill-card--${escHtml(color)}">
+      <div class="skill-card__header">
+        <span class="skill-card__icon">${escHtml(skill.icon ?? '')}</span>
+        <span class="skill-card__title">${escHtml(skill.title ?? '')}</span>
+      </div>
+      <div class="skill-card__audience">${escHtml(skill.audience ?? '')}</div>
+      <ul class="skill-card__contains">${contains}</ul>
+      <div class="skill-card__format"><code>${escHtml(skill.format ?? '')}</code></div>
+    </div>`;
+  }).join('');
+  return `<div class="skill-cards">${cards}</div>`;
+}
+
+function renderComponentGallery(data) {
+  const cards = (data.components ?? []).map(c => {
+    const apiCls = `comp-card__api--${escHtml((c.current_api ?? 'none').toLowerCase())}`;
+    return `<div class="comp-card">
+      <div class="comp-card__header">
+        <span class="comp-card__name">${escHtml(c.name ?? '')}</span>
+        <span class="comp-card__api ${apiCls}">${escHtml(c.current_api ?? 'none')}</span>
+      </div>
+      <code class="comp-card__tag">${escHtml(c.tag ?? '')}</code>
+      <div class="comp-card__role">${escHtml(c.role ?? '')}</div>
+      <em class="comp-card__use">${escHtml(c.agent_use_case ?? '')}</em>
+    </div>`;
+  }).join('');
+  return `<div class="comp-gallery">${cards}</div>`;
+}
+
+function renderComponentTable(data) {
+  const cols = data.columns ?? [];
+  const rows = data.rows ?? [];
+  const thead = `<tr>${cols.map(c => `<th>${escHtml(c)}</th>`).join('')}</tr>`;
+  const tbody = rows.map((row, ri) => {
+    const cells = (Array.isArray(row) ? row : []).map((cell, ci) =>
+      `<td${ci === 2 ? ' class="comp-table__mono"' : ''}>${escHtml(cell ?? '')}</td>`
+    ).join('');
+    return `<tr${ri % 2 ? ' class="comp-table__odd"' : ''}>${cells}</tr>`;
+  }).join('');
+  return `<table class="comp-table"><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+}
+
+function renderProposalCard(data) {
+  const statusCls = `proposal-card__status--${escHtml((data.status ?? 'proposed').toLowerCase().replace(/\s+/g, '-'))}`;
+  const methods = (data.methods ?? []).map(m => `
+    <div class="proposal-method">
+      <code class="proposal-method__name">${escHtml(m.name ?? '')}</code>
+      <code class="proposal-method__returns">${escHtml(m.returns ?? '')}</code>
+      <span class="proposal-method__use">${escHtml(m.use ?? '')}</span>
+    </div>`).join('');
+  return `<div class="proposal-card">
+    <div class="proposal-card__header">
+      <span class="proposal-card__title">${escHtml(data.title ?? '')}</span>
+      <span class="proposal-card__status ${statusCls}">${escHtml(data.status ?? '')}</span>
+    </div>
+    <div class="proposal-card__methods">${methods}</div>
+  </div>`;
 }
 
 customElements.define('sg-article-viewer', SgArticleViewer);
