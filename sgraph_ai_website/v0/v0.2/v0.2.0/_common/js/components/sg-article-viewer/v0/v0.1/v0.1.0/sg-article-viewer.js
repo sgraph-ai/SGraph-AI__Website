@@ -1,5 +1,5 @@
 /**
- * sg-article-viewer v0.1.2
+ * sg-article-viewer v0.1.3
  *
  * Full content pipeline: vault fetch → frontmatter parse → viewer render.
  *
@@ -15,6 +15,10 @@
  *   title, author, date, status, tags
  *
  * vault: image URIs:  ![alt](vault:obj-cas-imm-...)  resolved async after render.
+ *
+ * Token replacement (Option 2 — pre-processing pass before marked):
+ *   {{screenshot: id | title | description | dimensions}}
+ *   e.g. {{screenshot: settings-code-exec | Claude Settings | Toggle ON | 800x500}}
  *
  * Fires viewer:rendered on document with detail: { meta }
  */
@@ -86,7 +90,7 @@ class SgArticleViewer extends HTMLElement {
     marked.use({ renderer });
 
     const metaHtml  = renderMetaStrip(meta);
-    const bodyHtml  = marked.parse(body);
+    const bodyHtml  = marked.parse(applyTokens(body));
 
     this.innerHTML = `
       <div class="article-viewer">
@@ -340,6 +344,31 @@ function escHtml(str) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+// Token replacement — pre-processing pass on raw markdown body.
+// Supported tokens (must be on a single line):
+//   {{screenshot: id | title | description | dimensions}}
+function applyTokens(body) {
+  return body.replace(
+    /\{\{screenshot:\s*([^|\n}]+?)(?:\s*\|\s*([^|\n}]*?))?(?:\s*\|\s*([^|\n}]*?))?(?:\s*\|\s*([^|\n}]*?))?\s*\}\}/g,
+    (_, id, title, desc, dims) => {
+      id    = (id    ?? '').trim();
+      title = (title ?? '').trim();
+      desc  = (desc  ?? '').trim();
+      dims  = (dims  ?? '').trim();
+      const dimsLabel = dims ? dims.replace(/x/i, '×') : '';
+      const badge = dimsLabel ? `[ SCREENSHOT NEEDED ]  ~ ${dimsLabel}` : '[ SCREENSHOT NEEDED ]';
+      return `<div class="screenshot-placeholder" data-screenshot-id="${escHtml(id)}">` +
+             `<div class="screenshot-placeholder__header">` +
+             `<span class="screenshot-placeholder__icon">📷</span>` +
+             `<span class="screenshot-placeholder__title">${escHtml(title)}</span>` +
+             `</div>` +
+             (desc ? `<div class="screenshot-placeholder__desc">${escHtml(desc)}</div>` : '') +
+             `<div class="screenshot-placeholder__badge">${escHtml(badge)}</div>` +
+             `</div>`;
+    }
+  );
 }
 
 customElements.define('sg-article-viewer', SgArticleViewer);
