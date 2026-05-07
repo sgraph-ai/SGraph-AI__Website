@@ -164,6 +164,7 @@
     el.setAttribute('vault-id',  vaultId  || VAULT_ID);
     el.setAttribute('read-key',  readKey  || READ_KEY);
     el.setAttribute('object-id', objectId);
+    el.setAttribute('render',    render   || 'markdown');
     renderEl.appendChild(el);
 
     // Build TOC once content renders

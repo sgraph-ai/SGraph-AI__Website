@@ -1,12 +1,14 @@
 /**
- * sg-article-viewer v0.1.0
+ * sg-article-viewer v0.1.1
  *
  * Full content pipeline: vault fetch → frontmatter parse → viewer render.
  *
  * Attributes:
  *   vault-id   — content vault id
  *   read-key   — base64url AES-256-GCM read key
- *   object-id  — vault object id of the markdown file
+ *   object-id  — vault object id of the content file
+ *   render     — hint for content type: 'markdown' (default) | 'json'
+ *                Overridden by frontmatter 'viewer' key if present.
  *
  * Frontmatter keys:
  *   viewer: article (default) | <future types>
@@ -18,7 +20,7 @@
  */
 class SgArticleViewer extends HTMLElement {
   static get observedAttributes() {
-    return ['vault-id', 'read-key', 'object-id'];
+    return ['vault-id', 'read-key', 'object-id', 'render'];
   }
 
   connectedCallback()          { this._load(); }
@@ -41,10 +43,13 @@ class SgArticleViewer extends HTMLElement {
       const text = new TextDecoder().decode(buf);
 
       const { meta, body } = parseFrontmatter(text);
-      const viewer = meta.viewer ?? 'article';
+      const renderHint = this.getAttribute('render') ?? 'markdown';
+      const viewer = meta.viewer ?? (renderHint === 'json' ? 'json' : 'article');
 
       if (viewer === 'article') {
         await this._renderArticle(meta, body, vaultId, readKey);
+      } else if (viewer === 'json') {
+        this._renderJson(text);
       } else {
         this.innerHTML = `<p class="article-error">Unknown viewer: "${viewer}"</p>`;
       }
@@ -94,6 +99,47 @@ class SgArticleViewer extends HTMLElement {
     }));
 
     this._resolveVaultImages(vaultId, readKey);
+  }
+
+  _renderJson(text) {
+    let data;
+    try { data = JSON.parse(text); }
+    catch { this.innerHTML = `<pre class="article-json-raw">${escHtml(text)}</pre>`; return; }
+
+    const schema = data.schema ?? '';
+
+    if (schema === 'project-decisions-v1') {
+      const decisions = data.decisions ?? [];
+      this.innerHTML = `
+        <div class="article-viewer">
+          <div class="article-body">
+            <h1>Decision Log</h1>
+            <div class="decisions-log">
+              ${decisions.map(d => `
+                <div class="decision-entry">
+                  <div class="decision-entry__header">
+                    <span class="decision-entry__id">${escHtml(d.id ?? '')}</span>
+                    <span class="decision-entry__date">${escHtml(d.date ?? '')}</span>
+                    <span class="decision-entry__status decision-entry__status--${escHtml((d.status ?? '').toLowerCase())}">${escHtml(d.status ?? '')}</span>
+                    <span class="decision-entry__by">${escHtml(d.decided_by ?? '')}</span>
+                  </div>
+                  <div class="decision-entry__topic">${escHtml(d.topic ?? '')}</div>
+                  <div class="decision-entry__text">${escHtml(d.decision ?? '')}</div>
+                  ${d.detail ? `<div class="decision-entry__detail">${escHtml(d.detail)}</div>` : ''}
+                </div>`).join('')}
+            </div>
+          </div>
+        </div>`;
+    } else {
+      this.innerHTML = `
+        <div class="article-viewer">
+          <div class="article-body">
+            <pre class="article-json-raw">${escHtml(JSON.stringify(data, null, 2))}</pre>
+          </div>
+        </div>`;
+    }
+
+    document.dispatchEvent(new CustomEvent('viewer:rendered', { detail: { meta: {} } }));
   }
 
   _blobUrls = [];
