@@ -1,0 +1,58 @@
+{
+  "dev": {
+    "title": "Dev",
+    "version": "1.0",
+    "description": "Developer documentation — agent workflow, vault architecture, and project status.",
+    "vault_id": "1lfehfjh",
+    "cross_links": [
+      { "title": "Library", "href": "/en-gb/library/" }
+    ],
+    "sections": [
+      {
+        "title": "Project Status",
+        "articles": [
+          {
+            "title": "Workstreams & Tasks",
+            "slug": "workstreams",
+            "content_object_id": "obj-cas-imm-32aa32595ec4",
+            "vault_id": "1lfehfjh",
+            "read_key": "gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs",
+            "render": "json",
+            "schema": "project-workstreams-v1",
+            "description": "All active workstreams and their tasks."
+          },
+          {
+            "title": "Issues",
+            "slug": "issues",
+            "content_object_id": "obj-cas-imm-da66557cad10",
+            "vault_id": "1lfehfjh",
+            "read_key": "gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs",
+            "render": "json",
+            "schema": "project-issues-v1",
+            "description": "Open bugs, critical blockers, and feature requests."
+          },
+          {
+            "title": "Agents",
+            "slug": "agents",
+            "content_object_id": "obj-cas-imm-652a31e21300",
+            "vault_id": "1lfehfjh",
+            "read_key": "gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs",
+            "render": "json",
+            "schema": "project-agents-v1",
+            "description": "Agent roster, roles, and current session status."
+          },
+          {
+            "title": "Release History",
+            "slug": "releases",
+            "content_object_id": "obj-cas-imm-370b6d8434889a75",
+            "vault_id": "1lfehfjh",
+            "read_key": "gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs",
+            "render": "json",
+            "schema": "project-releases-v1",
+            "description": "Release history and shipped task archive."
+          }
+        ]
+      }
+    ]
+  }
+}

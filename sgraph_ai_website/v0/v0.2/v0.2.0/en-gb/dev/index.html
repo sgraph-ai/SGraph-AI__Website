@@ -33,14 +33,12 @@
 
 <!-- ═══ DEV SUB-SITE BAND ════════════════════════════════════ -->
 <!--
-  Vault: bf31a13c78c9  |  nav object: obj-cas-imm-4cb7740ea1f2 (dev nav v2.1)
+  Nav: nav.json (static, served from repo) — articles from status vault 1lfehfjh
 -->
 <sg-sub-nav
   site-title="Dev"
-  site-description="Developer documentation — the two-agent operating model, Email-FS protocol, vault architecture, and agent onboarding guides."
-  vault-id="bf31a13c78c9"
-  read-key="s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA"
-  nav-object-id="obj-cas-imm-23a4cac1cd36">
+  site-description="Developer documentation — agent workflow, vault architecture, and project status."
+  src="nav.json">
 </sg-sub-nav>
 
 <!-- ═══ THREE-COLUMN SHELL ════════════════════════════════════ -->
@@ -54,9 +52,7 @@
 <div class="sub-site" id="sub-site-shell">
 
   <sg-side-nav
-    vault-id="bf31a13c78c9"
-    read-key="s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA"
-    nav-object-id="obj-cas-imm-23a4cac1cd36"
+    src="nav.json"
     tree-label="Dev"
     version="v0.2.0"
     auto-select>
@@ -88,12 +84,12 @@
 <sg-site-footer></sg-site-footer>
 
 <script type="module">
-  const VAULT_ID = 'bf31a13c78c9';
-  const READ_KEY = 's68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA';
+  const VAULT_ID = '1lfehfjh';
+  const READ_KEY = 'gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs';
 
   function slugFromPath() {
     const segments = location.pathname.split('/').filter(Boolean);
-    return segments.length > 2 ? segments[2] : '';
+    return segments.length > 2 ? segments.slice(2).join('/') : '';
   }
 
   const shell      = document.getElementById('sub-site-shell');
@@ -131,7 +127,12 @@
       history.pushState({ slug }, '', targetPath);
     }
     setBreadcrumbs('Dev', sectionTitle, title);
-    showArticle(content_object_id, render ?? 'markdown', vault_id, read_key);
+    const effectiveRender = render ?? 'markdown';
+    if (effectiveRender === 'json') {
+      showJsonBoard(content_object_id, vault_id || VAULT_ID, read_key || READ_KEY, e.detail.schema, title);
+    } else {
+      showArticle(content_object_id, effectiveRender, vault_id, read_key);
+    }
     buildNextPrev(slug);
   });
 
@@ -152,6 +153,125 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     landing.hidden = false;
+  }
+
+  async function showJsonBoard(objectId, vaultId, readKey, schema, title) {
+    landing.hidden = true;
+    articleEl.hidden = false;
+    articleToc.hidden = true;
+    shell.classList.remove('with-toc');
+
+    const renderEl = document.getElementById('article-render');
+    renderEl.innerHTML = '<div style="padding:2rem 0;color:#888;font-size:.9rem">Loading…</div>';
+
+    try {
+      const { importReadKey, readObject } =
+        await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
+      const key = await importReadKey(readKey);
+      const buf = await readObject('https://send.sgraph.ai', vaultId, objectId, key);
+      const data = JSON.parse(new TextDecoder().decode(buf));
+      renderEl.innerHTML = renderJsonBoard(data, schema);
+    } catch (err) {
+      renderEl.innerHTML =
+        `<div class="sg-article-viewer__error">Failed to load board: ${err.message}</div>`;
+      console.error('showJsonBoard:', err);
+    }
+  }
+
+  function renderJsonBoard(data, schema) {
+    const STATUS_COLORS = {
+      done: '#22c55e', 'in-progress': '#3b82f6', next: '#f59e0b',
+      queued: '#94a3b8', blocked: '#ef4444', open: '#ef4444',
+      resolved: '#22c55e', released: '#22c55e', planned: '#94a3b8',
+      active: '#22c55e', idle: '#94a3b8',
+    };
+    const badge = s => {
+      const color = STATUS_COLORS[s] ?? '#94a3b8';
+      return `<span style="display:inline-block;padding:2px 8px;border-radius:9999px;
+        font-size:.72rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+        background:${color}22;color:${color};border:1px solid ${color}44">${s}</span>`;
+    };
+    const card = (title, meta, body) => `
+      <div style="background:#fafaf9;border:1px solid #e5e5e4;border-radius:8px;
+          padding:1rem 1.25rem;margin-bottom:.75rem">
+        <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:${body?'.5rem':'0'}">
+          <span style="font-weight:600;font-size:.95rem">${title}</span>
+          ${meta}
+        </div>
+        ${body ? `<div style="font-size:.85rem;color:#666;margin-top:.25rem">${body}</div>` : ''}
+      </div>`;
+
+    if (schema === 'project-workstreams-v1') {
+      const ws = data.workstreams ?? data;
+      return (Array.isArray(ws) ? ws : []).map(w => `
+        <div style="margin-bottom:2rem">
+          <h2 style="font-size:1.05rem;font-weight:700;margin:0 0 .75rem;
+              padding-bottom:.5rem;border-bottom:2px solid #e5e5e4">${w.title ?? w.id}</h2>
+          ${(w.tasks ?? []).map(t =>
+            card(
+              `<code style="font-size:.75rem;color:#888">${t.id}</code> ${t.title}`,
+              `${badge(t.status ?? 'queued')}${t.owner ? ` <span style="font-size:.8rem;color:#888">${t.owner}</span>` : ''}`,
+              t.description ?? ''
+            )
+          ).join('')}
+        </div>`).join('');
+    }
+
+    if (schema === 'project-issues-v1') {
+      const issues = data.issues ?? (Array.isArray(data) ? data : []);
+      return issues.map(i =>
+        card(
+          `<code style="font-size:.75rem;color:#888">${i.id}</code> ${i.title}`,
+          `${badge(i.status ?? 'open')}${i.priority ? badge(i.priority) : ''}${i.owner ? ` <span style="font-size:.8rem;color:#888">${i.owner}</span>` : ''}`,
+          i.description ?? ''
+        )
+      ).join('');
+    }
+
+    if (schema === 'project-agents-v1') {
+      const agents = data.agents ?? (Array.isArray(data) ? data : []);
+      return agents.map(a =>
+        card(
+          `${a.alias ?? a.id}`,
+          `${badge(a.session_status ?? 'idle')}${a.model ? ` <span style="font-size:.8rem;color:#888">${a.model}</span>` : ''}`,
+          [a.domain, a.current_task ? `Current task: ${a.current_task}` : ''].filter(Boolean).join(' · ')
+        )
+      ).join('');
+    }
+
+    if (schema === 'project-releases-v1') {
+      const releases = data.releases ?? (Array.isArray(data) ? data : []);
+      return releases.map(r => `
+        <div style="margin-bottom:2rem">
+          <h2 style="font-size:1.05rem;font-weight:700;margin:0 0 .75rem;
+              display:flex;align-items:center;gap:.75rem">
+            ${r.version} ${badge(r.status ?? 'planned')}
+            ${r.date ? `<span style="font-size:.8rem;font-weight:400;color:#888">${r.date}</span>` : ''}
+          </h2>
+          ${(r.tasks ?? []).map(t =>
+            `<div style="padding:.4rem 0;border-bottom:1px solid #f0f0ef;font-size:.875rem">
+              <code style="font-size:.75rem;color:#888">${t.id}</code> ${t.title}
+              ${t.owner ? `<span style="float:right;color:#aaa;font-size:.75rem">${t.owner}</span>` : ''}
+            </div>`
+          ).join('')}
+          ${(r.issues ?? []).map(i =>
+            `<div style="padding:.4rem 0;border-bottom:1px solid #f0f0ef;font-size:.875rem">
+              <code style="font-size:.75rem;color:#888">${i.id}</code> ${i.title}
+            </div>`
+          ).join('')}
+        </div>`).join('');
+    }
+
+    // Generic fallback
+    const topKey = Object.keys(data).find(k => Array.isArray(data[k]));
+    if (!topKey) return `<pre style="padding:2rem;overflow:auto;font-size:.8rem">${JSON.stringify(data, null, 2)}</pre>`;
+    return data[topKey].map(item =>
+      card(
+        item.title ?? item.name ?? item.id ?? JSON.stringify(item).slice(0, 60),
+        item.status ? badge(item.status) : '',
+        item.description ?? ''
+      )
+    ).join('');
   }
 
   function showArticle(objectId, render, vaultId, readKey) {
