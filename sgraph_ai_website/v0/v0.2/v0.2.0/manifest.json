@@ -3,9 +3,9 @@
   "versions": {
     "dev": {
       "label": "Dev (manual)",
-      "version": "3.3.0",
+      "version": "3.4.0",
       "updated": "2026-05-08",
-      "notes": "Kanban board fix, collapsible panels, GitHub Actions status page, manifest.json"
+      "notes": "Nav v3.6, Use Cases landing page, section index: field support"
     },
     "ci": {
       "label": "CI / GitHub Actions",
@@ -22,8 +22,8 @@
   },
   "site": {
     "version": "v0.2.0",
-    "nav": "v3.2",
-    "nav_object_id": "obj-cas-imm-c7eb33ac130f",
+    "nav": "v3.6",
+    "nav_object_id": "obj-cas-imm-42517d1709ac",
     "repo": "sgraph-ai/sgraph-ai__website"
   }
 }
