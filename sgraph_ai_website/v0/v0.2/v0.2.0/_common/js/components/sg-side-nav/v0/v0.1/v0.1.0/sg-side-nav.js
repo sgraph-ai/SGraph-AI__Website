@@ -103,14 +103,14 @@ class SgSideNav extends HTMLElement {
     // Initialise collapsed state: all sections collapsed by default on first render
     if (!this._collapsed) {
       this._collapsed = new Set(sections.map((_, i) => i));
-    }
-    // Always ensure the section containing the active article is expanded
-    if (activeSlug) {
-      sections.forEach((s, i) => {
-        if ((s.articles ?? []).some(a => a.slug === activeSlug)) {
-          this._collapsed.delete(i);
-        }
-      });
+      // Only on first render: expand the section containing the active article
+      if (activeSlug) {
+        sections.forEach((s, i) => {
+          if ((s.articles ?? []).some(a => a.slug === activeSlug)) {
+            this._collapsed.delete(i);
+          }
+        });
+      }
     }
 
     const totalArticles = sections.reduce((n, s) => n + (s.articles?.length ?? 0), 0);
@@ -137,35 +137,57 @@ class SgSideNav extends HTMLElement {
             stroke-linecap="round" stroke-linejoin="round"/>
     </svg>`;
 
-    const tree = sections.map((section, i) => {
-      const collapsed    = this._collapsed.has(i);
-      const articles     = section.articles ?? [];
-      const sectionSlug  = section.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
-
-      const docs = articles.map(article => {
-        const isActive = article.slug === activeSlug;
-        const cls = `sg-side-nav__doc${isActive ? ' sg-side-nav__doc--active' : ''}`;
-
-        if (article.href) {
-          return `<a class="${cls}" href="${article.href}"
-                     data-slug="${article.slug ?? ''}">
-                   ${docIcon}
-                   <span class="sg-side-nav__doc-label">${article.title}</span>
-                 </a>`;
-        }
-        return `<button class="${cls}"
-                         data-slug="${article.slug ?? ''}"
-                         data-object-id="${article.content_object_id ?? ''}"
-                         data-render="${article.render ?? 'markdown'}"
-                         data-schema="${article.schema ?? ''}"
-                         data-title="${article.title}"
-                         data-section="${section.title}"
-                         data-vault-id="${article.vault_id ?? ''}"
-                         data-read-key="${article.read_key ?? ''}">
+    const renderArticle = (article, sectionTitle) => {
+      const isActive = article.slug === activeSlug;
+      const cls = `sg-side-nav__doc${isActive ? ' sg-side-nav__doc--active' : ''}`;
+      if (article.href) {
+        return `<a class="${cls}" href="${article.href}" data-slug="${article.slug ?? ''}">
                   ${docIcon}
                   <span class="sg-side-nav__doc-label">${article.title}</span>
-                </button>`;
-      }).join('');
+                </a>`;
+      }
+      return `<button class="${cls}"
+                       data-slug="${article.slug ?? ''}"
+                       data-object-id="${article.content_object_id ?? ''}"
+                       data-render="${article.render ?? 'markdown'}"
+                       data-schema="${article.schema ?? ''}"
+                       data-title="${article.title}"
+                       data-section="${sectionTitle}"
+                       data-vault-id="${article.vault_id ?? ''}"
+                       data-read-key="${article.read_key ?? ''}">
+                ${docIcon}
+                <span class="sg-side-nav__doc-label">${article.title}</span>
+              </button>`;
+    };
+
+    const renderSubsection = (sub, sectionTitle) => {
+      const subSlug = `sub-${sub.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+      const isExpanded = !this._collapsedSubs?.has(subSlug);
+      const subsecChev = `<svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+        <path d="M1.5 2L3.5 4L5.5 2" stroke="currentColor" stroke-width="1.3"
+              stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      return `
+        <div class="sg-side-nav__subsection">
+          <div class="sg-side-nav__subfolder" data-subsec="${subSlug}">
+            <span class="sg-side-nav__chev${isExpanded ? ' sg-side-nav__chev--open' : ''}">${subsecChev}</span>
+            ${folderIcon}
+            <span class="sg-side-nav__subfolder-label">${sub.title}</span>
+          </div>
+          ${isExpanded ? `
+            <div class="sg-side-nav__subchildren">
+              ${(sub.articles ?? []).map(a => renderArticle(a, sectionTitle)).join('')}
+            </div>` : ''}
+        </div>`;
+    };
+
+    const tree = sections.map((section, i) => {
+      const collapsed   = this._collapsed.has(i);
+      const articles    = section.articles ?? [];
+      const subsections = section.subsections ?? [];
+      const sectionSlug = section.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
+
+      const docs = articles.map(a => renderArticle(a, section.title)).join('');
+      const subs = subsections.map(s => renderSubsection(s, section.title)).join('');
 
       return `
         <div class="sg-side-nav__section" data-section-index="${i}">
@@ -179,7 +201,7 @@ class SgSideNav extends HTMLElement {
                   data-section-slug="${sectionSlug}">${section.title}</span>
           </div>
           ${collapsed ? '' : `
-            <div class="sg-side-nav__children">${docs}</div>
+            <div class="sg-side-nav__children">${docs}${subs}</div>
           `}
         </div>`;
     }).join('');
@@ -220,6 +242,18 @@ class SgSideNav extends HTMLElement {
         const idx = parseInt(chev.dataset.chev, 10);
         if (this._collapsed.has(idx)) this._collapsed.delete(idx);
         else this._collapsed.add(idx);
+        this._render(sections);
+      });
+    });
+
+    // Subsection toggle
+    if (!this._collapsedSubs) this._collapsedSubs = new Set();
+    this.querySelectorAll('[data-subsec]').forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        const key = el.dataset.subsec;
+        if (this._collapsedSubs.has(key)) this._collapsedSubs.delete(key);
+        else this._collapsedSubs.add(key);
         this._render(sections);
       });
     });

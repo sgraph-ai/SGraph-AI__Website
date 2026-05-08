@@ -55,7 +55,7 @@
     src="nav.json"
     tree-label="Dev"
     version="v0.2.0"
-    extra-links='[{"section":"Tools","title":"Open Vaults Directory","href":"/en-gb/dev/vaults/","slug":"vaults"},{"section":"Tools","title":"CI / GitHub Actions","href":"/en-gb/dev/ci/","slug":"ci"},{"section":"Status","title":"Workstreams","slug":"status/workstreams","object_id":"obj-cas-imm-32aa32595ec4","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Issues","slug":"status/issues","object_id":"obj-cas-imm-da66557cad10","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Agents","slug":"status/agents","object_id":"obj-cas-imm-652a31e21300","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"}]'
+    extra-links='[{"section":"Tools","title":"Open Vaults Directory","href":"/en-gb/dev/vaults/","slug":"vaults"},{"section":"Tools","title":"CI / GitHub Actions","slug":"ci","object_id":"__ci__"},{"section":"Status","title":"Workstreams","slug":"status/workstreams","object_id":"obj-cas-imm-32aa32595ec4","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Issues","slug":"status/issues","object_id":"obj-cas-imm-da66557cad10","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Agents","slug":"status/agents","object_id":"obj-cas-imm-652a31e21300","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"}]'
     home-href="/en-gb/dev/"
     auto-select>
   </sg-side-nav>
@@ -87,6 +87,9 @@
   <span class="sub-site-footer__copy">© 2026 SGraph AI Ltd.</span>
   <span class="sub-site-footer__meta" id="footer-meta">sgraph.ai/dev · site v0.2.0 · status vault 1lfehfjh</span>
 </footer>
+
+<sg-debug-panel></sg-debug-panel>
+<script type="module" src="../../_common/js/components/sg-debug-panel/v0/v0.1/v0.1.0/sg-debug-panel.js"></script>
 
 <script type="module">
   const VAULT_ID = '1lfehfjh';
@@ -157,6 +160,16 @@
       history.pushState({ slug }, '', targetPath);
     }
     setBreadcrumbs('Dev', sectionTitle, title);
+
+    // Special built-in views
+    if (content_object_id === '__ci__' || slug === 'ci') {
+      showCiView();
+      buildNextPrev(slug);
+      return;
+    }
+    // Guard: don't attempt vault load if no object ID
+    if (!content_object_id) { showLanding(); return; }
+
     const effectiveRender = render ?? 'markdown';
     if (effectiveRender === 'json') {
       showJsonBoard(content_object_id, vault_id || VAULT_ID, read_key || READ_KEY, e.detail.schema, title);
@@ -207,13 +220,155 @@
         await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
       const key = await importReadKey(readKey);
       const buf = await readObject('https://send.sgraph.ai', vaultId, objectId, key);
-      const data = JSON.parse(new TextDecoder().decode(buf));
+      const text = new TextDecoder().decode(buf);
+      const data = JSON.parse(text);
       renderEl.innerHTML = renderJsonBoard(data, data.schema ?? schema);
+      // Emit raw content for debug panel
+      document.dispatchEvent(new CustomEvent('debug:vault-content',
+        { detail: { objectId, text, kind: 'json board' } }));
     } catch (err) {
       renderEl.innerHTML =
         `<div class="sg-article-viewer__error">Failed to load board: ${err.message}</div>`;
       console.error('showJsonBoard:', err);
     }
+  }
+
+  // ── CI / GitHub Actions inline view ──────────────────────────────────────
+  function showCiView() {
+    landing.hidden = true;
+    articleEl.hidden = false;
+    articleToc.hidden = true;
+    shell.classList.remove('with-toc');
+    setBreadcrumbs('Dev', 'Tools', 'CI / GitHub Actions');
+
+    const renderEl = document.getElementById('article-render');
+    renderEl.innerHTML = `
+      <div class="article-viewer" style="max-width:860px">
+        <div class="article-body" id="ci-body">
+          <h1 style="font-size:1.4rem;margin-bottom:.25rem">CI / GitHub Actions</h1>
+          <p style="color:#888;font-size:.85rem;margin-bottom:1.5rem">sgraph-ai/sgraph-ai__website · live run data</p>
+          <div id="ci-manifest-strip" style="background:#fafaf9;border:1px solid #e5e5e4;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.5rem;display:flex;gap:1.5rem;flex-wrap:wrap"></div>
+          <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap">
+            <select id="ci-wf-filter" style="font-size:.83rem;padding:5px 10px;border:1px solid #d4d4d2;border-radius:6px;background:#fff">
+              <option value="">All workflows</option>
+            </select>
+            <select id="ci-st-filter" style="font-size:.83rem;padding:5px 10px;border:1px solid #d4d4d2;border-radius:6px;background:#fff">
+              <option value="">All statuses</option>
+              <option value="success">Success</option>
+              <option value="failure">Failure</option>
+              <option value="in_progress">In progress</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <button id="ci-refresh" style="display:flex;align-items:center;gap:.4rem;padding:5px 12px;border:1px solid #d4d4d2;border-radius:6px;background:#fff;font-size:.83rem;cursor:pointer">⟳ Refresh</button>
+            <span id="ci-last" style="margin-left:auto;font-size:.75rem;color:#aaa"></span>
+          </div>
+          <div id="ci-runs" style="color:#888;font-size:.88rem;padding:1rem 0">Fetching workflow runs…</div>
+        </div>
+      </div>`;
+
+    // Load manifest strip
+    fetch('/manifest.json',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(m=>{
+      if(!m) return;
+      const strip = document.getElementById('ci-manifest-strip');
+      if(!strip) return;
+      const vs = m.versions ?? {};
+      strip.innerHTML = Object.entries(vs).map(([,v])=>`
+        <div style="flex:1;min-width:120px">
+          <div style="font-size:.68rem;color:#aaa;text-transform:uppercase;letter-spacing:.05em">${v.label??''}</div>
+          <div style="font-size:.95rem;font-weight:600;font-family:monospace">${v.version??'—'}</div>
+          ${v.updated?`<div style="font-size:.72rem;color:#888">${v.updated}</div>`:''}
+        </div>`).join('');
+    }).catch(()=>{});
+
+    let _runs = [];
+    const ciRuns = () => document.getElementById('ci-runs');
+    const REPO   = 'sgraph-ai/sgraph-ai__website';
+
+    const fetchRuns = async () => {
+      const el = ciRuns(); if(!el) return;
+      el.innerHTML = '<span style="color:#888">Fetching…</span>';
+      try {
+        const r = await fetch(`https://api.github.com/repos/${REPO}/actions/runs?per_page=30`,
+          { headers:{'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'} });
+        if(!r.ok) throw new Error(`HTTP ${r.status}`);
+        const d = await r.json();
+        _runs = d.workflow_runs ?? [];
+        const wfSel = document.getElementById('ci-wf-filter');
+        if(wfSel) {
+          const names = [...new Set(_runs.map(r=>r.name))].sort();
+          wfSel.innerHTML = '<option value="">All workflows</option>' +
+            names.map(n=>`<option value="${n}">${n}</option>`).join('');
+        }
+        const lastEl = document.getElementById('ci-last');
+        if(lastEl) lastEl.textContent = `Fetched ${new Date().toLocaleTimeString()}`;
+        renderRuns();
+      } catch(err) {
+        if(el) el.innerHTML = `<div style="padding:.75rem 1rem;background:#fff0f0;border:1px solid #fecaca;border-radius:6px;color:#dc2626;font-size:.83rem">⚠ ${err.message}</div>`;
+      }
+    };
+
+    const stateColor = s =>
+      s==='success'?'#16a34a':s==='failure'?'#dc2626':s==='in_progress'?'#2563eb':
+      s==='cancelled'||s==='skipped'?'#6b7280':'#94a3b8';
+    const stateIcon  = s =>
+      s==='success'?'✓':s==='failure'?'✗':s==='in_progress'?'⟳':s==='cancelled'?'⊘':'●';
+    const fmtDur = secs => secs<60?`${Math.round(secs)}s`:`${Math.floor(secs/60)}m ${Math.round(secs%60)}s`;
+    const timeAgo = d => {
+      const s=Math.floor((Date.now()-d)/1000);
+      return s<60?'just now':s<3600?`${Math.floor(s/60)}m ago`:s<86400?`${Math.floor(s/3600)}h ago`:`${Math.floor(s/86400)}d ago`;
+    };
+    const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    const renderRuns = () => {
+      const el = ciRuns(); if(!el) return;
+      const wf = document.getElementById('ci-wf-filter')?.value ?? '';
+      const st = document.getElementById('ci-st-filter')?.value ?? '';
+      let runs = _runs;
+      if(wf) runs = runs.filter(r=>r.name===wf);
+      if(st) runs = runs.filter(r=>(r.conclusion??r.status)===st);
+      if(!runs.length){ el.innerHTML='<div style="color:#aaa;font-size:.85rem;padding:1rem 0">No matching runs.</div>'; return; }
+      const byWf = {};
+      runs.forEach(r=>{ (byWf[r.name]||(byWf[r.name]=[])).push(r); });
+      el.innerHTML = Object.entries(byWf).map(([wfName,wfRuns])=>`
+        <div style="margin-bottom:1.5rem">
+          <div style="font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#888;padding-bottom:.4rem;margin-bottom:.5rem;border-bottom:1px solid #e5e5e4">${escH(wfName)}</div>
+          ${wfRuns.map(run=>{
+            const state = run.conclusion??run.status;
+            const color = stateColor(state);
+            const start = run.run_started_at?new Date(run.run_started_at):null;
+            const upd   = run.updated_at?new Date(run.updated_at):null;
+            const dur   = start&&upd?fmtDur((upd-start)/1000):null;
+            const commitMsg = (run.head_commit?.message??run.display_title??'').split('\n')[0];
+            return `<div onclick="window.open('${escH(run.html_url)}','_blank','noopener')"
+                style="display:grid;grid-template-columns:26px 1fr auto;gap:.5rem;align-items:start;
+                padding:.7rem .9rem;border:1px solid #e5e5e4;border-radius:7px;margin-bottom:.4rem;
+                background:#fff;cursor:pointer;transition:box-shadow .15s"
+                onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.07)'"
+                onmouseout="this.style.boxShadow='none'">
+              <div style="width:26px;height:26px;border-radius:50%;background:${color}22;color:${color};
+                display:flex;align-items:center;justify-content:center;font-size:13px;margin-top:2px">${stateIcon(state)}</div>
+              <div>
+                <div style="font-weight:600;font-size:.88rem;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:400px">${escH(commitMsg||`Run #${run.run_number}`)}</div>
+                <div style="font-size:.75rem;color:#888;margin-top:3px;display:flex;gap:.5rem;flex-wrap:wrap">
+                  <code style="background:#f0f9ff;color:#0369a1;padding:1px 5px;border-radius:3px;border:1px solid #bae6fd">${escH(run.head_branch??'')}</code>
+                  <code style="color:#aaa">${(run.head_sha??'').slice(0,7)}</code>
+                  ${run.actor?.login?`<span>by ${escH(run.actor.login)}</span>`:''}
+                  ${start?`<span>${timeAgo(start)}</span>`:''}
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0">
+                <span style="display:inline-block;padding:2px 7px;border-radius:9999px;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;background:${color}22;color:${color};border:1px solid ${color}44">${escH(state??'?')}</span>
+                ${dur?`<div style="font-size:.72rem;color:#888;margin-top:3px">${dur}</div>`:''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`).join('');
+    };
+
+    document.getElementById('ci-refresh')?.addEventListener('click', fetchRuns);
+    document.getElementById('ci-wf-filter')?.addEventListener('change', renderRuns);
+    document.getElementById('ci-st-filter')?.addEventListener('change', renderRuns);
+    fetchRuns();
   }
 
   function renderJsonBoard(data, schema) {

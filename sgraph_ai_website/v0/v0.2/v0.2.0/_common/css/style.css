@@ -2243,6 +2243,23 @@ sg-side-nav {
   padding-top: 2px;
 }
 
+/* Subsection (one level deeper) */
+.sg-side-nav__subfolder {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 10px 4px 12px;
+  cursor: pointer;
+  color: var(--ss-fg-faint);
+  font-family: var(--font-mono); font-size: 11px;
+  font-weight: 600; letter-spacing: .02em;
+}
+.sg-side-nav__subfolder:hover { color: var(--ss-fg); }
+.sg-side-nav__subfolder-label { flex: 1; }
+.sg-side-nav__subchildren {
+  margin-left: 16px;
+  border-left: 1px dashed var(--ss-border);
+  padding-bottom: 4px;
+}
+
 .sg-side-nav__doc {
   display: flex; align-items: center; gap: 6px;
   width: 100%; text-align: left;
