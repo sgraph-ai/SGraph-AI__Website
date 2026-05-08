@@ -195,7 +195,7 @@
       const key = await importReadKey(readKey);
       const buf = await readObject('https://send.sgraph.ai', vaultId, objectId, key);
       const data = JSON.parse(new TextDecoder().decode(buf));
-      renderEl.innerHTML = renderJsonBoard(data, schema);
+      renderEl.innerHTML = renderJsonBoard(data, data.schema ?? schema);
     } catch (err) {
       renderEl.innerHTML =
         `<div class="sg-article-viewer__error">Failed to load board: ${err.message}</div>`;
@@ -285,6 +285,67 @@
             </div>`
           ).join('')}
         </div>`).join('');
+    }
+
+    if (schema === 'project-workstreams-v2') {
+      const workstreams = data.workstreams ?? [];
+      const columns = [
+        { key: 'queued',      label: 'Queued',      color: '#94a3b8' },
+        { key: 'next',        label: 'Up Next',     color: '#f59e0b' },
+        { key: 'in-progress', label: 'In Progress', color: '#3b82f6' },
+        { key: 'done',        label: 'Done',         color: '#22c55e' },
+      ];
+      const allTasks = workstreams.flatMap(ws =>
+        (ws.tasks ?? []).map(t => ({ ...t, _ws: ws.title, _color: ws.color ?? '#6366f1' }))
+      );
+      const colsHtml = columns.map(col => {
+        const tasks = allTasks.filter(t =>
+          (t.status ?? '').toLowerCase().replace(/\s+/g, '-') === col.key
+        );
+        if (!tasks.length && col.key === 'next') return '';
+        return `
+          <div style="flex:1;min-width:160px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem;
+                font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${col.color}">
+              <span style="width:8px;height:8px;border-radius:50%;background:${col.color};flex-shrink:0"></span>
+              ${col.label}
+              <span style="margin-left:auto;background:${col.color}22;color:${col.color};
+                  padding:1px 7px;border-radius:9999px;font-size:.7rem">${tasks.length}</span>
+            </div>
+            ${tasks.map(t => `
+              <div style="background:#fafaf9;border:1px solid #e5e5e4;border-left:3px solid ${t._color};
+                  border-radius:6px;padding:.6rem .85rem;margin-bottom:.5rem;font-size:.85rem">
+                <div style="font-size:.7rem;color:#aaa;margin-bottom:2px">${t._ws}</div>
+                <div style="font-weight:500;color:#1a1a1a">${t.task ?? t.title ?? ''}</div>
+                ${t.owner ? `<div style="font-size:.72rem;color:#888;margin-top:3px">${t.owner}</div>` : ''}
+                ${t.notes ? `<div style="font-size:.75rem;color:#777;margin-top:4px;border-top:1px solid #f0f0ef;padding-top:4px">${t.notes}</div>` : ''}
+              </div>`).join('')}
+            ${!tasks.length ? `<div style="font-size:.8rem;color:#ccc;padding:.5rem 0">—</div>` : ''}
+          </div>`;
+      }).filter(Boolean).join('');
+
+      const legend = workstreams.map(ws =>
+        `<span style="display:inline-flex;align-items:center;gap:5px;font-size:.78rem;color:#555">
+          <span style="width:8px;height:8px;border-radius:50%;background:${ws.color ?? '#6366f1'}"></span>
+          ${ws.title}
+        </span>`
+      ).join('');
+
+      return `
+        ${legend ? `<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:1.5rem">${legend}</div>` : ''}
+        <div style="display:flex;gap:16px;align-items:flex-start;overflow-x:auto">${colsHtml}</div>`;
+    }
+
+    if (schema === 'project-agents-v2') {
+      const agents = data.agents ?? [];
+      return agents.map(a => {
+        const statusColor = STATUS_COLORS[a.session_status?.toLowerCase()] ?? '#94a3b8';
+        return card(
+          `${a.alias ?? ''}`,
+          `${badge(a.session_status ?? 'idle')}${a.model ? ` <span style="font-size:.8rem;color:#888">${a.model}</span>` : ''}`,
+          [a.role, a.location].filter(Boolean).join(' · ')
+        );
+      }).join('');
     }
 
     // Generic fallback
