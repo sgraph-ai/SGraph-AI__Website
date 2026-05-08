@@ -1,5 +1,5 @@
 /**
- * sg-debug-panel v0.1.1
+ * sg-debug-panel v0.1.2
  *
  * Floating debug overlay for sgraph.ai sub-sites. Two tabs:
  *   Log     — intercepted fetch calls (vault / GitHub API) + custom nav:* events
@@ -8,7 +8,7 @@
  * Only active on qa / dev / localhost — no-op on prod.
  *
  * Usage:  <sg-debug-panel></sg-debug-panel>  (anywhere in <body>)
- * Trigger: ◉ fixed button (bottom-left) or keyboard Shift+D
+ * Trigger: ◉ button injected into sg-sub-nav controls, or keyboard Shift+D
  *
  * Pages emit raw content by dispatching:
  *   document.dispatchEvent(new CustomEvent('debug:nav-json',     { detail: { json, src } }))
@@ -38,6 +38,7 @@ class SgDebugPanel extends HTMLElement {
     if (this._origFetch) window.fetch = this._origFetch;
     this._evtAbort?.abort();
     this._kbAbort?.abort();
+    this._btnObserver?.disconnect();
   }
 
   // ── UI ────────────────────────────────────────────────────────────────────
@@ -45,17 +46,22 @@ class SgDebugPanel extends HTMLElement {
   _buildUI() {
     const style = document.createElement('style');
     style.textContent = `
+      /* Button inside sg-sub-nav controls */
       .sgdbg-btn {
-        position: fixed; bottom: 12px; left: 12px; z-index: 9000;
-        width: 28px; height: 28px; border-radius: 50%;
-        background: #1e293b; color: #94a3b8;
-        border: 1px solid #334155; cursor: pointer;
-        font-size: 13px; display: flex; align-items: center; justify-content: center;
-        box-shadow: 0 2px 8px rgba(0,0,0,.35);
+        width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+        background: #334155; color: #94a3b8;
+        border: 1px solid #475569; cursor: pointer;
+        font-size: 12px; display: inline-flex; align-items: center; justify-content: center;
         transition: color .15s, background .15s; user-select: none;
+        margin-left: 6px; align-self: center;
       }
-      .sgdbg-btn:hover { background: #0f172a; color: #e2e8f0; }
-      .sgdbg-btn.active { background: #0f172a; color: #38bdf8; border-color: #38bdf8; }
+      .sgdbg-btn:hover { background: #1e293b; color: #e2e8f0; }
+      .sgdbg-btn.active { color: #38bdf8; border-color: #38bdf8; background: #1e293b; }
+      /* Fallback: fixed positioning when no sg-sub-nav found */
+      .sgdbg-btn.sgdbg-btn--fixed {
+        position: fixed; bottom: 14px; right: 14px; z-index: 9000;
+        box-shadow: 0 2px 8px rgba(0,0,0,.4);
+      }
 
       .sgdbg-panel {
         position: fixed; inset: 0; z-index: 8999;
@@ -72,15 +78,26 @@ class SgDebugPanel extends HTMLElement {
 
       .sgdbg-drawer {
         position: absolute; top: 0; right: 0; bottom: 0;
-        width: min(720px, 96vw);
+        width: var(--sgdbg-w, min(720px, 96vw));
+        min-width: 320px; max-width: 96vw;
         background: #0f172a; color: #e2e8f0;
         display: flex; flex-direction: column;
         transform: translateX(100%); transition: transform .22s ease;
         box-shadow: -4px 0 24px rgba(0,0,0,.5);
         font-family: 'DM Mono', 'Menlo', 'Consolas', monospace;
-        font-size: 12px;
+        font-size: 12px; user-select: none;
       }
+      .sgdbg-drawer.resizing { transition: none; user-select: none; }
       .sgdbg-panel.open .sgdbg-drawer { transform: translateX(0); }
+
+      /* Resize handle — draggable left edge */
+      .sgdbg-resize {
+        position: absolute; top: 0; left: 0; bottom: 0; width: 6px;
+        cursor: col-resize; z-index: 1;
+        background: transparent;
+        transition: background .15s;
+      }
+      .sgdbg-resize:hover, .sgdbg-resize.dragging { background: #38bdf844; }
 
       /* Head */
       .sgdbg-head {
@@ -205,14 +222,14 @@ class SgDebugPanel extends HTMLElement {
     `;
     document.head.appendChild(style);
 
-    // Toggle button
+    // Toggle button — will be mounted into sg-sub-nav controls
     const btn = document.createElement('button');
     btn.className = 'sgdbg-btn' + (this._open ? ' active' : '');
     btn.title = 'Debug panel (Shift+D)';
     btn.textContent = '◉';
     btn.addEventListener('click', () => this.toggle());
-    document.body.appendChild(btn);
     this._btn = btn;
+    this._mountBtn();
 
     // Panel
     const panel = document.createElement('div');
@@ -220,6 +237,7 @@ class SgDebugPanel extends HTMLElement {
     panel.innerHTML = `
       <div class="sgdbg-overlay"></div>
       <div class="sgdbg-drawer">
+        <div class="sgdbg-resize" id="sgdbg-resize"></div>
         <div class="sgdbg-head">
           <span class="sgdbg-title">◉ Debug</span>
           <div class="sgdbg-tabs">
@@ -265,9 +283,11 @@ class SgDebugPanel extends HTMLElement {
     document.body.appendChild(panel);
     this._panel = panel;
 
-    // Overlay + close
-    panel.querySelector('.sgdbg-overlay').addEventListener('click', () => this.close());
+    // Overlay click does NOT close (panel stays until explicitly closed)
     panel.querySelector('#sgdbg-close').addEventListener('click', () => this.close());
+
+    // Resize handle
+    this._initResize(panel.querySelector('#sgdbg-resize'), panel.querySelector('.sgdbg-drawer'));
 
     // Tab switching
     panel.querySelectorAll('.sgdbg-tab').forEach(tab => {
@@ -307,6 +327,60 @@ class SgDebugPanel extends HTMLElement {
     this._logEl  = panel.querySelector('#sgdbg-log');
     this._srcEl  = panel.querySelector('#sgdbg-sources');
     this._logFilter = '';
+  }
+
+  // ── Button placement ──────────────────────────────────────────────────────
+
+  _mountBtn() {
+    const attach = () => {
+      const controls = document.querySelector('sg-sub-nav .sg-sub-nav__controls');
+      if (controls) {
+        if (!controls.contains(this._btn)) controls.appendChild(this._btn);
+      } else if (!document.body.contains(this._btn)) {
+        this._btn.classList.add('sgdbg-btn--fixed');
+        document.body.appendChild(this._btn);
+      }
+    };
+    // Try immediately, then watch for sg-sub-nav to render
+    attach();
+    const subNav = document.querySelector('sg-sub-nav');
+    if (subNav) {
+      const mo = new MutationObserver(attach);
+      mo.observe(subNav, { childList: true, subtree: false });
+      this._btnObserver = mo;
+    }
+  }
+
+  // ── Resize handle ─────────────────────────────────────────────────────────
+
+  _initResize(handle, drawer) {
+    if (!handle || !drawer) return;
+    const STORE_KEY = 'sg-debug-width';
+    // Restore saved width
+    const saved = localStorage.getItem(STORE_KEY);
+    if (saved) document.documentElement.style.setProperty('--sgdbg-w', `${saved}px`);
+
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      drawer.classList.add('resizing');
+      handle.classList.add('dragging');
+      const startX = e.clientX;
+      const startW = drawer.getBoundingClientRect().width;
+      const onMove = mv => {
+        const newW = Math.max(320, Math.min(window.innerWidth * 0.96, startW + (startX - mv.clientX)));
+        document.documentElement.style.setProperty('--sgdbg-w', `${newW}px`);
+      };
+      const onUp = () => {
+        drawer.classList.remove('resizing');
+        handle.classList.remove('dragging');
+        const finalW = drawer.getBoundingClientRect().width;
+        localStorage.setItem(STORE_KEY, Math.round(finalW));
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
   }
 
   toggle() { this._open ? this.close() : this.open(); }
