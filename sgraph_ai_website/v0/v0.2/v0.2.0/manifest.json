@@ -1,0 +1,29 @@
+{
+  "schema": "site-manifest-v1",
+  "versions": {
+    "dev": {
+      "label": "Dev (manual)",
+      "version": "3.3.0",
+      "updated": "2026-05-08",
+      "notes": "Kanban board fix, collapsible panels, GitHub Actions status page, manifest.json"
+    },
+    "ci": {
+      "label": "CI / GitHub Actions",
+      "version": null,
+      "updated": null,
+      "notes": "Updated automatically by the deploy pipeline on each successful push to qa"
+    },
+    "ifd": {
+      "label": "IFD",
+      "version": null,
+      "updated": null,
+      "notes": "IFD version — updated by the IFD agent"
+    }
+  },
+  "site": {
+    "version": "v0.2.0",
+    "nav": "v3.2",
+    "nav_object_id": "obj-cas-imm-c7eb33ac130f",
+    "repo": "sgraph-ai/sgraph-ai__website"
+  }
+}

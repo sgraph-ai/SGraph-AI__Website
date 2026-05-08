@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CI / GitHub Actions — sgraph.ai Dev</title>
+  <base href="/en-gb/dev/ci/">
+  <link rel="icon"       href="../../../_common/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap">
+  <link rel="stylesheet" href="../../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../../_common/css/style.css">
+  <style>
+    .ci-page { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    .ci-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+    .ci-header h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+    .ci-header__meta { color: #888; font-size: .85rem; }
+
+    .ci-manifest { background: #fafaf9; border: 1px solid #e5e5e4; border-radius: 8px;
+                   padding: 1.25rem 1.5rem; margin-bottom: 2rem; }
+    .ci-manifest h2 { font-size: .85rem; font-weight: 700; letter-spacing: .05em;
+                      text-transform: uppercase; color: #888; margin: 0 0 .75rem; }
+    .ci-manifest__grid { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .ci-manifest__item { flex: 1; min-width: 160px; }
+    .ci-manifest__label { font-size: .72rem; color: #aaa; text-transform: uppercase;
+                          letter-spacing: .05em; margin-bottom: 2px; }
+    .ci-manifest__value { font-size: 1rem; font-weight: 600; color: #1a1a1a; font-family: monospace; }
+    .ci-manifest__date { font-size: .78rem; color: #888; margin-top: 2px; }
+    .ci-manifest__notes { font-size: .78rem; color: #666; margin-top: 3px; }
+
+    .ci-toolbar { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.25rem; }
+    .ci-toolbar select { font-size: .85rem; padding: 5px 10px; border: 1px solid #d4d4d2;
+                         border-radius: 6px; background: #fff; color: #333; cursor: pointer; }
+    .ci-refresh { display: flex; align-items: center; gap: .4rem; padding: 5px 12px;
+                  border: 1px solid #d4d4d2; border-radius: 6px; background: #fff;
+                  font-size: .85rem; color: #333; cursor: pointer; transition: background .15s; }
+    .ci-refresh:hover { background: #f5f5f4; }
+    .ci-refresh svg { width: 14px; height: 14px; }
+    .ci-last-fetch { margin-left: auto; font-size: .78rem; color: #aaa; }
+
+    .ci-runs { }
+    .ci-run { display: grid; grid-template-columns: 28px 1fr auto; gap: .75rem;
+              align-items: start; padding: .9rem 1rem; border: 1px solid #e5e5e4;
+              border-radius: 8px; margin-bottom: .5rem; background: #fff;
+              transition: box-shadow .15s; }
+    .ci-run:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    .ci-run__icon { width: 28px; height: 28px; border-radius: 50%;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+    .ci-run__body { min-width: 0; }
+    .ci-run__title { font-weight: 600; font-size: .9rem; color: #1a1a1a;
+                     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ci-run__meta { font-size: .78rem; color: #888; margin-top: 3px;
+                    display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; }
+    .ci-run__branch { font-family: monospace; font-size: .75rem;
+                      background: #f0f9ff; color: #0369a1; padding: 1px 6px;
+                      border-radius: 4px; border: 1px solid #bae6fd; }
+    .ci-run__right { text-align: right; flex-shrink: 0; }
+    .ci-run__duration { font-size: .78rem; color: #888; margin-top: 3px; }
+    .ci-badge { display: inline-block; padding: 2px 8px; border-radius: 9999px;
+                font-size: .72rem; font-weight: 600; letter-spacing: .04em;
+                text-transform: uppercase; }
+    .ci-badge--success { background: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
+    .ci-badge--failure { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+    .ci-badge--in_progress { background: #dbeafe; color: #2563eb; border: 1px solid #bfdbfe; }
+    .ci-badge--queued,
+    .ci-badge--waiting { background: #fef9c3; color: #92400e; border: 1px solid #fde68a; }
+    .ci-badge--cancelled,
+    .ci-badge--skipped { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
+    .ci-badge--neutral { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+
+    .ci-empty { padding: 3rem 1rem; text-align: center; color: #aaa; font-size: .9rem; }
+    .ci-error { padding: 1rem 1.25rem; background: #fff0f0; border: 1px solid #fecaca;
+                border-radius: 8px; color: #dc2626; font-size: .85rem; margin-bottom: 1rem; }
+    .ci-loading { padding: 2rem 0; color: #888; font-size: .9rem; text-align: center; }
+
+    .ci-workflow-runs { }
+    .ci-workflow-section { margin-bottom: 2rem; }
+    .ci-workflow-section h3 { font-size: .8rem; font-weight: 700; letter-spacing: .06em;
+                              text-transform: uppercase; color: #888;
+                              margin: 0 0 .75rem; padding-bottom: .4rem;
+                              border-bottom: 1px solid #e5e5e4; }
+
+    @media (max-width: 600px) {
+      .ci-run { grid-template-columns: 24px 1fr; }
+      .ci-run__right { display: none; }
+    }
+  </style>
+</head>
+<body class="sub-site-page">
+
+<sg-site-header site="Send"></sg-site-header>
+<div class="sub-site-gap"></div>
+
+<sg-sub-nav
+  site-title="Dev"
+  site-description="Developer documentation — agent workflow, vault architecture, and project status."
+  src="../nav.json">
+</sg-sub-nav>
+
+<div class="sub-site" id="sub-site-shell">
+  <sg-side-nav
+    src="../nav.json"
+    tree-label="Dev"
+    version="v0.2.0"
+    extra-links='[{"section":"Tools","title":"Open Vaults Directory","href":"/en-gb/dev/vaults/","slug":"vaults"},{"section":"Status","title":"CI / Actions","href":"/en-gb/dev/ci/","slug":"ci"},{"section":"Status","title":"Workstreams","slug":"status/workstreams","object_id":"obj-cas-imm-32aa32595ec4","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Issues","slug":"status/issues","object_id":"obj-cas-imm-da66557cad10","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Agents","slug":"status/agents","object_id":"obj-cas-imm-652a31e21300","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"}]'
+    home-href="/en-gb/dev/"
+    active-slug="ci">
+  </sg-side-nav>
+
+  <div class="sub-site__content" style="display:block">
+    <div class="sub-site__crumbs">
+      <a class="sub-site__crumbs-link" href="/en-gb/dev/">Dev</a>
+      <span class="sub-site__crumbs-sep">/</span>
+      <span class="sub-site__crumbs-here">CI / GitHub Actions</span>
+    </div>
+    <div id="article-render">
+      <div class="article-viewer">
+        <div class="article-body ci-page">
+
+          <div class="ci-header">
+            <h1>CI / GitHub Actions</h1>
+            <span class="ci-header__meta" id="repo-label">sgraph-ai/sgraph-ai__website</span>
+          </div>
+
+          <!-- Manifest / version info -->
+          <div class="ci-manifest" id="manifest-panel">
+            <h2>Version Manifest</h2>
+            <div class="ci-manifest__grid" id="manifest-grid">
+              <div class="ci-manifest__item">
+                <div class="ci-manifest__label">Loading…</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Toolbar -->
+          <div class="ci-toolbar">
+            <select id="filter-workflow">
+              <option value="">All workflows</option>
+            </select>
+            <select id="filter-status">
+              <option value="">All statuses</option>
+              <option value="success">Success</option>
+              <option value="failure">Failure</option>
+              <option value="in_progress">In progress</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <button class="ci-refresh" id="btn-refresh">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M13.5 2.5A7 7 0 1 0 14 8" stroke-linecap="round"/>
+                <polyline points="10 2 14 2 14 6" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Refresh
+            </button>
+            <span class="ci-last-fetch" id="last-fetch"></span>
+          </div>
+
+          <div id="ci-runs-container">
+            <div class="ci-loading">Fetching workflow runs…</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub-site__toc" id="article-toc" hidden></div>
+</div>
+
+<footer class="sub-site-footer">
+  <span class="sub-site-footer__copy">© 2026 SGraph AI Ltd.</span>
+  <span class="sub-site-footer__meta" id="footer-meta">sgraph.ai/dev · site v0.2.0</span>
+</footer>
+
+<script type="module">
+  const REPO  = 'sgraph-ai/sgraph-ai__website';
+  const API   = `https://api.github.com/repos/${REPO}`;
+  const PER_PAGE = 30;
+
+  // Panel collapse restore
+  const shell = document.getElementById('sub-site-shell');
+  const _savedNav = localStorage.getItem('sg-nav-collapsed');
+  if (_savedNav === 'true' || (_savedNav === null && window.innerWidth <= 900)) {
+    shell.classList.add('nav-collapsed');
+  }
+
+  // ── Manifest ────────────────────────────────────────────────────────────────
+  async function loadManifest() {
+    try {
+      const r = await fetch('/manifest.json', { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const m = await r.json();
+      renderManifest(m);
+      // Update footer
+      const footerMeta = document.getElementById('footer-meta');
+      if (m.site?.version) {
+        footerMeta.textContent =
+          `sgraph.ai/dev · site ${m.site.version} · dev v${m.versions?.dev?.version ?? '—'}`;
+      }
+    } catch (e) {
+      document.getElementById('manifest-grid').innerHTML =
+        `<div style="color:#aaa;font-size:.82rem">manifest.json unavailable: ${e.message}</div>`;
+    }
+  }
+
+  function renderManifest(m) {
+    const grid = document.getElementById('manifest-grid');
+    const vs = m.versions ?? {};
+    const items = Object.entries(vs).map(([key, v]) => `
+      <div class="ci-manifest__item">
+        <div class="ci-manifest__label">${v.label ?? key}</div>
+        <div class="ci-manifest__value">${v.version ?? '—'}</div>
+        ${v.updated ? `<div class="ci-manifest__date">${v.updated}</div>` : ''}
+        ${v.notes   ? `<div class="ci-manifest__notes">${v.notes}</div>` : ''}
+      </div>`).join('');
+    grid.innerHTML = items ||
+      `<div style="color:#aaa;font-size:.82rem">No version data in manifest</div>`;
+  }
+
+  // ── GitHub Actions API ───────────────────────────────────────────────────────
+  let _allRuns = [];
+  let _workflows = {};
+
+  async function fetchRuns() {
+    const container = document.getElementById('ci-runs-container');
+    container.innerHTML = '<div class="ci-loading">Fetching workflow runs…</div>';
+
+    try {
+      // Fetch latest runs (no auth — public repo, rate limit 60/hr for unauthenticated)
+      const r = await fetch(`${API}/actions/runs?per_page=${PER_PAGE}`, {
+        headers: { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' }
+      });
+
+      if (r.status === 403 || r.status === 429) {
+        const resetTs = r.headers.get('x-ratelimit-reset');
+        const resetTime = resetTs ? new Date(parseInt(resetTs, 10) * 1000).toLocaleTimeString() : '?';
+        throw new Error(`GitHub API rate limit hit. Resets at ${resetTime}.`);
+      }
+      if (!r.ok) throw new Error(`GitHub API returned HTTP ${r.status}`);
+
+      const data = await r.json();
+      _allRuns = data.workflow_runs ?? [];
+
+      // Collect workflow names for filter dropdown
+      const wfNames = [...new Set(_allRuns.map(r => r.name))].sort();
+      const sel = document.getElementById('filter-workflow');
+      sel.innerHTML = '<option value="">All workflows</option>' +
+        wfNames.map(n => `<option value="${n}">${n}</option>`).join('');
+
+      document.getElementById('last-fetch').textContent =
+        `Last fetched: ${new Date().toLocaleTimeString()}`;
+
+      renderRuns();
+    } catch (err) {
+      container.innerHTML =
+        `<div class="ci-error">⚠ ${err.message}</div>
+         <div style="font-size:.8rem;color:#888;margin-top:.5rem;padding:0 .25rem">
+           GitHub's unauthenticated API allows 60 requests/hour per IP.
+           If you hit the limit, wait a few minutes and refresh.
+         </div>`;
+    }
+  }
+
+  function renderRuns() {
+    const container = document.getElementById('ci-runs-container');
+    const wfFilter = document.getElementById('filter-workflow').value;
+    const stFilter = document.getElementById('filter-status').value;
+
+    let runs = _allRuns;
+    if (wfFilter) runs = runs.filter(r => r.name === wfFilter);
+    if (stFilter) runs = runs.filter(r => {
+      const conclusion = r.conclusion ?? r.status;
+      return conclusion === stFilter;
+    });
+
+    if (!runs.length) {
+      container.innerHTML = '<div class="ci-empty">No workflow runs match the current filters.</div>';
+      return;
+    }
+
+    // Group by workflow name
+    const byWorkflow = {};
+    runs.forEach(r => {
+      const name = r.name ?? 'Unknown';
+      if (!byWorkflow[name]) byWorkflow[name] = [];
+      byWorkflow[name].push(r);
+    });
+
+    const html = Object.entries(byWorkflow).map(([wfName, wfRuns]) => `
+      <div class="ci-workflow-section">
+        <h3>${escHtml(wfName)}</h3>
+        ${wfRuns.map(runCard).join('')}
+      </div>`).join('');
+
+    container.innerHTML = `<div class="ci-workflow-runs">${html}</div>`;
+
+    // Wire up "view on GitHub" links
+    container.querySelectorAll('[data-run-url]').forEach(el => {
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', () => {
+        window.open(el.dataset.runUrl, '_blank', 'noopener');
+      });
+    });
+  }
+
+  function runCard(run) {
+    const conclusion = run.conclusion; // success | failure | cancelled | skipped | neutral | timed_out
+    const status     = run.status;    // queued | in_progress | completed | waiting
+    const state      = conclusion ?? status;
+    const icon       = stateIcon(state);
+    const badgeCls   = `ci-badge ci-badge--${state ?? 'neutral'}`;
+
+    const started  = run.run_started_at ? new Date(run.run_started_at) : null;
+    const updated  = run.updated_at     ? new Date(run.updated_at)     : null;
+    const duration = started && updated
+      ? formatDuration((updated - started) / 1000)
+      : null;
+    const timeAgo  = started ? timeAgoStr(started) : '';
+
+    const commit = run.head_commit;
+    const commitMsg = commit?.message?.split('\n')[0] ?? '';
+    const commitSha = (run.head_sha ?? '').slice(0, 7);
+    const actor     = run.actor?.login ?? run.triggering_actor?.login ?? '';
+
+    return `
+      <div class="ci-run" data-run-url="${escAttr(run.html_url)}">
+        <div class="ci-run__icon" style="background:${stateColor(state)}22;color:${stateColor(state)}">
+          ${icon}
+        </div>
+        <div class="ci-run__body">
+          <div class="ci-run__title">${escHtml(commitMsg || run.display_title || `Run #${run.run_number}`)}</div>
+          <div class="ci-run__meta">
+            <span class="ci-run__branch">${escHtml(run.head_branch ?? '—')}</span>
+            ${commitSha ? `<code style="font-size:.72rem;color:#aaa">${commitSha}</code>` : ''}
+            ${actor ? `<span>by ${escHtml(actor)}</span>` : ''}
+            ${timeAgo ? `<span>${timeAgo}</span>` : ''}
+          </div>
+        </div>
+        <div class="ci-run__right">
+          <span class="${badgeCls}">${escHtml(state ?? 'unknown')}</span>
+          ${duration ? `<div class="ci-run__duration">${duration}</div>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function stateIcon(s) {
+    if (s === 'success')     return '✓';
+    if (s === 'failure')     return '✗';
+    if (s === 'in_progress') return '⟳';
+    if (s === 'cancelled')   return '⊘';
+    if (s === 'skipped')     return '⊘';
+    if (s === 'timed_out')   return '⏱';
+    return '●';
+  }
+
+  function stateColor(s) {
+    if (s === 'success')     return '#16a34a';
+    if (s === 'failure')     return '#dc2626';
+    if (s === 'in_progress') return '#2563eb';
+    if (s === 'cancelled' || s === 'skipped') return '#6b7280';
+    if (s === 'timed_out')   return '#ea580c';
+    return '#94a3b8';
+  }
+
+  function formatDuration(seconds) {
+    if (seconds < 60)  return `${Math.round(seconds)}s`;
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  }
+
+  function timeAgoStr(date) {
+    const secs = Math.floor((Date.now() - date) / 1000);
+    if (secs < 60)   return 'just now';
+    if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
+    if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
+    return `${Math.floor(secs / 86400)}d ago`;
+  }
+
+  function escHtml(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                          .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function escAttr(s) { return escHtml(s); }
+
+  // ── Wire up controls ─────────────────────────────────────────────────────────
+  document.getElementById('btn-refresh').addEventListener('click', fetchRuns);
+  document.getElementById('filter-workflow').addEventListener('change', renderRuns);
+  document.getElementById('filter-status').addEventListener('change', renderRuns);
+
+  // ── Bootstrap ────────────────────────────────────────────────────────────────
+  loadManifest();
+  fetchRuns();
+</script>
+
+<script type="module" src="../../../_common/js/components/sg-site-header/v0/v0.1/v0.1.0/sg-site-header.js"></script>
+<script type="module" src="../../../_common/js/components/sg-sub-nav/v0/v0.1/v0.1.0/sg-sub-nav.js"></script>
+<script type="module" src="../../../_common/js/components/sg-side-nav/v0/v0.1/v0.1.0/sg-side-nav.js"></script>
+</body>
+</html>
