@@ -63,18 +63,11 @@ class SgDebugPanel extends HTMLElement {
         box-shadow: 0 2px 8px rgba(0,0,0,.4);
       }
 
+      /* Container is always pointer-events:none — only the drawer itself is interactive */
       .sgdbg-panel {
         position: fixed; inset: 0; z-index: 8999;
         pointer-events: none;
       }
-      .sgdbg-panel.open { pointer-events: all; }
-
-      .sgdbg-overlay {
-        position: absolute; inset: 0;
-        background: rgba(0,0,0,.25);
-        opacity: 0; transition: opacity .2s;
-      }
-      .sgdbg-panel.open .sgdbg-overlay { opacity: 1; }
 
       .sgdbg-drawer {
         position: absolute; top: 0; right: 0; bottom: 0;
@@ -85,7 +78,8 @@ class SgDebugPanel extends HTMLElement {
         transform: translateX(100%); transition: transform .22s ease;
         box-shadow: -4px 0 24px rgba(0,0,0,.5);
         font-family: 'DM Mono', 'Menlo', 'Consolas', monospace;
-        font-size: 12px; user-select: none;
+        font-size: 12px;
+        pointer-events: all;   /* drawer is interactive even when overlay is not */
       }
       .sgdbg-drawer.resizing { transition: none; user-select: none; }
       .sgdbg-panel.open .sgdbg-drawer { transform: translateX(0); }
@@ -235,7 +229,6 @@ class SgDebugPanel extends HTMLElement {
     const panel = document.createElement('div');
     panel.className = 'sgdbg-panel' + (this._open ? ' open' : '');
     panel.innerHTML = `
-      <div class="sgdbg-overlay"></div>
       <div class="sgdbg-drawer">
         <div class="sgdbg-resize" id="sgdbg-resize"></div>
         <div class="sgdbg-head">
@@ -283,7 +276,6 @@ class SgDebugPanel extends HTMLElement {
     document.body.appendChild(panel);
     this._panel = panel;
 
-    // Overlay click does NOT close (panel stays until explicitly closed)
     panel.querySelector('#sgdbg-close').addEventListener('click', () => this.close());
 
     // Resize handle
