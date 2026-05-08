@@ -1,5 +1,5 @@
 /**
- * sg-debug-panel v0.1.2
+ * sg-debug-panel v0.1.4
  *
  * Floating debug overlay for sgraph.ai sub-sites. Two tabs:
  *   Log     — intercepted fetch calls (vault / GitHub API) + custom nav:* events
@@ -31,7 +31,7 @@ class SgDebugPanel extends HTMLElement {
     this._patchFetch();
     this._listenEvents();
     this._listenKeyboard();
-    this._pushLog({ kind: 'system', msg: `sg-debug-panel v0.1.1 · ${env} · ${location.pathname}` });
+    this._pushLog({ kind: 'system', msg: `sg-debug-panel v0.1.4 · ${env} · ${location.pathname}` });
   }
 
   disconnectedCallback() {
@@ -80,6 +80,7 @@ class SgDebugPanel extends HTMLElement {
         font-family: 'DM Mono', 'Menlo', 'Consolas', monospace;
         font-size: 12px;
         pointer-events: all;   /* drawer is interactive even when overlay is not */
+        overscroll-behavior: contain;
       }
       .sgdbg-drawer.resizing { transition: none; user-select: none; }
       .sgdbg-panel.open .sgdbg-drawer { transform: translateX(0); }
@@ -135,7 +136,7 @@ class SgDebugPanel extends HTMLElement {
       .sgdbg-tbtn.on { color: #38bdf8; border-color: #38bdf8; }
 
       /* Log entries */
-      .sgdbg-log { flex: 1; overflow-y: auto; padding: 4px 0; scroll-behavior: smooth; }
+      .sgdbg-log { flex: 1; overflow-y: auto; padding: 4px 0; overscroll-behavior: contain; }
       .sgdbg-entry {
         display: grid; grid-template-columns: 56px 60px 1fr;
         gap: 0 8px; padding: 4px 14px;
@@ -176,7 +177,7 @@ class SgDebugPanel extends HTMLElement {
       .sgdbg-entry.expanded .sgdbg-detail { display: block; }
 
       /* Sources tab */
-      .sgdbg-sources { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0; }
+      .sgdbg-sources { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0; overscroll-behavior: contain; }
       .sgdbg-source-item { border-bottom: 1px solid #1e293b; }
       .sgdbg-source-hd {
         display: flex; align-items: center; gap: 8px; padding: 8px 14px;
@@ -195,9 +196,14 @@ class SgDebugPanel extends HTMLElement {
       .sgdbg-source-body {
         display: none; padding: 10px 14px;
         white-space: pre-wrap; word-break: break-all;
-        font-size: 10.5px; color: #94a3b8; max-height: 400px; overflow-y: auto;
-        background: #0a1122;
+        font-size: 10.5px; color: #94a3b8; max-height: 60vh; overflow-y: auto;
+        background: #0a1122; overscroll-behavior: contain;
       }
+      /* JSON syntax highlighting */
+      .sgdbg-jk { color: #7dd3fc; }
+      .sgdbg-jv { color: #86efac; }
+      .sgdbg-jn { color: #fda4af; }
+      .sgdbg-jb { color: #fbbf24; }
       .sgdbg-source-item.open .sgdbg-source-body { display: block; }
       .sgdbg-src-empty { padding: 2rem; text-align: center; color: #334155; font-size: 11px; }
 
@@ -389,7 +395,7 @@ class SgDebugPanel extends HTMLElement {
   _pushLog(entry) {
     entry.ts = new Date().toLocaleTimeString('en-GB', { hour12:false, second:'2-digit', fractionalSecondDigits:2 });
     entry.id = ++SgDebugPanel._seq;
-    this._log.push(entry);
+    this._log.unshift(entry);
     this._updateCounts();
     if (this._open && this._activeTab==='log') this._renderLog();
   }
@@ -436,7 +442,6 @@ class SgDebugPanel extends HTMLElement {
     this._logEl.querySelectorAll('.sgdbg-entry').forEach(row =>
       row.addEventListener('click', () => row.classList.toggle('expanded'))
     );
-    this._logEl.scrollTop = this._logEl.scrollHeight;
   }
 
   // ── Sources ───────────────────────────────────────────────────────────────
@@ -450,36 +455,61 @@ class SgDebugPanel extends HTMLElement {
   }
 
   _renderSources() {
+    this._srcEl.innerHTML = '';
     if (!this._sources.length) {
-      this._srcEl.innerHTML = '<div class="sgdbg-src-empty">No sources captured yet.<br>Load an article or nav to populate.</div>';
+      const empty = document.createElement('div');
+      empty.className = 'sgdbg-src-empty';
+      empty.innerHTML = 'No sources captured yet.<br>Load an article or nav to populate.';
+      this._srcEl.appendChild(empty);
       return;
     }
-    this._srcEl.innerHTML = this._sources.map((s, i) => `
-      <div class="sgdbg-source-item${s.open?' open':''}" data-si="${i}">
-        <div class="sgdbg-source-hd">
-          <span class="sgdbg-source-hd-label">${esc(s.kind)} · ${esc(s.label)}</span>
-          <span class="sgdbg-source-hd-meta">${s.size ?? ''}</span>
-          <button class="sgdbg-source-hd-copy" data-si="${i}">Copy</button>
-        </div>
-        <div class="sgdbg-source-body">${esc(s.content)}</div>
-      </div>`).join('');
+    this._sources.forEach((s, i) => {
+      const item = document.createElement('div');
+      item.className = 'sgdbg-source-item' + (s.open ? ' open' : '');
 
-    this._srcEl.querySelectorAll('.sgdbg-source-hd').forEach((hd, i) => {
-      hd.addEventListener('click', e => {
-        if (e.target.classList.contains('sgdbg-source-hd-copy')) return;
-        this._sources[i].open = !this._sources[i].open;
-        this._renderSources();
-      });
-    });
-    this._srcEl.querySelectorAll('.sgdbg-source-hd-copy').forEach(btn => {
-      btn.addEventListener('click', e => {
+      const hd = document.createElement('div');
+      hd.className = 'sgdbg-source-hd';
+
+      const lbl = document.createElement('span');
+      lbl.className = 'sgdbg-source-hd-label';
+      lbl.textContent = `${s.kind} · ${s.label}`;
+
+      const meta = document.createElement('span');
+      meta.className = 'sgdbg-source-hd-meta';
+      meta.textContent = s.size ?? '';
+
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'sgdbg-source-hd-copy';
+      copyBtn.textContent = 'Copy';
+      copyBtn.addEventListener('click', e => {
         e.stopPropagation();
-        const si = parseInt(btn.dataset.si, 10);
-        navigator.clipboard?.writeText(this._sources[si]?.content ?? '').then(() => {
-          btn.textContent = 'Copied!';
-          setTimeout(() => btn.textContent = 'Copy', 1500);
+        navigator.clipboard?.writeText(s.content ?? '').then(() => {
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
         });
       });
+
+      hd.appendChild(lbl);
+      hd.appendChild(meta);
+      hd.appendChild(copyBtn);
+      hd.addEventListener('click', e => {
+        if (e.target === copyBtn) return;
+        this._sources[i].open = !this._sources[i].open;
+        item.classList.toggle('open', this._sources[i].open);
+      });
+
+      const body = document.createElement('div');
+      body.className = 'sgdbg-source-body';
+      const isJson = s.kind?.toLowerCase().includes('json');
+      if (isJson) {
+        body.innerHTML = hlJson(s.content ?? '');
+      } else {
+        body.textContent = s.content ?? '';
+      }
+
+      item.appendChild(hd);
+      item.appendChild(body);
+      this._srcEl.appendChild(item);
     });
   }
 
@@ -597,6 +627,21 @@ SgDebugPanel._seq = 0;
 
 function esc(s) {
   return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function hlJson(raw) {
+  // Escape HTML, then apply single-pass token regex for syntax highlighting
+  const h = raw.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return h.replace(
+    /("(?:[^"\\]|\\.)*")(\s*:)?|(-?\d+\.?\d*(?:[eE][+-]?\d+)?)|(true|false|null)/g,
+    (m, str, colon, num, kw) => {
+      if (str && colon) return `<span class="sgdbg-jk">${str}</span>${colon}`;
+      if (str)          return `<span class="sgdbg-jv">${str}</span>`;
+      if (num !== undefined && num !== '') return `<span class="sgdbg-jn">${num}</span>`;
+      if (kw)           return `<span class="sgdbg-jb">${kw}</span>`;
+      return m;
+    }
+  );
 }
 
 customElements.define('sg-debug-panel', SgDebugPanel);
