@@ -1965,7 +1965,7 @@ body.sub-site-page {
 
 sg-sub-nav {
   display: block;
-  margin: 0 32px;
+  margin: 0 32px 0 0;
 }
 
 /* Sub-nav home link — wraps monogram + text block */
@@ -1978,7 +1978,7 @@ sg-sub-nav {
 .sg-sub-nav__band {
   background: var(--ss-fg);
   color: #FAF7F2;
-  border-radius: 16px;
+  border-radius: 0 16px 16px 0;
   padding: 28px 32px;
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -2091,10 +2091,11 @@ sg-sub-nav {
 .sub-site {
   display: grid;
   grid-template-columns: var(--ss-sidebar-w) 1fr;
-  margin: 24px 32px 40px;
+  margin: 0 32px 40px 0;
   background: var(--ss-content-bg);
   border: 1px solid var(--ss-border);
-  border-radius: 16px;
+  border-left: none;
+  border-radius: 0 16px 16px 0;
   overflow: clip; /* clip not hidden: allows sticky children, clips border-radius */
   min-height: 70vh;
   align-items: start;
@@ -2135,7 +2136,7 @@ sg-side-nav {
   top: calc(var(--site-header-height, 3.75rem) + 0.5rem);
   max-height: calc(100vh - var(--site-header-height, 3.75rem) - 1rem);
   overflow-y: auto;
-  align-self: start;
+  align-self: stretch;
 }
 
 /* Sidebar panel collapse toggle */
@@ -2539,6 +2540,7 @@ sg-side-nav {
     grid-template-rows: auto auto;
     padding: 20px 20px;
     gap: 16px;
+    border-radius: 16px;
   }
 
   .sg-sub-nav__controls {
@@ -2553,6 +2555,7 @@ sg-side-nav {
   .sub-site {
     margin: 16px 16px 32px;
     grid-template-columns: 1fr;
+    border-left: 1px solid var(--ss-border);
     border-radius: 12px;
   }
 
