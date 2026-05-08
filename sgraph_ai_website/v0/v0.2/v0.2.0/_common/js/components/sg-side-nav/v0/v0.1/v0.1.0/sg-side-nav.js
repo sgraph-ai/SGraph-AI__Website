@@ -83,7 +83,8 @@ class SgSideNav extends HTMLElement {
             content_object_id:  item.object_id,
             vault_id:           item.vault_id  ?? undefined,
             read_key:           item.read_key  ?? undefined,
-            render:             item.render    ?? 'markdown' }
+            render:             item.render    ?? 'markdown',
+            schema:             item.schema    ?? undefined }
         : { title: item.title, href: item.href, slug: item.slug ?? '' };
       if (section) {
         if (!(section.articles ?? []).some(a => a.slug === entry.slug)) {
@@ -156,6 +157,7 @@ class SgSideNav extends HTMLElement {
                          data-slug="${article.slug ?? ''}"
                          data-object-id="${article.content_object_id ?? ''}"
                          data-render="${article.render ?? 'markdown'}"
+                         data-schema="${article.schema ?? ''}"
                          data-title="${article.title}"
                          data-section="${section.title}"
                          data-vault-id="${article.vault_id ?? ''}"
@@ -249,6 +251,7 @@ class SgSideNav extends HTMLElement {
             slug:              btn.dataset.slug,
             content_object_id: btn.dataset.objectId,
             render:            btn.dataset.render,
+            schema:            btn.dataset.schema   || null,
             sectionTitle:      btn.dataset.section ?? '',
             vault_id:          btn.dataset.vaultId  || null,
             read_key:          btn.dataset.readKey  || null,
@@ -282,6 +285,7 @@ class SgSideNav extends HTMLElement {
               slug:              target.dataset.slug,
               content_object_id: target.dataset.objectId,
               render:            target.dataset.render,
+              schema:            target.dataset.schema   || null,
               sectionTitle:      target.dataset.section ?? '',
               vault_id:          target.dataset.vaultId || null,
               read_key:          target.dataset.readKey || null,
