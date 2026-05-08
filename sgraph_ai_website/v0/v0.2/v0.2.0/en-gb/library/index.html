@@ -92,6 +92,9 @@
   <span class="sub-site-footer__meta">sgraph.ai/library · site v0.2.0 · content nav v3.6</span>
 </footer>
 
+<sg-debug-panel></sg-debug-panel>
+<script type="module" src="../../_common/js/components/sg-debug-panel/v0/v0.1/v0.1.0/sg-debug-panel.js"></script>
+
 <script type="module">
   const VAULT_ID = '4wrqg006';
   const READ_KEY = 'GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg';
@@ -137,6 +140,9 @@
     allArticles = sections.flatMap(s =>
       (s.articles ?? []).map(a => ({ ...a, sectionTitle: s.title }))
     );
+    // Emit full nav tree to debug panel
+    document.dispatchEvent(new CustomEvent('debug:nav-json',
+      { detail: { json: { sections }, src: 'library nav (live)' } }));
     buildLandingCards(sections);
 
     const slug = slugFromPath();
