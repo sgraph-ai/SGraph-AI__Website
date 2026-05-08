@@ -55,7 +55,7 @@
     src="nav.json"
     tree-label="Dev"
     version="v0.2.0"
-    extra-links='[{"section":"Tools","title":"Open Vaults Directory","href":"/en-gb/dev/vaults/","slug":"vaults"},{"section":"Status","title":"Workstreams","slug":"status/workstreams","object_id":"obj-cas-imm-32aa32595ec4","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Issues","slug":"status/issues","object_id":"obj-cas-imm-da66557cad10","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Agents","slug":"status/agents","object_id":"obj-cas-imm-652a31e21300","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"}]'
+    extra-links='[{"section":"Tools","title":"Open Vaults Directory","href":"/en-gb/dev/vaults/","slug":"vaults"},{"section":"Tools","title":"CI / GitHub Actions","href":"/en-gb/dev/ci/","slug":"ci"},{"section":"Status","title":"Workstreams","slug":"status/workstreams","object_id":"obj-cas-imm-32aa32595ec4","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Issues","slug":"status/issues","object_id":"obj-cas-imm-da66557cad10","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Agents","slug":"status/agents","object_id":"obj-cas-imm-652a31e21300","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"}]'
     home-href="/en-gb/dev/"
     auto-select>
   </sg-side-nav>
@@ -85,7 +85,7 @@
 
 <footer class="sub-site-footer">
   <span class="sub-site-footer__copy">© 2026 SGraph AI Ltd.</span>
-  <span class="sub-site-footer__meta">sgraph.ai/dev · site v0.2.0 · status vault 1lfehfjh</span>
+  <span class="sub-site-footer__meta" id="footer-meta">sgraph.ai/dev · site v0.2.0 · status vault 1lfehfjh</span>
 </footer>
 
 <script type="module">
@@ -116,6 +116,19 @@
   let allArticles = [];
   let allSections = [];
   let headingObserver = null;
+
+  // Load manifest.json and update footer with dev version
+  fetch('/manifest.json', { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(m => {
+      if (!m) return;
+      const footerMeta = document.getElementById('footer-meta');
+      const devV = m.versions?.dev?.version ?? null;
+      footerMeta.textContent = devV
+        ? `sgraph.ai/dev · site ${m.site?.version ?? 'v0.2.0'} · dev v${devV}`
+        : `sgraph.ai/dev · site ${m.site?.version ?? 'v0.2.0'} · status vault 1lfehfjh`;
+    })
+    .catch(() => {});
 
   const initialSlug = slugFromPath();
   if (initialSlug) sideNav.setAttribute('active-slug', initialSlug);
