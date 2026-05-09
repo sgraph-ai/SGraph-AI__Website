@@ -186,7 +186,7 @@ class SgSideNav extends HTMLElement {
                   data-section-slug="${sectionSlug}">${section.title}</span>
           </div>
           ${collapsed ? '' : `
-            <div class="sg-side-nav__children">${docs}${subs}</div>
+            <div class="sg-side-nav__children">${docs}</div>
           `}
         </div>`;
     }).join('');
