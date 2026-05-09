@@ -709,6 +709,11 @@
 </script>
 
 <script src="../../_common/js/nav.js"></script>
+<script>
+  // Reload if browser restores page from bfcache (back/forward cache).
+  // Prevents stale HTML shell being shown after navigation on mobile.
+  window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+</script>
 <script type="module" src="../../_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
 <script type="module" src="../../_common/js/components/sg-sub-nav/v0/v0.1/v0.1.0/sg-sub-nav.js"></script>
 <script type="module" src="../../_common/js/components/sg-side-nav/v0/v0.1/v0.1.0/sg-side-nav.js"></script>
