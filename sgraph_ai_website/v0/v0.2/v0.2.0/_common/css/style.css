@@ -2583,6 +2583,10 @@ sg-side-nav {
     overflow-y: visible;
   }
 
+  /* On mobile, collapsed/expanded both stay single-column — sidebar stacks above content */
+  .sub-site.nav-collapsed,
+  .sub-site.nav-collapsed.with-toc { grid-template-columns: 1fr; }
+
   /* When collapsed on mobile: sidebar shrinks to just the toggle bar */
   .sub-site.nav-collapsed sg-side-nav {
     border-bottom: 1px solid var(--ss-border);
