@@ -108,7 +108,10 @@ class SgSideNav extends HTMLElement {
     if (activeSlug) {
       sections.forEach((s, i) => {
         if ((s.articles ?? []).some(a =>
-          a.slug === activeSlug || (a.children ?? []).some(c => c.slug === activeSlug)
+          a.slug === activeSlug || (a.children ?? []).some(c => {
+            const cs = (c.slug && a.slug && !c.slug.startsWith(a.slug + '/')) ? `${a.slug}/${c.slug}` : c.slug;
+            return cs === activeSlug;
+          })
         )) {
           this._collapsed.delete(i);
         }
@@ -170,7 +173,13 @@ class SgSideNav extends HTMLElement {
       const docs = articles.map(article => {
         const children = article.children ?? [];
         if (!children.length) return renderDoc(article, section.title);
-        const childDocs = children.map(c => renderDoc(c, section.title, ' sg-side-nav__doc--child', article.title)).join('');
+        const childDocs = children.map(c => {
+          // Build compound slug if child has a short slug (no parent prefix yet)
+          const childSlug = (c.slug && article.slug && !c.slug.startsWith(article.slug + '/'))
+            ? `${article.slug}/${c.slug}`
+            : c.slug;
+          return renderDoc({ ...c, slug: childSlug }, section.title, ' sg-side-nav__doc--child', article.title);
+        }).join('');
         return renderDoc(article, section.title) +
           `<div class="sg-side-nav__grandchildren">${childDocs}</div>`;
       }).join('');

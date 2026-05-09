@@ -166,6 +166,11 @@
     setBreadcrumbs('Library', sectionTitle, parentTitle || null, title);
     showArticle(content_object_id, render ?? 'markdown', vault_id, read_key);
     buildNextPrev(slug);
+    // Auto-collapse nav on mobile so content is immediately visible
+    if (window.innerWidth <= 900) {
+      shell.classList.add('nav-collapsed');
+      localStorage.setItem('sg-nav-collapsed', 'true');
+    }
   });
 
   // Section folder label clicked — show section index page
