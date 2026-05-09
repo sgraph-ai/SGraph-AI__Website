@@ -186,7 +186,7 @@ class SgSideNav extends HTMLElement {
                   data-section-slug="${sectionSlug}">${section.title}</span>
           </div>
           ${collapsed ? '' : `
-            <div class="sg-side-nav__children">${docs}</div>
+            <div class="sg-side-nav__children">${docs}${subs}</div>
           `}
         </div>`;
     }).join('');
@@ -227,6 +227,18 @@ class SgSideNav extends HTMLElement {
         const idx = parseInt(chev.dataset.chev, 10);
         if (this._collapsed.has(idx)) this._collapsed.delete(idx);
         else this._collapsed.add(idx);
+        this._render(sections);
+      });
+    });
+
+    // Subsection toggle
+    if (!this._collapsedSubs) this._collapsedSubs = new Set();
+    this.querySelectorAll('[data-subsec]').forEach(el => {
+      el.addEventListener('click', e => {
+        e.stopPropagation();
+        const key = el.dataset.subsec;
+        if (this._collapsedSubs.has(key)) this._collapsedSubs.delete(key);
+        else this._collapsedSubs.add(key);
         this._render(sections);
       });
     });
