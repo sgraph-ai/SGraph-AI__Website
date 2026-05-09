@@ -2583,13 +2583,18 @@ sg-side-nav {
     overflow-y: visible;
   }
 
+  /* On mobile, collapsed/expanded both stay single-column — sidebar stacks above content */
+  .sub-site.nav-collapsed,
+  .sub-site.nav-collapsed.with-toc { grid-template-columns: 1fr; }
+
   /* When collapsed on mobile: sidebar shrinks to just the toggle bar */
   .sub-site.nav-collapsed sg-side-nav {
     border-bottom: 1px solid var(--ss-border);
   }
 
-  /* Mobile toggle: full-width, left-aligned, with text label */
+  /* Mobile toggle: full-width, left-aligned, with text label; not sticky */
   .sg-side-nav__toggle {
+    position: static;
     height: 44px;
     justify-content: flex-start;
     padding: 0 16px;

@@ -108,7 +108,10 @@ class SgSideNav extends HTMLElement {
     if (activeSlug) {
       sections.forEach((s, i) => {
         if ((s.articles ?? []).some(a =>
-          a.slug === activeSlug || (a.children ?? []).some(c => c.slug === activeSlug)
+          a.slug === activeSlug || (a.children ?? []).some(c => {
+            const cs = (c.slug && a.slug && !c.slug.startsWith(a.slug + '/')) ? `${a.slug}/${c.slug}` : c.slug;
+            return cs === activeSlug;
+          })
         )) {
           this._collapsed.delete(i);
         }
@@ -140,7 +143,7 @@ class SgSideNav extends HTMLElement {
             stroke-linecap="round" stroke-linejoin="round"/>
     </svg>`;
 
-    const renderDoc = (article, sectionTitle, extraCls = '') => {
+    const renderDoc = (article, sectionTitle, extraCls = '', parentTitle = '') => {
       const isActive = article.slug === activeSlug;
       const cls = `sg-side-nav__doc${isActive ? ' sg-side-nav__doc--active' : ''}${extraCls}`;
       if (article.href) {
@@ -155,6 +158,7 @@ class SgSideNav extends HTMLElement {
                        data-schema="${article.schema ?? ''}"
                        data-title="${article.title}"
                        data-section="${sectionTitle}"
+                       data-parent-title="${parentTitle}"
                        data-vault-id="${article.vault_id ?? ''}"
                        data-read-key="${article.read_key ?? ''}">
                 ${docIcon}<span class="sg-side-nav__doc-label">${article.title}</span>
@@ -169,7 +173,13 @@ class SgSideNav extends HTMLElement {
       const docs = articles.map(article => {
         const children = article.children ?? [];
         if (!children.length) return renderDoc(article, section.title);
-        const childDocs = children.map(c => renderDoc(c, section.title, ' sg-side-nav__doc--child')).join('');
+        const childDocs = children.map(c => {
+          // Build compound slug if child has a short slug (no parent prefix yet)
+          const childSlug = (c.slug && article.slug && !c.slug.startsWith(article.slug + '/'))
+            ? `${article.slug}/${c.slug}`
+            : c.slug;
+          return renderDoc({ ...c, slug: childSlug }, section.title, ' sg-side-nav__doc--child', article.title);
+        }).join('');
         return renderDoc(article, section.title) +
           `<div class="sg-side-nav__grandchildren">${childDocs}</div>`;
       }).join('');
@@ -272,6 +282,7 @@ class SgSideNav extends HTMLElement {
             render:            btn.dataset.render,
             schema:            btn.dataset.schema   || null,
             sectionTitle:      btn.dataset.section ?? '',
+            parentTitle:       btn.dataset.parentTitle || null,
             vault_id:          btn.dataset.vaultId  || null,
             read_key:          btn.dataset.readKey  || null,
           },
@@ -306,6 +317,7 @@ class SgSideNav extends HTMLElement {
               render:            target.dataset.render,
               schema:            target.dataset.schema   || null,
               sectionTitle:      target.dataset.section ?? '',
+              parentTitle:       target.dataset.parentTitle || null,
               vault_id:          target.dataset.vaultId || null,
               read_key:          target.dataset.readKey || null,
             },
