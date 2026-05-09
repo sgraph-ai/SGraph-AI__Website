@@ -107,13 +107,16 @@ class SgSideNav extends HTMLElement {
     // Always ensure the section containing the active article is expanded
     if (activeSlug) {
       sections.forEach((s, i) => {
-        if ((s.articles ?? []).some(a => a.slug === activeSlug)) {
+        if ((s.articles ?? []).some(a =>
+          a.slug === activeSlug || (a.children ?? []).some(c => c.slug === activeSlug)
+        )) {
           this._collapsed.delete(i);
         }
       });
     }
 
-    const totalArticles = sections.reduce((n, s) => n + (s.articles?.length ?? 0), 0);
+    const totalArticles = sections.reduce((n, s) =>
+      n + (s.articles?.reduce((m, a) => m + 1 + (a.children?.length ?? 0), 0) ?? 0), 0);
 
     const env = location.hostname.startsWith('qa.') ? 'qa'
               : location.hostname.startsWith('dev.') ? 'dev'
@@ -137,34 +140,38 @@ class SgSideNav extends HTMLElement {
             stroke-linecap="round" stroke-linejoin="round"/>
     </svg>`;
 
+    const renderDoc = (article, sectionTitle, extraCls = '') => {
+      const isActive = article.slug === activeSlug;
+      const cls = `sg-side-nav__doc${isActive ? ' sg-side-nav__doc--active' : ''}${extraCls}`;
+      if (article.href) {
+        return `<a class="${cls}" href="${article.href}" data-slug="${article.slug ?? ''}">
+                   ${docIcon}<span class="sg-side-nav__doc-label">${article.title}</span>
+                 </a>`;
+      }
+      return `<button class="${cls}"
+                       data-slug="${article.slug ?? ''}"
+                       data-object-id="${article.content_object_id ?? ''}"
+                       data-render="${article.render ?? 'markdown'}"
+                       data-schema="${article.schema ?? ''}"
+                       data-title="${article.title}"
+                       data-section="${sectionTitle}"
+                       data-vault-id="${article.vault_id ?? ''}"
+                       data-read-key="${article.read_key ?? ''}">
+                ${docIcon}<span class="sg-side-nav__doc-label">${article.title}</span>
+              </button>`;
+    };
+
     const tree = sections.map((section, i) => {
       const collapsed    = this._collapsed.has(i);
       const articles     = section.articles ?? [];
       const sectionSlug  = section.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
 
       const docs = articles.map(article => {
-        const isActive = article.slug === activeSlug;
-        const cls = `sg-side-nav__doc${isActive ? ' sg-side-nav__doc--active' : ''}`;
-
-        if (article.href) {
-          return `<a class="${cls}" href="${article.href}"
-                     data-slug="${article.slug ?? ''}">
-                   ${docIcon}
-                   <span class="sg-side-nav__doc-label">${article.title}</span>
-                 </a>`;
-        }
-        return `<button class="${cls}"
-                         data-slug="${article.slug ?? ''}"
-                         data-object-id="${article.content_object_id ?? ''}"
-                         data-render="${article.render ?? 'markdown'}"
-                         data-schema="${article.schema ?? ''}"
-                         data-title="${article.title}"
-                         data-section="${section.title}"
-                         data-vault-id="${article.vault_id ?? ''}"
-                         data-read-key="${article.read_key ?? ''}">
-                  ${docIcon}
-                  <span class="sg-side-nav__doc-label">${article.title}</span>
-                </button>`;
+        const children = article.children ?? [];
+        if (!children.length) return renderDoc(article, section.title);
+        const childDocs = children.map(c => renderDoc(c, section.title, ' sg-side-nav__doc--child')).join('');
+        return renderDoc(article, section.title) +
+          `<div class="sg-side-nav__grandchildren">${childDocs}</div>`;
       }).join('');
 
       return `
