@@ -1,30 +1,36 @@
 /**
- * sg-side-nav v3 — file-tree style sidebar navigation (two-tone paper design)
+ * sg-side-nav v4 — file-tree sidebar navigation
  *
  * Attributes:
- *   src              — URL of a nav JSON file (local or absolute)
+ *   src              — URL of a nav JSON file
  *   vault-id         — content vault id
  *   read-key         — base64url AES-256-GCM read key
  *   nav-object-id    — vault object-id of the nav JSON
  *   active-slug      — slug of the currently active article
- *   auto-select      — boolean; fires nav:select for active-slug article on first
- *                      data load. Does NOT auto-select when active-slug is empty
- *                      (page shows landing overview instead).
- *   tree-label       — label for sidebar header (default: "Contents")
- *   version          — version string shown in footer (e.g. "v0.2.0")
+ *   auto-select      — boolean; fires nav:select for active-slug on first load
+ *   tree-label       — sidebar header label (default: "Contents")
+ *   version          — version string shown in footer
  *
- * Nav JSON shapes handled:
+ * Nav JSON shapes:
  *   { "library": { "sections": [...] } }
  *   { "dev":     { "sections": [...] } }
  *   { "sections": [...] }
  *
- * Articles:
- *   href field            → rendered as <a> (link-out, not SPA)
- *   content_object_id     → rendered as <button> (fires nav:select)
+ * Section fields:
+ *   articles[]        — inline articles (current behaviour)
+ *   nav_object_id     — vault object-id of a child nav JSON (lazy-loaded on expand)
+ *   vault_id          — override vault for nav_object_id fetch
+ *   read_key          — override read key for nav_object_id fetch
+ *
+ * Article fields:
+ *   href              — renders as <a> (link-out)
+ *   content_object_id — renders as <button> (fires nav:select)
+ *   children[]        — renders article as a collapsible folder
  *
  * Fires:
- *   nav:loaded  — detail: { sections, totalArticles } — once on first data load
- *   nav:select  — detail: { title, slug, content_object_id, render, sectionTitle }
+ *   nav:loaded  — detail: { sections, totalArticles }
+ *   nav:select  — detail: { title, slug, content_object_id, render, schema,
+ *                           sectionTitle, parentTitle, vault_id, read_key }
  */
 class SgSideNav extends HTMLElement {
   static get observedAttributes() {
@@ -69,6 +75,28 @@ class SgSideNav extends HTMLElement {
     }
   }
 
+  // Fetch a section's articles from vault when nav_object_id is declared
+  async _loadSection(section, sections) {
+    section._loading = true;
+    try {
+      const { importReadKey, readObject } =
+        await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
+      const vaultId  = section.vault_id  ?? this.getAttribute('vault-id');
+      const readKey  = section.read_key  ?? this.getAttribute('read-key');
+      const cryptoKey = await importReadKey(readKey);
+      const buf = await readObject('https://send.sgraph.ai', vaultId, section.nav_object_id, cryptoKey);
+      const data = JSON.parse(new TextDecoder().decode(buf));
+      section._loadedArticles = (data.library ?? data.dev ?? data).articles ?? data.articles ?? [];
+      section._loading = false;
+      this._render(sections);
+    } catch (err) {
+      console.error('sg-side-nav: section load error', section.title, err);
+      section._loading = false;
+      section._loadError = true;
+      this._render(sections);
+    }
+  }
+
   _injectExtraLinks(sections) {
     const raw = this.getAttribute('extra-links');
     if (!raw) return;
@@ -76,15 +104,14 @@ class SgSideNav extends HTMLElement {
     try { extras = JSON.parse(raw); } catch { return; }
     for (const item of extras) {
       const section = sections.find(s => s.title === item.section);
-      // Items with object_id become vault-backed buttons; items with href become links
       const entry = item.object_id
-        ? { title:              item.title,
-            slug:               item.slug ?? '',
-            content_object_id:  item.object_id,
-            vault_id:           item.vault_id  ?? undefined,
-            read_key:           item.read_key  ?? undefined,
-            render:             item.render    ?? 'markdown',
-            schema:             item.schema    ?? undefined }
+        ? { title:             item.title,
+            slug:              item.slug ?? '',
+            content_object_id: item.object_id,
+            vault_id:          item.vault_id  ?? undefined,
+            read_key:          item.read_key  ?? undefined,
+            render:            item.render    ?? 'markdown',
+            schema:            item.schema    ?? undefined }
         : { title: item.title, href: item.href, slug: item.slug ?? '' };
       if (section) {
         if (!(section.articles ?? []).some(a => a.slug === entry.slug)) {
@@ -97,35 +124,55 @@ class SgSideNav extends HTMLElement {
   }
 
   _render(sections) {
-    const activeSlug  = this.getAttribute('active-slug') ?? '';
-    const version     = this.getAttribute('version') ?? '';
-    const treeLabel   = this.getAttribute('tree-label') ?? 'Contents';
-    // Initialise collapsed state: all sections collapsed by default on first render
+    const activeSlug = this.getAttribute('active-slug') ?? '';
+    const version    = this.getAttribute('version') ?? '';
+    const treeLabel  = this.getAttribute('tree-label') ?? 'Contents';
+
+    // ── Collapse state: sections ──────────────────────────────────────────
     if (!this._collapsed) {
       this._collapsed = new Set(sections.map((_, i) => i));
     }
-    // Always ensure the section containing the active article is expanded
-    if (activeSlug) {
-      sections.forEach((s, i) => {
-        if ((s.articles ?? []).some(a =>
-          a.slug === activeSlug || (a.children ?? []).some(c => {
-            const cs = (c.slug && a.slug && !c.slug.startsWith(a.slug + '/')) ? `${a.slug}/${c.slug}` : c.slug;
-            return cs === activeSlug;
-          })
-        )) {
-          this._collapsed.delete(i);
-        }
+
+    // ── Collapse state: article folders (articles with children[]) ────────
+    if (!this._collapsedFolders) {
+      this._collapsedFolders = new Set();
+      // Default all article-folders to collapsed
+      sections.forEach(s => {
+        (s._loadedArticles ?? s.articles ?? []).forEach(a => {
+          if ((a.children ?? []).length) this._collapsedFolders.add(a.slug ?? a.title);
+        });
       });
     }
 
-    const totalArticles = sections.reduce((n, s) =>
-      n + (s.articles?.reduce((m, a) => m + 1 + (a.children?.length ?? 0), 0) ?? 0), 0);
+    // Expand section + article-folder that contains the active slug
+    if (activeSlug) {
+      sections.forEach((s, i) => {
+        const arts = s._loadedArticles ?? s.articles ?? [];
+        arts.forEach(a => {
+          const isParent = a.slug === activeSlug;
+          const hasActiveChild = (a.children ?? []).some(c => {
+            const cs = _compoundSlug(a.slug, c.slug);
+            return cs === activeSlug;
+          });
+          if (isParent || hasActiveChild) {
+            this._collapsed.delete(i);
+            if ((a.children ?? []).length) this._collapsedFolders.delete(a.slug ?? a.title);
+          }
+        });
+      });
+    }
+
+    const totalArticles = sections.reduce((n, s) => {
+      const arts = s._loadedArticles ?? s.articles ?? [];
+      return n + arts.reduce((m, a) => m + 1 + (a.children?.length ?? 0), 0);
+    }, 0);
 
     const env = location.hostname.startsWith('qa.') ? 'qa'
               : location.hostname.startsWith('dev.') ? 'dev'
               : location.hostname === 'localhost' ? 'local'
               : 'prod';
 
+    // ── SVG icons ─────────────────────────────────────────────────────────
     const folderIcon = `<svg class="sg-side-nav__folder-icon" width="13" height="13"
         viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path d="M2 5a1.5 1.5 0 011.5-1.5h3.086a1 1 0 01.707.293L8.5 5H12.5A1.5 1.5 0 0114 6.5v5A1.5 1.5 0 0112.5 13h-9A1.5 1.5 0 012 11.5V5z"
@@ -143,6 +190,9 @@ class SgSideNav extends HTMLElement {
             stroke-linecap="round" stroke-linejoin="round"/>
     </svg>`;
 
+    // ── Render helpers ────────────────────────────────────────────────────
+
+    // Plain doc item (leaf article or child)
     const renderDoc = (article, sectionTitle, extraCls = '', parentTitle = '') => {
       const isActive = article.slug === activeSlug;
       const cls = `sg-side-nav__doc${isActive ? ' sg-side-nav__doc--active' : ''}${extraCls}`;
@@ -165,24 +215,73 @@ class SgSideNav extends HTMLElement {
               </button>`;
     };
 
-    const tree = sections.map((section, i) => {
-      const collapsed    = this._collapsed.has(i);
-      const articles     = section.articles ?? [];
-      const sectionSlug  = section.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
+    // Article folder (parent article with children[])
+    const renderArticleFolder = (article, sectionTitle) => {
+      const folderKey   = article.slug ?? article.title;
+      const isCollapsed = this._collapsedFolders.has(folderKey);
+      const isActive    = article.slug === activeSlug;
+      const children    = article.children ?? [];
 
-      const docs = articles.map(article => {
-        const children = article.children ?? [];
-        if (!children.length) return renderDoc(article, section.title);
-        const childDocs = children.map(c => {
-          // Build compound slug if child has a short slug (no parent prefix yet)
-          const childSlug = (c.slug && article.slug && !c.slug.startsWith(article.slug + '/'))
-            ? `${article.slug}/${c.slug}`
-            : c.slug;
-          return renderDoc({ ...c, slug: childSlug }, section.title, ' sg-side-nav__doc--child', article.title);
-        }).join('');
-        return renderDoc(article, section.title) +
-          `<div class="sg-side-nav__grandchildren">${childDocs}</div>`;
+      const childDocs = children.map(c => {
+        const childSlug = _compoundSlug(article.slug, c.slug);
+        return renderDoc({ ...c, slug: childSlug }, sectionTitle, ' sg-side-nav__doc--child', article.title);
       }).join('');
+
+      // Title row: button if article has its own content, else plain label
+      const titleEl = article.content_object_id
+        ? `<button class="sg-side-nav__doc sg-side-nav__doc--folder-title${isActive ? ' sg-side-nav__doc--active' : ''}"
+                           data-slug="${article.slug ?? ''}"
+                           data-object-id="${article.content_object_id}"
+                           data-render="${article.render ?? 'markdown'}"
+                           data-schema="${article.schema ?? ''}"
+                           data-title="${article.title}"
+                           data-section="${sectionTitle}"
+                           data-parent-title=""
+                           data-vault-id="${article.vault_id ?? ''}"
+                           data-read-key="${article.read_key ?? ''}">
+                    <span class="sg-side-nav__doc-label">${article.title}</span>
+                  </button>`
+        : `<span class="sg-side-nav__article-folder-label"
+                  data-article-folder-key="${folderKey}">${article.title}</span>`;
+
+      return `
+        <div class="sg-side-nav__article-folder">
+          <div class="sg-side-nav__article-folder-hd">
+            <span class="sg-side-nav__chev${isCollapsed ? '' : ' sg-side-nav__chev--open'}"
+                  data-article-chev="${folderKey}">
+              ${chevronSvg}
+            </span>
+            ${folderIcon}
+            ${titleEl}
+          </div>
+          ${isCollapsed ? '' : `<div class="sg-side-nav__grandchildren">${childDocs}</div>`}
+        </div>`;
+    };
+
+    // ── Build section tree ────────────────────────────────────────────────
+    const tree = sections.map((section, i) => {
+      const collapsed   = this._collapsed.has(i);
+      const articles    = section._loadedArticles ?? section.articles ?? [];
+      const sectionSlug = section.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
+
+      // Trigger lazy load for vault-backed sections
+      if (!collapsed && section.nav_object_id && !section._loadedArticles && !section._loading && !section._loadError) {
+        this._loadSection(section, sections);
+      }
+
+      let docsHtml;
+      if (!collapsed && section.nav_object_id && section._loading) {
+        docsHtml = `<span class="sg-side-nav__loading">Loading…</span>`;
+      } else if (!collapsed && section.nav_object_id && section._loadError) {
+        docsHtml = `<span class="sg-side-nav__load-error">Failed to load</span>`;
+      } else {
+        docsHtml = articles.map(article => {
+          const children = article.children ?? [];
+          return children.length
+            ? renderArticleFolder(article, section.title)
+            : renderDoc(article, section.title);
+        }).join('');
+      }
 
       return `
         <div class="sg-side-nav__section" data-section-index="${i}">
@@ -195,9 +294,7 @@ class SgSideNav extends HTMLElement {
                   data-section-title="${section.title}"
                   data-section-slug="${sectionSlug}">${section.title}</span>
           </div>
-          ${collapsed ? '' : `
-            <div class="sg-side-nav__children">${docs}</div>
-          `}
+          ${collapsed ? '' : `<div class="sg-side-nav__children">${docsHtml}</div>`}
         </div>`;
     }).join('');
 
@@ -222,6 +319,8 @@ class SgSideNav extends HTMLElement {
       ${tree || '<p class="sg-side-nav__empty">No articles yet.</p>'}
       ${footer}`;
 
+    // ── Event handlers ────────────────────────────────────────────────────
+
     // Sidebar panel toggle
     this.querySelector('.sg-side-nav__toggle')?.addEventListener('click', () => {
       const shell = this.closest('.sub-site');
@@ -230,7 +329,7 @@ class SgSideNav extends HTMLElement {
       localStorage.setItem('sg-nav-collapsed', collapsed);
     });
 
-    // Chevron: toggle expand/collapse only
+    // Section chevron: toggle section expand/collapse
     this.querySelectorAll('[data-chev]').forEach(chev => {
       chev.addEventListener('click', e => {
         e.stopPropagation();
@@ -241,19 +340,7 @@ class SgSideNav extends HTMLElement {
       });
     });
 
-    // Subsection toggle
-    if (!this._collapsedSubs) this._collapsedSubs = new Set();
-    this.querySelectorAll('[data-subsec]').forEach(el => {
-      el.addEventListener('click', e => {
-        e.stopPropagation();
-        const key = el.dataset.subsec;
-        if (this._collapsedSubs.has(key)) this._collapsedSubs.delete(key);
-        else this._collapsedSubs.add(key);
-        this._render(sections);
-      });
-    });
-
-    // Folder label: expand section AND fire nav:section for index page
+    // Section folder label: expand section + fire nav:section
     this.querySelectorAll('.sg-side-nav__folder-label').forEach(label => {
       label.addEventListener('click', () => {
         const idx = sections.findIndex(s => s.title === label.dataset.sectionTitle);
@@ -263,6 +350,27 @@ class SgSideNav extends HTMLElement {
           bubbles: true,
           detail: { title: label.dataset.sectionTitle, sectionSlug: label.dataset.sectionSlug },
         }));
+      });
+    });
+
+    // Article folder chevron: toggle article-folder expand/collapse
+    this.querySelectorAll('[data-article-chev]').forEach(chev => {
+      chev.addEventListener('click', e => {
+        e.stopPropagation();
+        const key = chev.dataset.articleChev;
+        if (this._collapsedFolders.has(key)) this._collapsedFolders.delete(key);
+        else this._collapsedFolders.add(key);
+        this._render(sections);
+      });
+    });
+
+    // Article folder label (no content — label-only parent): toggle on click
+    this.querySelectorAll('[data-article-folder-key]').forEach(label => {
+      label.addEventListener('click', () => {
+        const key = label.dataset.articleFolderKey;
+        if (this._collapsedFolders.has(key)) this._collapsedFolders.delete(key);
+        else this._collapsedFolders.add(key);
+        this._render(sections);
       });
     });
 
@@ -299,7 +407,6 @@ class SgSideNav extends HTMLElement {
         detail: { sections, totalArticles },
       }));
 
-      // Only auto-select when a specific slug was requested
       if (activeSlug) {
         const target = this.querySelector(
           `.sg-side-nav__doc[data-slug="${CSS.escape(activeSlug)}"]`
@@ -326,6 +433,12 @@ class SgSideNav extends HTMLElement {
       }
     }
   }
+}
+
+// Build compound slug: prefix child slug with parent slug if not already prefixed
+function _compoundSlug(parentSlug, childSlug) {
+  if (!childSlug || !parentSlug) return childSlug;
+  return childSlug.startsWith(parentSlug + '/') ? childSlug : `${parentSlug}/${childSlug}`;
 }
 
 customElements.define('sg-side-nav', SgSideNav);

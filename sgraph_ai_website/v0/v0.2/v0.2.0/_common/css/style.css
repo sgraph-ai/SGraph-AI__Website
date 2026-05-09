@@ -2255,6 +2255,44 @@ sg-side-nav {
   opacity: 0.85;
 }
 
+/* Article folder (parent article with children[]) */
+.sg-side-nav__article-folder-hd {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 2px;
+}
+
+/* Folder-title button: inherits doc styles but no leading icon (folder icon is in the row) */
+.sg-side-nav__doc--folder-title {
+  flex: 1;
+  gap: 0;
+  padding: 4px 8px 4px 4px;
+}
+
+/* Label-only parent (no content_object_id): non-interactive label style */
+.sg-side-nav__article-folder-label {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ss-fg-soft);
+  cursor: pointer;
+  padding: 4px 4px 4px 2px;
+  user-select: none;
+}
+.sg-side-nav__article-folder-label:hover { color: var(--ss-fg); }
+
+/* Lazy-load states */
+.sg-side-nav__loading,
+.sg-side-nav__load-error {
+  display: block;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--ss-fg-faint);
+}
+.sg-side-nav__load-error { color: #c0392b; }
+
 .sg-side-nav__doc {
   display: flex; align-items: center; gap: 6px;
   width: 100%; text-align: left;
