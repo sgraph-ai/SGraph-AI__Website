@@ -1,5 +1,5 @@
 /**
- * sg-debug-panel v0.1.4
+ * sg-debug-panel v0.1.5
  *
  * Floating debug overlay for sgraph.ai sub-sites. Two tabs:
  *   Log     — intercepted fetch calls (vault / GitHub API) + custom nav:* events
@@ -22,16 +22,17 @@ class SgDebugPanel extends HTMLElement {
               : 'prod';
     if (env === 'prod') return;
 
-    this._log       = [];
-    this._sources   = [];   // { kind, label, content }
-    this._open      = localStorage.getItem('sg-debug-open') === 'true';
-    this._activeTab = localStorage.getItem('sg-debug-tab') ?? 'log';
+    this._log          = [];
+    this._sources      = [];   // { kind, label, content }
+    this._vaultContent = new Map();   // objectId → decrypted text
+    this._open         = localStorage.getItem('sg-debug-open') === 'true';
+    this._activeTab    = localStorage.getItem('sg-debug-tab') ?? 'log';
 
     this._buildUI();
     this._patchFetch();
     this._listenEvents();
     this._listenKeyboard();
-    this._pushLog({ kind: 'system', msg: `sg-debug-panel v0.1.4 · ${env} · ${location.pathname}` });
+    this._pushLog({ kind: 'system', msg: `sg-debug-panel v0.1.5 · ${env} · ${location.pathname}` });
   }
 
   disconnectedCallback() {
@@ -136,9 +137,9 @@ class SgDebugPanel extends HTMLElement {
       .sgdbg-tbtn.on { color: #38bdf8; border-color: #38bdf8; }
 
       /* Log entries */
-      .sgdbg-log { flex: 1; overflow-y: auto; padding: 4px 0; overscroll-behavior: contain; }
+      .sgdbg-log { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0; overscroll-behavior: contain; }
       .sgdbg-entry {
-        display: grid; grid-template-columns: 56px 60px 1fr;
+        display: grid; grid-template-columns: 32px 56px 60px 1fr;
         gap: 0 8px; padding: 4px 14px;
         border-bottom: 1px solid #1e293b0a;
         align-items: start; cursor: pointer;
@@ -154,6 +155,7 @@ class SgDebugPanel extends HTMLElement {
       .sgdbg-entry.warn      { border-left-color: #f59e0b; }
       .sgdbg-entry.gh        { border-left-color: #f59e0b; }
       .sgdbg-entry.system    { border-left-color: #16a34a; }
+      .sgdbg-idx  { color: #334155; font-size: 9px; padding-top: 2px; white-space: nowrap; text-align: right; }
       .sgdbg-ts   { color: #475569; font-size: 10px; padding-top: 1px; white-space: nowrap; }
       .sgdbg-kind { font-size: 10px; font-weight: 700; text-transform: uppercase;
                     letter-spacing: .04em; padding-top: 1px; white-space: nowrap; }
@@ -177,7 +179,7 @@ class SgDebugPanel extends HTMLElement {
       .sgdbg-entry.expanded .sgdbg-detail { display: block; }
 
       /* Sources tab */
-      .sgdbg-sources { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0; overscroll-behavior: contain; }
+      .sgdbg-sources { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 0; overscroll-behavior: contain; }
       .sgdbg-source-item { border-bottom: 1px solid #1e293b; }
       .sgdbg-source-hd {
         display: flex; align-items: center; gap: 8px; padding: 8px 14px;
@@ -251,7 +253,7 @@ class SgDebugPanel extends HTMLElement {
         </div>
 
         <!-- LOG tab -->
-        <div id="sgdbg-tab-log" style="${this._activeTab==='log'?'display:flex;flex-direction:column;flex:1':'display:none'}">
+        <div id="sgdbg-tab-log" style="${this._activeTab==='log'?'display:flex;flex-direction:column;flex:1;min-height:0':'display:none'}">
           <div class="sgdbg-toolbar">
             <input class="sgdbg-filter" id="sgdbg-filter" placeholder="Filter…" type="search">
             <button class="sgdbg-tbtn on"  id="sgdbg-f-all">All</button>
@@ -264,7 +266,7 @@ class SgDebugPanel extends HTMLElement {
         </div>
 
         <!-- SOURCES tab -->
-        <div id="sgdbg-tab-sources" style="${this._activeTab==='sources'?'display:flex;flex-direction:column;flex:1':'display:none'}">
+        <div id="sgdbg-tab-sources" style="${this._activeTab==='sources'?'display:flex;flex-direction:column;flex:1;min-height:0':'display:none'}">
           <div class="sgdbg-toolbar">
             <span style="font-size:10px;color:#475569;flex:1">Raw nav JSON · decrypted vault content</span>
             <button class="sgdbg-tbtn" id="sgdbg-src-clear">Clear</button>
@@ -295,8 +297,8 @@ class SgDebugPanel extends HTMLElement {
         panel.querySelectorAll('.sgdbg-tab').forEach(t => t.classList.toggle('active', t === tab));
         panel.querySelector('#sgdbg-tab-log').style.display     = this._activeTab==='log'     ? 'flex' : 'none';
         panel.querySelector('#sgdbg-tab-sources').style.display = this._activeTab==='sources' ? 'flex' : 'none';
-        if (this._activeTab === 'log')     { panel.querySelector('#sgdbg-tab-log').style.flexDirection = 'column'; panel.querySelector('#sgdbg-tab-log').style.flex = '1'; }
-        if (this._activeTab === 'sources') { panel.querySelector('#sgdbg-tab-sources').style.flexDirection = 'column'; panel.querySelector('#sgdbg-tab-sources').style.flex = '1'; }
+        if (this._activeTab === 'log')     { const el = panel.querySelector('#sgdbg-tab-log');     el.style.flexDirection='column'; el.style.flex='1'; el.style.minHeight='0'; }
+        if (this._activeTab === 'sources') { const el = panel.querySelector('#sgdbg-tab-sources'); el.style.flexDirection='column'; el.style.flex='1'; el.style.minHeight='0'; }
         if (this._activeTab === 'sources') this._renderSources();
       });
     });
@@ -424,18 +426,24 @@ class SgDebugPanel extends HTMLElement {
       return;
     }
     this._logEl.innerHTML = entries.map(e => {
-      const cls  = e.kind?.replace(/-ok|-err/,'') ?? 'system';
+      const cls   = e.kind?.replace(/-ok|-err/,'') ?? 'system';
       const badge = e.kind==='vault-ok'  ? '✓ vault'
                   : e.kind==='vault-err' ? '✗ vault'
                   : e.kind==='vault'     ? '… vault'
                   : e.kind ?? 'info';
+      const hasContent = e.objectId && this._vaultContent.has(e.objectId);
+      const contentHl  = hasContent
+        ? hlJson(this._vaultContent.get(e.objectId).slice(0, 40000))
+        : '';
       return `<div class="sgdbg-entry ${cls}" data-id="${e.id}">
+        <span class="sgdbg-idx">#${e.id}</span>
         <span class="sgdbg-ts">${e.ts}</span>
         <span class="sgdbg-kind">${badge}</span>
         <div>
           <div class="sgdbg-msg">${esc(e.msg??'')}</div>
           ${e.sub ? `<div class="sgdbg-sub">${esc(e.sub)}</div>` : ''}
           ${e.detail ? `<div class="sgdbg-detail">${esc(typeof e.detail==='string'?e.detail:JSON.stringify(e.detail,null,2))}</div>` : ''}
+          ${hasContent ? `<div class="sgdbg-detail">${contentHl}</div>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -525,10 +533,10 @@ class SgDebugPanel extends HTMLElement {
       const isNav   = !isVault && !isGH && (url.endsWith('.json') || url.includes('nav'));
 
       if (isVault || isGH || isNav) {
-        const short = url.replace(/^https?:\/\/[^/]+/, '').slice(0, 80);
-        const kind  = isVault ? 'vault' : isGH ? 'gh' : 'nav';
-        const t0    = performance.now();
-        if (isVault || isGH) self._pushLog({ kind, msg: `${kind.toUpperCase()} → ${short}`, sub: 'fetching…' });
+        const decoded = decodeURIComponent(url);
+        const short   = decoded.replace(/^https?:\/\/[^/]+/, '').slice(0, 100);
+        const kind    = isVault ? 'vault' : isGH ? 'gh' : 'nav';
+        const t0      = performance.now();
 
         try {
           const res  = await self._origFetch.call(this, input, init);
@@ -546,11 +554,14 @@ class SgDebugPanel extends HTMLElement {
           }
 
           if (isVault || isGH) {
+            // Extract last path segment as objectId for vault entries
+            const objectId = isVault ? (decoded.split('/').pop() ?? '') : undefined;
             self._pushLog({
-              kind:   res.ok ? `${kind}-ok` : `${kind}-err`,
-              msg:    `${res.ok ? '✓' : `✗ ${res.status}`} ${short}`,
-              sub:    `${ms}ms`,
-              detail: res.ok ? null : `HTTP ${res.status} ${res.statusText}`,
+              kind:     res.ok ? `${kind}-ok` : `${kind}-err`,
+              msg:      `${res.ok ? '✓' : `✗ ${res.status}`} ${short}`,
+              sub:      `${ms}ms`,
+              objectId: res.ok ? objectId : undefined,
+              detail:   res.ok ? null : `HTTP ${res.status} ${res.statusText}`,
             });
           }
           return res;
@@ -586,9 +597,15 @@ class SgDebugPanel extends HTMLElement {
     document.addEventListener('debug:vault-content', e => {
       const { objectId, text, kind } = e.detail ?? {};
       if (text) {
+        // Store for on-demand display in log entries
+        if (objectId) self._vaultContent.set(objectId, text);
         self._pushSource({ kind: kind ?? 'vault content', label: objectId ?? 'unknown',
                            content: text, size: `${(text.length/1024).toFixed(1)} KB`, open: true });
-        self._pushLog({ kind:'vault-ok', msg:`content captured · ${objectId}`, sub:`${(text.length/1024).toFixed(1)} KB` });
+        self._pushLog({ kind:'vault-ok', msg:`content captured · ${objectId}`,
+                        sub: `${(text.length/1024).toFixed(1)} KB · click to expand`,
+                        objectId });
+        // Re-render so any earlier fetch log entry for this objectId shows the content
+        if (self._open && self._activeTab === 'log') self._renderLog();
       }
     }, { signal: sig });
 
