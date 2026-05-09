@@ -158,12 +158,12 @@
 
   // Article selected via sidebar
   document.addEventListener('nav:select', e => {
-    const { title, slug, sectionTitle, content_object_id, render, vault_id, read_key } = e.detail;
+    const { title, slug, sectionTitle, parentTitle, content_object_id, render, vault_id, read_key } = e.detail;
     const targetPath = `/en-gb/library/${slug}/`;
     if (location.pathname !== targetPath) {
       history.pushState({ slug }, '', targetPath);
     }
-    setBreadcrumbs('Library', sectionTitle, title);
+    setBreadcrumbs('Library', sectionTitle, parentTitle || null, title);
     showArticle(content_object_id, render ?? 'markdown', vault_id, read_key);
     buildNextPrev(slug);
   });
@@ -275,11 +275,11 @@
     headingObserver.observe(renderEl, { childList: true, subtree: true });
   }
 
-  function setBreadcrumbs(site, section, article) {
+  function setBreadcrumbs(site, section, parent, article) {
     const siteHref    = '/en-gb/library/';
     const sectionHref = section ? `/en-gb/library/${toSlug(section)}/` : null;
     const el = document.getElementById('article-crumbs');
-    const parts = [site, section, article].filter(Boolean);
+    const parts = [site, section, parent, article].filter(Boolean);
     el.innerHTML = parts.map((p, i) => {
       if (i === 0) return `<a class="sub-site__crumbs-link" href="${siteHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
       if (i === 1 && parts.length > 2) return `<a class="sub-site__crumbs-link" href="${sectionHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
