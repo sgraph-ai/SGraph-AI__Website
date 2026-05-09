@@ -2592,8 +2592,9 @@ sg-side-nav {
     border-bottom: 1px solid var(--ss-border);
   }
 
-  /* Mobile toggle: full-width, left-aligned, with text label */
+  /* Mobile toggle: full-width, left-aligned, with text label; not sticky */
   .sg-side-nav__toggle {
+    position: static;
     height: 44px;
     justify-content: flex-start;
     padding: 0 16px;
