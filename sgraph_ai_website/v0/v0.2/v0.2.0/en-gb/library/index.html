@@ -60,7 +60,12 @@
     tree-label="Library"
     version="v0.2.0"
     home-href="/en-gb/library/"
-    auto-select>
+    auto-select
+    extra-links="[
+      {&quot;section&quot;:&quot;Blog&quot;,&quot;title&quot;:&quot;Introducing @Journalist&quot;,&quot;slug&quot;:&quot;blog/introducing-journalist&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-684e59d65e77a25d6846245eee2291e9a1767860ef80dcb6351e4e78607ad123&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;},
+      {&quot;section&quot;:&quot;Blog&quot;,&quot;title&quot;:&quot;Agentics London Session&quot;,&quot;slug&quot;:&quot;blog/agentics-london-session&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-77c47abb9be86ebfcd7f826f275856f8849914377aa9dab015145c1a9af1cf8e&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;},
+      {&quot;section&quot;:&quot;What&#39;s New&quot;,&quot;title&quot;:&quot;Team Expansion — Seven Agents&quot;,&quot;slug&quot;:&quot;whats-new/team-expansion-seven-agents&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-f678dd3857795479a88c8064c138330732c9ff2ee9ed8d4782904af861847355&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;}
+    ]">
   </sg-side-nav>
 
   <!-- Landing page — shown at /en-gb/library/ (no article selected) -->
@@ -108,6 +113,26 @@
     return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
   }
 
+  function compoundSlug(parentSlug, childSlug) {
+    if (!childSlug || !parentSlug) return childSlug;
+    return childSlug.startsWith(parentSlug + '/') ? childSlug : `${parentSlug}/${childSlug}`;
+  }
+
+  // Walk full nav tree (sections → articles → children) to find an article by slug.
+  // Returns the article object augmented with sectionTitle and parentTitle, or null.
+  function findArticleBySlug(sections, slug) {
+    for (const s of sections) {
+      for (const a of (s.articles ?? [])) {
+        if (a.slug === slug) return { ...a, sectionTitle: s.title, parentTitle: null };
+        for (const c of (a.children ?? [])) {
+          const cs = compoundSlug(a.slug, c.slug);
+          if (cs === slug) return { ...c, slug: cs, sectionTitle: s.title, parentTitle: a.title };
+        }
+      }
+    }
+    return null;
+  }
+
   const shell      = document.getElementById('sub-site-shell');
   const sideNav    = document.querySelector('sg-side-nav');
   const landing    = document.getElementById('landing');
@@ -149,10 +174,20 @@
     if (!slug) {
       showLanding();
     } else {
-      // If slug matches a section title (not an article), show section index
       const matchedSection = sections.find(s => toSlug(s.title) === slug);
-      if (matchedSection) showSectionIndex(matchedSection);
-      // else: auto-select on sg-side-nav handles it
+      if (matchedSection) {
+        showSectionIndex(matchedSection);
+      } else {
+        // Explicit slug routing: walk full nav tree to find article or child article.
+        // This fires before auto-select (which also calls showArticle via nav:select).
+        // The article-viewer sequence counter ensures only the final load renders.
+        const found = findArticleBySlug(sections, slug);
+        if (found) {
+          setBreadcrumbs('Library', found.sectionTitle, found.parentTitle || null, found.title);
+          showArticle(found.content_object_id, found.render ?? 'markdown', found.vault_id ?? null, found.read_key ?? null);
+          buildNextPrev(slug);
+        }
+      }
     }
   });
 

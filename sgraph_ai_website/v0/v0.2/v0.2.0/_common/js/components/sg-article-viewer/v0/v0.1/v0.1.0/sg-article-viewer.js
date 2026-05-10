@@ -1,5 +1,5 @@
 /**
- * sg-article-viewer v0.1.6
+ * sg-article-viewer v0.1.7
  *
  * Full content pipeline: vault fetch → frontmatter parse → viewer render.
  *
@@ -31,12 +31,16 @@ class SgArticleViewer extends HTMLElement {
   attributeChangedCallback()   { this._load(); }
   disconnectedCallback()       { this._revokeBlobUrls(); }
 
+  // Sequence counter: each _load() gets an ID; stale concurrent loads are discarded.
+  _loadSeq = 0;
+
   async _load() {
     const vaultId  = this.getAttribute('vault-id');
     const readKey  = this.getAttribute('read-key');
     const objectId = this.getAttribute('object-id');
     if (!vaultId || !readKey || !objectId) return;
 
+    const seq = ++this._loadSeq;
     this.innerHTML = '<div class="article-loading" aria-live="polite">Loading…</div>';
 
     try {
@@ -44,6 +48,9 @@ class SgArticleViewer extends HTMLElement {
         await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
       const cryptoKey = await importReadKey(readKey);
       const buf = await readObject('https://send.sgraph.ai', vaultId, objectId, cryptoKey);
+
+      if (seq !== this._loadSeq) return;
+
       const text = new TextDecoder().decode(buf);
 
       const { meta, body } = parseFrontmatter(text);
@@ -58,8 +65,13 @@ class SgArticleViewer extends HTMLElement {
         this.innerHTML = `<p class="article-error">Unknown viewer: "${viewer}"</p>`;
       }
     } catch (err) {
+      if (seq !== this._loadSeq) return;
+      const msg = err?.message ?? String(err);
       this.innerHTML = `<p class="article-error">Failed to load content.</p>`;
-      console.error('sg-article-viewer:', err);
+      console.error('sg-article-viewer load failed', { objectId, vaultId, err });
+      document.dispatchEvent(new CustomEvent('debug:log', {
+        detail: { type: 'error', src: 'article-viewer', msg: `${objectId}: ${msg}` },
+      }));
     }
   }
 
