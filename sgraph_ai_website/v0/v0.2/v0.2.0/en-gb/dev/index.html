@@ -104,6 +104,8 @@
     return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
   }
 
+  const escH = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
   const shell      = document.getElementById('sub-site-shell');
   const sideNav    = document.querySelector('sg-side-nav');
   const landing    = document.getElementById('landing');
@@ -140,8 +142,8 @@
     const { sections } = e.detail;
     allSections = sections;
     allArticles = sections.flatMap(s =>
-      (s.articles ?? []).filter(a => a.content_object_id)
-                        .map(a => ({ ...a, sectionTitle: s.title }))
+      (s.children ?? s.articles ?? []).filter(a => a.content_object_id)
+                                      .map(a => ({ ...a, sectionTitle: s.title }))
     );
     buildLandingCards(sections);
     const slug = slugFromPath();
@@ -222,7 +224,9 @@
       const buf = await readObject('https://send.sgraph.ai', vaultId, objectId, key);
       const text = new TextDecoder().decode(buf);
       const data = JSON.parse(text);
-      renderEl.innerHTML = renderJsonBoard(data, data.schema ?? schema);
+      const effectiveSchema = data.schema ?? schema;
+      renderEl.innerHTML = renderJsonBoard(data, effectiveSchema);
+      wireKanban(renderEl, data, effectiveSchema);
       // Emit raw content for debug panel
       document.dispatchEvent(new CustomEvent('debug:vault-content',
         { detail: { objectId, text, kind: 'json board' } }));
@@ -317,8 +321,6 @@
       const s=Math.floor((Date.now()-d)/1000);
       return s<60?'just now':s<3600?`${Math.floor(s/60)}m ago`:s<86400?`${Math.floor(s/3600)}h ago`:`${Math.floor(s/86400)}d ago`;
     };
-    const escH = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
     const renderRuns = () => {
       const el = ciRuns(); if(!el) return;
       const wf = document.getElementById('ci-wf-filter')?.value ?? '';
@@ -395,19 +397,7 @@
       </div>`;
 
     if (schema === 'project-workstreams-v1') {
-      const ws = data.workstreams ?? data;
-      return (Array.isArray(ws) ? ws : []).map(w => `
-        <div style="margin-bottom:2rem">
-          <h2 style="font-size:1.05rem;font-weight:700;margin:0 0 .75rem;
-              padding-bottom:.5rem;border-bottom:2px solid #e5e5e4">${w.title ?? w.id}</h2>
-          ${(w.tasks ?? []).map(t =>
-            card(
-              `<code style="font-size:.75rem;color:#888">${t.id}</code> ${t.title}`,
-              `${badge(t.status ?? 'queued')}${t.owner ? ` <span style="font-size:.8rem;color:#888">${t.owner}</span>` : ''}`,
-              t.description ?? ''
-            )
-          ).join('')}
-        </div>`).join('');
+      return renderWorkstreamsKanban(data.workstreams ?? (Array.isArray(data) ? data : []));
     }
 
     if (schema === 'project-issues-v1') {
@@ -528,6 +518,134 @@
     ).join('');
   }
 
+  function renderWorkstreamsKanban(workstreams) {
+    const COLS = [
+      { key: 'queued',      label: 'Queued',      color: '#94a3b8' },
+      { key: 'next',        label: 'Up Next',     color: '#f59e0b' },
+      { key: 'in-progress', label: 'In Progress', color: '#3b82f6' },
+      { key: 'done',        label: 'Done',        color: '#22c55e' },
+    ];
+    const deriveStatus = ws => {
+      if (ws.status) return ws.status;
+      const tasks = ws.tasks ?? [];
+      if (!tasks.length) return 'queued';
+      if (tasks.every(t => t.status === 'done')) return 'done';
+      if (tasks.some(t => t.status === 'in-progress')) return 'in-progress';
+      if (tasks.some(t => t.status === 'next')) return 'next';
+      return 'queued';
+    };
+
+    const colsHtml = COLS.map(col => {
+      const wsList = workstreams.filter(ws => deriveStatus(ws) === col.key);
+      const cardsHtml = wsList.map(ws => {
+        const tasks  = ws.tasks ?? [];
+        const total  = tasks.length;
+        const counts = { queued: 0, next: 0, 'in-progress': 0, done: 0 };
+        tasks.forEach(t => { const s = t.status ?? 'queued'; counts[s] = (counts[s] ?? 0) + 1; });
+        const donePct = total ? Math.round((counts.done / total) * 100) : 0;
+        const color   = ws.color ?? '#6366f1';
+        return `
+          <div data-ws-id="${escH(ws.id)}" style="
+              background:#fafaf9;border:1px solid #e5e5e4;border-left:3px solid ${color};
+              border-radius:6px;padding:.75rem 1rem;margin-bottom:.5rem;cursor:pointer;
+              transition:box-shadow .15s"
+            onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'"
+            onmouseout="this.style.boxShadow='none'">
+            <div style="font-weight:600;font-size:.9rem;color:#1a1a1a;margin-bottom:.5rem">${escH(ws.title ?? ws.id)}</div>
+            <div style="background:#e5e5e4;border-radius:9999px;height:4px;margin-bottom:.5rem;overflow:hidden">
+              <div style="background:${color};height:100%;width:${donePct}%;border-radius:9999px"></div>
+            </div>
+            <div style="display:flex;gap:.35rem;flex-wrap:wrap;font-size:.7rem">
+              ${counts.queued      ? `<span style="background:#94a3b822;color:#64748b;padding:1px 6px;border-radius:9999px">Q&nbsp;${counts.queued}</span>` : ''}
+              ${counts.next        ? `<span style="background:#f59e0b22;color:#b45309;padding:1px 6px;border-radius:9999px">N&nbsp;${counts.next}</span>` : ''}
+              ${counts['in-progress'] ? `<span style="background:#3b82f622;color:#1d4ed8;padding:1px 6px;border-radius:9999px">P&nbsp;${counts['in-progress']}</span>` : ''}
+              ${counts.done        ? `<span style="background:#22c55e22;color:#15803d;padding:1px 6px;border-radius:9999px">D&nbsp;${counts.done}</span>` : ''}
+              ${!total ? '<span style="color:#ccc">No tasks</span>' : ''}
+            </div>
+          </div>`;
+      }).join('');
+
+      return `
+        <div style="flex:1;min-width:180px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem;
+              font-size:.73rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${col.color}">
+            <span style="width:8px;height:8px;border-radius:50%;background:${col.color};flex-shrink:0"></span>
+            ${col.label}
+            <span style="margin-left:auto;background:${col.color}22;color:${col.color};
+                padding:1px 7px;border-radius:9999px;font-size:.68rem">${wsList.length}</span>
+          </div>
+          ${cardsHtml || '<div style="font-size:.8rem;color:#ccc;padding:.5rem 0">—</div>'}
+        </div>`;
+    }).join('');
+
+    return `<div style="display:flex;gap:1rem;align-items:flex-start;overflow-x:auto">${colsHtml}</div>`;
+  }
+
+  function renderWorkstreamDetail(ws) {
+    const COLS = [
+      { key: 'queued',      label: 'Queued',      color: '#94a3b8' },
+      { key: 'next',        label: 'Up Next',     color: '#f59e0b' },
+      { key: 'in-progress', label: 'In Progress', color: '#3b82f6' },
+      { key: 'done',        label: 'Done',        color: '#22c55e' },
+    ];
+    const color = ws.color ?? '#6366f1';
+    const tasks = ws.tasks ?? [];
+
+    const colsHtml = COLS.map(col => {
+      const colTasks = tasks.filter(t => (t.status ?? 'queued') === col.key);
+      return `
+        <div style="flex:1;min-width:160px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem;
+              font-size:.73rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${col.color}">
+            <span style="width:8px;height:8px;border-radius:50%;background:${col.color};flex-shrink:0"></span>
+            ${col.label}
+            <span style="margin-left:auto;background:${col.color}22;color:${col.color};
+                padding:1px 7px;border-radius:9999px;font-size:.68rem">${colTasks.length}</span>
+          </div>
+          ${colTasks.map(t => `
+            <div style="background:#fafaf9;border:1px solid #e5e5e4;border-left:3px solid ${color};
+                border-radius:6px;padding:.6rem .85rem;margin-bottom:.5rem;font-size:.85rem">
+              <div style="font-size:.7rem;color:#aaa;margin-bottom:2px;font-family:monospace">${escH(t.id ?? '')}</div>
+              <div style="font-weight:500;color:#1a1a1a">${escH(t.title ?? t.task ?? '')}</div>
+              ${t.owner ? `<div style="font-size:.72rem;color:#888;margin-top:3px">${escH(t.owner)}</div>` : ''}
+              ${t.description ? `<div style="font-size:.75rem;color:#777;margin-top:4px;border-top:1px solid #f0f0ef;padding-top:4px">${escH(t.description)}</div>` : ''}
+            </div>`).join('')}
+          ${!colTasks.length ? '<div style="font-size:.8rem;color:#ccc;padding:.5rem 0">—</div>' : ''}
+        </div>`;
+    }).join('');
+
+    return `
+      <div>
+        <button data-back="workstreams" style="display:inline-flex;align-items:center;gap:.4rem;
+            font-size:.83rem;color:#555;background:none;border:1px solid #e5e5e4;border-radius:6px;
+            padding:4px 10px;cursor:pointer;margin-bottom:1.25rem">
+          ← All Workstreams
+        </button>
+        <h1 style="font-size:1.15rem;font-weight:700;margin:0 0 .25rem;display:flex;align-items:center;gap:.6rem">
+          <span style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></span>
+          ${escH(ws.title ?? ws.id)}
+        </h1>
+        ${ws.description ? `<p style="color:#888;font-size:.88rem;margin:0 0 1.5rem">${escH(ws.description)}</p>` : '<div style="margin-bottom:1.5rem"></div>'}
+        <div style="display:flex;gap:1rem;align-items:flex-start;overflow-x:auto">${colsHtml}</div>
+      </div>`;
+  }
+
+  function wireKanban(renderEl, data, schema) {
+    if (schema !== 'project-workstreams-v1') return;
+    const workstreams = data.workstreams ?? (Array.isArray(data) ? data : []);
+    renderEl.querySelectorAll('[data-ws-id]').forEach(card => {
+      card.addEventListener('click', () => {
+        const ws = workstreams.find(w => w.id === card.dataset.wsId);
+        if (!ws) return;
+        renderEl.innerHTML = renderWorkstreamDetail(ws);
+        renderEl.querySelector('[data-back="workstreams"]')?.addEventListener('click', () => {
+          renderEl.innerHTML = renderWorkstreamsKanban(workstreams);
+          wireKanban(renderEl, data, schema);
+        });
+      });
+    });
+  }
+
   function showSectionIndex(section) {
     landing.hidden = true;
     articleToc.hidden = true;
@@ -536,7 +654,7 @@
 
     setBreadcrumbs('Dev', section.title, null);
 
-    const articles = section.articles ?? [];
+    const articles = section.children ?? section.articles ?? [];
     document.getElementById('article-render').innerHTML = `
       <div class="article-viewer">
         <div class="article-body">
@@ -634,7 +752,7 @@
   function buildLandingCards(sections) {
     const container = document.getElementById('landing-sections');
     container.innerHTML = sections.map(section => {
-      const articles = section.articles ?? [];
+      const articles = section.children ?? section.articles ?? [];
       const shown    = articles.slice(0, 4);
       const overflow = articles.length - shown.length;
       return `
