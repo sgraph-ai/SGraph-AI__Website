@@ -35,14 +35,14 @@
 
 <!-- ═══ LIBRARY SUB-SITE BAND ════════════════════════════════ -->
 <!--
-  Vault: 4wrqg006  |  nav object: obj-cas-imm-2180d5cc4bf3 (v3.11 — LinkedIn ref added to moat article)
+  Vault: 4wrqg006  |  nav object: obj-cas-imm-a4c9266f9cc5 (v3.12 — articles→children rename + js-tool-api fix)
 -->
 <sg-sub-nav
   site-title="Library"
   site-description="A growing public knowledge base. How sgraph.ai delivers content from encrypted vaults — the cryptography, the components, and the trust boundaries."
   vault-id="4wrqg006"
   read-key="GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg"
-  nav-object-id="obj-cas-imm-2180d5cc4bf3">
+  nav-object-id="obj-cas-imm-a4c9266f9cc5">
 </sg-sub-nav>
 
 <!-- ═══ THREE-COLUMN SHELL ════════════════════════════════════ -->
@@ -56,7 +56,7 @@
   <sg-side-nav
     vault-id="4wrqg006"
     read-key="GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg"
-    nav-object-id="obj-cas-imm-2180d5cc4bf3"
+    nav-object-id="obj-cas-imm-a4c9266f9cc5"
     tree-label="Library"
     version="v0.2.0"
     home-href="/en-gb/library/"
@@ -94,7 +94,7 @@
 
 <footer class="sub-site-footer">
   <span class="sub-site-footer__copy">© 2026 SGraph AI Ltd.</span>
-  <span class="sub-site-footer__meta">sgraph.ai/library · site v0.2.0 · content nav v3.11</span>
+  <span class="sub-site-footer__meta">sgraph.ai/library · site v0.2.0 · content nav v3.12</span>
 </footer>
 
 <sg-debug-panel></sg-debug-panel>
@@ -118,11 +118,11 @@
     return childSlug.startsWith(parentSlug + '/') ? childSlug : `${parentSlug}/${childSlug}`;
   }
 
-  // Walk full nav tree (sections → articles → children) to find an article by slug.
+  // Walk full nav tree (sections → children → children) to find an article by slug.
   // Returns the article object augmented with sectionTitle and parentTitle, or null.
   function findArticleBySlug(sections, slug) {
     for (const s of sections) {
-      for (const a of (s.articles ?? [])) {
+      for (const a of (s.children ?? [])) {
         if (a.slug === slug) return { ...a, sectionTitle: s.title, parentTitle: null };
         for (const c of (a.children ?? [])) {
           const cs = compoundSlug(a.slug, c.slug);
@@ -163,7 +163,7 @@
     const { sections } = e.detail;
     allSections = sections;
     allArticles = sections.flatMap(s =>
-      (s.articles ?? []).map(a => ({ ...a, sectionTitle: s.title }))
+      (s.children ?? []).map(a => ({ ...a, sectionTitle: s.title }))
     );
     // Emit full nav tree to debug panel
     document.dispatchEvent(new CustomEvent('debug:nav-json',
@@ -242,7 +242,7 @@
   function showSectionIndex(section) {
     // If the section declares an index article, load it as the landing page
     if (section.index) {
-      const indexArticle = (section.articles ?? []).find(a => a.slug === section.index);
+      const indexArticle = (section.children ?? []).find(a => a.slug === section.index);
       if (indexArticle?.content_object_id) {
         setBreadcrumbs('Library', section.title, null);
         showArticle(indexArticle.content_object_id, indexArticle.render ?? 'markdown',
@@ -259,7 +259,7 @@
 
     setBreadcrumbs('Library', section.title, null);
 
-    const articles = section.articles ?? [];
+    const articles = section.children ?? [];
     document.getElementById('article-render').innerHTML = `
       <div class="article-viewer">
         <div class="article-body">
@@ -360,7 +360,7 @@
   function buildLandingCards(sections) {
     const container = document.getElementById('landing-sections');
     container.innerHTML = sections.map(section => {
-      const articles = section.articles ?? [];
+      const articles = section.children ?? [];
       const shown    = articles.slice(0, 4);
       const overflow = articles.length - shown.length;
       return `
