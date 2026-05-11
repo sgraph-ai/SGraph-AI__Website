@@ -17,7 +17,8 @@
  *   { "sections": [...] }
  *
  * Section fields:
- *   articles[]        — inline articles (current behaviour)
+ *   children[]        — inline articles (canonical since nav v3.12)
+ *   articles[]        — inline articles (legacy alias; still supported)
  *   nav_object_id     — vault object-id of a child nav JSON (lazy-loaded on expand)
  *   vault_id          — override vault for nav_object_id fetch
  *   read_key          — override read key for nav_object_id fetch
@@ -86,7 +87,8 @@ class SgSideNav extends HTMLElement {
       const cryptoKey = await importReadKey(readKey);
       const buf = await readObject('https://send.sgraph.ai', vaultId, section.nav_object_id, cryptoKey);
       const data = JSON.parse(new TextDecoder().decode(buf));
-      section._loadedArticles = (data.library ?? data.dev ?? data).articles ?? data.articles ?? [];
+      const root = data.library ?? data.dev ?? data;
+      section._loadedArticles = root.children ?? root.articles ?? [];
       section._loading = false;
       this._render(sections);
     } catch (err) {
@@ -114,11 +116,12 @@ class SgSideNav extends HTMLElement {
             schema:            item.schema    ?? undefined }
         : { title: item.title, href: item.href, slug: item.slug ?? '' };
       if (section) {
-        if (!(section.articles ?? []).some(a => a.slug === entry.slug)) {
-          section.articles = [...(section.articles ?? []), entry];
+        const field = 'children' in section ? 'children' : 'articles';
+        if (!(section[field] ?? []).some(a => a.slug === entry.slug)) {
+          section[field] = [...(section[field] ?? []), entry];
         }
       } else {
-        sections.push({ title: item.section, articles: [entry] });
+        sections.push({ title: item.section, children: [entry] });
       }
     }
   }
@@ -138,7 +141,7 @@ class SgSideNav extends HTMLElement {
       this._collapsedFolders = new Set();
       // Default all article-folders to collapsed
       sections.forEach(s => {
-        (s._loadedArticles ?? s.articles ?? []).forEach(a => {
+        (s._loadedArticles ?? s.children ?? s.articles ?? []).forEach(a => {
           if ((a.children ?? []).length) this._collapsedFolders.add(a.slug ?? a.title);
         });
       });
@@ -147,7 +150,7 @@ class SgSideNav extends HTMLElement {
     // Expand section + article-folder that contains the active slug
     if (activeSlug) {
       sections.forEach((s, i) => {
-        const arts = s._loadedArticles ?? s.articles ?? [];
+        const arts = s._loadedArticles ?? s.children ?? s.articles ?? [];
         arts.forEach(a => {
           const isParent = a.slug === activeSlug;
           const hasActiveChild = (a.children ?? []).some(c => {
@@ -163,7 +166,7 @@ class SgSideNav extends HTMLElement {
     }
 
     const totalArticles = sections.reduce((n, s) => {
-      const arts = s._loadedArticles ?? s.articles ?? [];
+      const arts = s._loadedArticles ?? s.children ?? s.articles ?? [];
       return n + arts.reduce((m, a) => m + 1 + (a.children?.length ?? 0), 0);
     }, 0);
 
@@ -261,7 +264,7 @@ class SgSideNav extends HTMLElement {
     // ── Build section tree ────────────────────────────────────────────────
     const tree = sections.map((section, i) => {
       const collapsed   = this._collapsed.has(i);
-      const articles    = section._loadedArticles ?? section.articles ?? [];
+      const articles    = section._loadedArticles ?? section.children ?? section.articles ?? [];
       const sectionSlug = section.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
 
       // Trigger lazy load for vault-backed sections
