@@ -54,7 +54,7 @@ Do NOT use the hex form (64 chars, 0-9a-f only) — `importReadKey()` will fail 
 
 | Field | Value |
 |-------|-------|
-| Vault key | `c7zfa1fwr0tc1xnsfiea0ssb:iqjele6l` |
+| Vault ID | `iqjele6l` (key NOT stored here — this is a public repo; obtain from the team vault / @Dinis) |
 | Push token | `graphs-and-maps` |
 | Base URL | `https://send.sgraph.ai` |
 | Agent mailbox | `mail/dev.sgraph/` |
@@ -66,7 +66,7 @@ Do NOT use the hex form (64 chars, 0-9a-f only) — `importReadKey()` will fail 
 
 ```bash
 # 1. Clone / pull collab vault
-sgit --base-url https://send.sgraph.ai --token "graphs-and-maps" clone c7zfa1fwr0tc1xnsfiea0ssb:iqjele6l
+sgit --base-url https://send.sgraph.ai --token "graphs-and-maps" clone <COLLAB_VAULT_KEY>:iqjele6l
 cd iqjele6l && sgit pull
 
 # 2. Recover session state
