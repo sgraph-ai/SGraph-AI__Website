@@ -55,7 +55,7 @@
     src="nav.json"
     tree-label="Dev"
     version="v0.2.0"
-    extra-links='[{"section":"Tools","title":"Open Vaults Directory","href":"/en-gb/dev/vaults/","slug":"vaults"},{"section":"Tools","title":"CI / GitHub Actions","slug":"ci","object_id":"__ci__"},{"section":"Status","title":"Workstreams","slug":"status/workstreams","object_id":"obj-cas-imm-32aa32595ec4","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Issues","slug":"status/issues","object_id":"obj-cas-imm-da66557cad10","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Agents","slug":"status/agents","object_id":"obj-cas-imm-652a31e21300","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"}]'
+    extra-links='[{"section":"Tools","title":"Open Vaults Directory","href":"/en-gb/dev/vaults/","slug":"vaults"},{"section":"Tools","title":"CI / GitHub Actions","slug":"ci","object_id":"__ci__"},{"section":"Status","title":"Workstreams","slug":"status/workstreams","object_id":"obj-cas-imm-7b3afd2369b6","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Issues","slug":"status/issues","object_id":"obj-cas-imm-2b3e7db3acaf","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"},{"section":"Status","title":"Agents","slug":"status/agents","object_id":"obj-cas-imm-9003620b3304","vault_id":"1lfehfjh","read_key":"gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs","render":"json"}]'
     home-href="/en-gb/dev/"
     auto-select>
   </sg-side-nav>
@@ -396,7 +396,7 @@
         ${body ? `<div style="font-size:.85rem;color:#666;margin-top:.25rem">${body}</div>` : ''}
       </div>`;
 
-    if (schema === 'project-workstreams-v1') {
+    if (schema === 'project-workstreams-v1' || schema === 'project-workstreams-v2') {
       return renderWorkstreamsKanban(data.workstreams ?? (Array.isArray(data) ? data : []));
     }
 
@@ -443,55 +443,6 @@
             </div>`
           ).join('')}
         </div>`).join('');
-    }
-
-    if (schema === 'project-workstreams-v2') {
-      const workstreams = data.workstreams ?? [];
-      const columns = [
-        { key: 'queued',      label: 'Queued',      color: '#94a3b8' },
-        { key: 'next',        label: 'Up Next',     color: '#f59e0b' },
-        { key: 'in-progress', label: 'In Progress', color: '#3b82f6' },
-        { key: 'done',        label: 'Done',         color: '#22c55e' },
-      ];
-      const allTasks = workstreams.flatMap(ws =>
-        (ws.tasks ?? []).map(t => ({ ...t, _ws: ws.title, _color: ws.color ?? '#6366f1' }))
-      );
-      const colsHtml = columns.map(col => {
-        const tasks = allTasks.filter(t =>
-          (t.status ?? '').toLowerCase().replace(/\s+/g, '-') === col.key
-        );
-        if (!tasks.length && col.key === 'next') return '';
-        return `
-          <div style="flex:1;min-width:160px">
-            <div style="display:flex;align-items:center;gap:6px;margin-bottom:.75rem;
-                font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${col.color}">
-              <span style="width:8px;height:8px;border-radius:50%;background:${col.color};flex-shrink:0"></span>
-              ${col.label}
-              <span style="margin-left:auto;background:${col.color}22;color:${col.color};
-                  padding:1px 7px;border-radius:9999px;font-size:.7rem">${tasks.length}</span>
-            </div>
-            ${tasks.map(t => `
-              <div style="background:#fafaf9;border:1px solid #e5e5e4;border-left:3px solid ${t._color};
-                  border-radius:6px;padding:.6rem .85rem;margin-bottom:.5rem;font-size:.85rem">
-                <div style="font-size:.7rem;color:#aaa;margin-bottom:2px">${t._ws}</div>
-                <div style="font-weight:500;color:#1a1a1a">${t.task ?? t.title ?? ''}</div>
-                ${t.owner ? `<div style="font-size:.72rem;color:#888;margin-top:3px">${t.owner}</div>` : ''}
-                ${t.notes ? `<div style="font-size:.75rem;color:#777;margin-top:4px;border-top:1px solid #f0f0ef;padding-top:4px">${t.notes}</div>` : ''}
-              </div>`).join('')}
-            ${!tasks.length ? `<div style="font-size:.8rem;color:#ccc;padding:.5rem 0">—</div>` : ''}
-          </div>`;
-      }).filter(Boolean).join('');
-
-      const legend = workstreams.map(ws =>
-        `<span style="display:inline-flex;align-items:center;gap:5px;font-size:.78rem;color:#555">
-          <span style="width:8px;height:8px;border-radius:50%;background:${ws.color ?? '#6366f1'}"></span>
-          ${ws.title}
-        </span>`
-      ).join('');
-
-      return `
-        ${legend ? `<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:1.5rem">${legend}</div>` : ''}
-        <div style="display:flex;gap:16px;align-items:flex-start;overflow-x:auto">${colsHtml}</div>`;
     }
 
     if (schema === 'project-agents-v2') {
@@ -631,7 +582,7 @@
   }
 
   function wireKanban(renderEl, data, schema) {
-    if (schema !== 'project-workstreams-v1') return;
+    if (schema !== 'project-workstreams-v1' && schema !== 'project-workstreams-v2') return;
     const workstreams = data.workstreams ?? (Array.isArray(data) ? data : []);
     renderEl.querySelectorAll('[data-ws-id]').forEach(card => {
       card.addEventListener('click', () => {
