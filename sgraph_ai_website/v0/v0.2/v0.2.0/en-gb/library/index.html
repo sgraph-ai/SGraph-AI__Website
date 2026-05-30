@@ -162,8 +162,20 @@
   document.addEventListener('nav:loaded', e => {
     const { sections } = e.detail;
     allSections = sections;
+    // Flatten into a linear reading order: each section's articles, and for any
+    // parent article with children[], the parent followed by its child pages
+    // (with compound slugs). Drives prev/next navigation on every page type.
     allArticles = sections.flatMap(s =>
-      (s.children ?? []).map(a => ({ ...a, sectionTitle: s.title }))
+      (s.children ?? []).flatMap(a => {
+        const self = { ...a, sectionTitle: s.title };
+        const kids = (a.children ?? []).map(c => ({
+          ...c,
+          slug: compoundSlug(a.slug, c.slug),
+          sectionTitle: s.title,
+          parentTitle: a.title,
+        }));
+        return [self, ...kids];
+      })
     );
     // Emit full nav tree to debug panel
     document.dispatchEvent(new CustomEvent('debug:nav-json',
@@ -266,13 +278,27 @@
           <h1>${section.title}</h1>
           ${section.description ? `<p class="section-index-desc">${section.description}</p>` : ''}
           <ul class="section-index-list">
-            ${articles.map(a => `
+            ${articles.map(a => {
+              const kids = (a.children ?? []);
+              const childList = kids.length ? `
+                <ul class="section-index-list section-index-list--nested">
+                  ${kids.map(c => `
+                    <li class="section-index-list__item">
+                      <button class="section-index-list__link" data-slug="${compoundSlug(a.slug, c.slug)}">
+                        <span class="section-index-list__title">${c.title}</span>
+                        ${c.description ? `<span class="section-index-list__desc">${c.description}</span>` : ''}
+                      </button>
+                    </li>`).join('')}
+                </ul>` : '';
+              return `
               <li class="section-index-list__item">
                 <button class="section-index-list__link" data-slug="${a.slug ?? ''}">
                   <span class="section-index-list__title">${a.title}</span>
                   ${a.description ? `<span class="section-index-list__desc">${a.description}</span>` : ''}
                 </button>
-              </li>`).join('')}
+                ${childList}
+              </li>`;
+            }).join('')}
           </ul>
         </div>
       </div>`;
