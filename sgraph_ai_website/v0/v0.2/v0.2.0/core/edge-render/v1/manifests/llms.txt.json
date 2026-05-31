@@ -1,0 +1,21 @@
+{
+  "schema": "sg-render/v1",
+  "type": "llms.txt",
+  "content_type": "text/plain; charset=utf-8",
+  "vault": {
+    "id": "pmcv9tfe",
+    "read_key": "dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw",
+    "nav_path": "library/_nav.json"
+  },
+  "site": {
+    "title": "sgraph.ai Library",
+    "summary": "A public knowledge base on how sgraph.ai delivers content from encrypted vaults — cryptography, components, and trust boundaries.",
+    "base_path": "/en-gb/library",
+    "page_suffix": ".md"
+  },
+  "include": {
+    "exclude_sections": ["Blog"],
+    "exclude_slugs": [],
+    "max_pages": 500
+  }
+}
