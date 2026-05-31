@@ -17,7 +17,7 @@ including the full use-case section (5 sub-pages + a meta article).
 ### Changes shipped (all on `qa` branch, deployed to qa.sgraph.ai)
 
 1. **`library/index.html`** — Four updates:
-   - Vault credentials updated: `VAULT_ID=4wrqg006`, `READ_KEY=GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg` (base64url)
+   - Vault credentials updated: `VAULT_ID=pmcv9tfe`, `READ_KEY=dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw` (base64url)
    - `NAV_OBJECT_ID` updated to `obj-cas-imm-495b4572d121` (nav v2.1 with meta article)
    - `slugFromPath()` bug fix: `segments[2]` → `segments.slice(2).join('/')` for nested paths
    - `showArticle()` now accepts per-article `vaultId`/`readKey` with fallback to page-level
@@ -39,13 +39,13 @@ including the full use-case section (5 sub-pages + a meta article).
 
 ## Current vault state
 
-### Content vault (4wrqg006) — READ ONLY for @Dev
+### Content vault (pmcv9tfe) — READ ONLY for @Dev
 
 Nav object currently wired: `obj-cas-imm-495b4572d121` (v2.1 — includes meta article)
 
 All use-case content is live in the vault. No pending content updates from @Content.
 
-### Collab vault (iqjele6l)
+### Collab vault (r8m13rgj)
 
 Mail state:
 - **@Dev inbox**: EMPTY — all mail processed
@@ -84,10 +84,10 @@ Then commit + push to `qa`. That's all — no other code changes needed.
 
 The content vault read key has two representations:
 - **Hex (64 chars, wrong):** `1814ee917a34b6bcfd756779a79aaa0bae0bc3ea11b0f84e3a2cfd6697b07708`
-- **Base64url (43 chars, correct):** `GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg`
+- **Base64url (43 chars, correct):** `dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw`
 
 `importReadKey()` fails silently on hex. Always use the 43-char base64url form.
-See `iqjele6l/decisions/006-read-key-format.md`.
+See `r8m13rgj/decisions/006-read-key-format.md`.
 
 ### 2. Nested slug routing requires `segments.slice(2).join('/')`
 
@@ -119,7 +119,7 @@ fallback to page-level credentials. Enables multi-vault navs.
 
 ```bash
 # 1. Pull collab vault
-cd /home/user/iqjele6l && sgit pull
+cd /home/user/r8m13rgj && sgit pull
 
 # 2. Read this handover and session notes
 cat mail/sessions/dev.sgraph/notes.md

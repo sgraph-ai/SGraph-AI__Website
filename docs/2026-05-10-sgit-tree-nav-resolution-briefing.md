@@ -27,7 +27,7 @@ import { importReadKey, readObject } from
 const cryptoKey = await importReadKey(readKey);   // base64url AES-256-GCM key
 const buf = await readObject(
   'https://send.sgraph.ai',   // endpoint
-  vaultId,                    // e.g. '4wrqg006'
+  vaultId,                    // e.g. 'pmcv9tfe'
   objectId,                   // e.g. 'obj-cas-imm-2180d5cc4bf3'
   cryptoKey
 );
@@ -42,8 +42,8 @@ each publish of nav JSON produces a brand new object ID.
 
 | Field     | Value                                          |
 |-----------|------------------------------------------------|
-| Vault ID  | `4wrqg006`                                     |
-| Read key  | `GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg` |
+| Vault ID  | `pmcv9tfe`                                     |
+| Read key  | `dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw` |
 | Endpoint  | `https://send.sgraph.ai`                       |
 
 ### How nav is currently loaded
@@ -52,8 +52,8 @@ The HTML page hardcodes the nav object ID as an attribute:
 
 ```html
 <sg-side-nav
-  vault-id="4wrqg006"
-  read-key="GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg"
+  vault-id="pmcv9tfe"
+  read-key="dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw"
   nav-object-id="obj-cas-imm-2180d5cc4bf3"
   ...>
 </sg-side-nav>
@@ -148,7 +148,7 @@ Does resolving the branch HEAD require the vault read key?
 Or is the branch ref public / separately credentialed?
 
 ### e) Stable file path
-Given the content vault (`4wrqg006`), what is the stable file path where
+Given the content vault (`pmcv9tfe`), what is the stable file path where
 @Content's nav JSON is stored in the sgit tree?  
 (e.g. `nav/library.json` or `content/nav.json` — we need the exact path)
 
