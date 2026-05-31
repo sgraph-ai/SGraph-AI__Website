@@ -25,7 +25,7 @@
 import { writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
-const VERSION = 'v0.1.5'
+const VERSION = 'v0.1.6'
 const RENDER_PATH = '/core/edge-render/v1/sg-edge-render.mjs'
 
 // Which requests this function answers. Everything else passes straight through
@@ -58,9 +58,10 @@ export const handler = async (event) => {
   // At origin-request, CloudFront rewrites Host to the S3/origin domain.
   // Each distribution's viewer-request function stamps the real public hostname
   // into X-Sg-Site-Host (url-rewrite) or X-Forwarded-Host (vault-publish).
-  const host = req.headers?.['x-sg-site-host']?.[0]?.value
-            ?? req.headers?.['x-forwarded-host']?.[0]?.value
-            ?? req.headers?.host?.[0]?.value
+  const host   = req.headers?.['x-sg-site-host']?.[0]?.value
+             ?? req.headers?.['x-forwarded-host']?.[0]?.value
+             ?? req.headers?.host?.[0]?.value
+  const cfVer  = req.headers?.['x-sg-cf-version']?.[0]?.value ?? ''
   if (!host) return req // can't derive orchestrator URL — pass through
 
   try {
@@ -74,6 +75,7 @@ export const handler = async (event) => {
         'cache-control': [{ key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' }],
         'x-sg-commit':      [{ key: 'X-Sg-Commit',      value: out.commit ?? '' }],
         'x-sg-version':     [{ key: 'X-Sg-Version',     value: VERSION }],
+        'x-sg-cf-version':  [{ key: 'X-Sg-Cf-Version',  value: cfVer }],
         'x-sg-site-host':   [{ key: 'X-Sg-Site-Host',   value: host }],
       },
       body: out.body,
@@ -83,9 +85,10 @@ export const handler = async (event) => {
       status: '502',
       statusDescription: 'Bad Gateway',
       headers: {
-        'content-type':   [{ key: 'Content-Type',   value: 'text/plain; charset=utf-8' }],
-        'x-sg-version':   [{ key: 'X-Sg-Version',   value: VERSION }],
-        'x-sg-site-host': [{ key: 'X-Sg-Site-Host', value: host }],
+        'content-type':     [{ key: 'Content-Type',     value: 'text/plain; charset=utf-8' }],
+        'x-sg-version':     [{ key: 'X-Sg-Version',     value: VERSION }],
+        'x-sg-cf-version':  [{ key: 'X-Sg-Cf-Version',  value: cfVer }],
+        'x-sg-site-host':   [{ key: 'X-Sg-Site-Host',   value: host }],
       },
       body: `edge-render failed: ${err.message}\n`,
     }

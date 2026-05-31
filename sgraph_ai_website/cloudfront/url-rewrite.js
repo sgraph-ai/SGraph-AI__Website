@@ -30,6 +30,8 @@
 //
 //   Then associate with distribution as Viewer Request.
 
+var CF_VERSION = 'v0.1.0';
+
 function handler(event) {
     var request = event.request;
     var uri = request.uri;
@@ -37,6 +39,7 @@ function handler(event) {
     // Stamp the real public hostname before CloudFront rewrites Host to the S3 origin.
     // Lambda@Edge at origin-request reads this to derive the orchestrator URL.
     request.headers['x-sg-site-host'] = { value: event.request.headers.host.value };
+    request.headers['x-sg-cf-version'] = { value: CF_VERSION };
 
     // SPA sub-site rewrites — must run before the generic index.html append.
     // Only apply to trailing-slash URIs (bare paths are handled below with a redirect).
