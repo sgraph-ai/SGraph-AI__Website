@@ -35,7 +35,8 @@
 
 <!-- ═══ LIBRARY SUB-SITE BAND ════════════════════════════════ -->
 <!--
-  Vault: pmcv9tfe  |  nav object: obj-cas-imm-73353c112dc7 (v3.16 — rekeyed content vault pmcv9tfe (all 52 article ids regenerated))
+  Vault: pmcv9tfe  |  nav resolved at runtime via tree walk: library/_nav.json
+  (Approach A — no hardcoded nav-object-id; vault-client v1.2.2 resolves HEAD → tree → blob_id)
 -->
 <sg-sub-nav
   site-title="Library"
@@ -56,7 +57,7 @@
   <sg-side-nav
     vault-id="pmcv9tfe"
     read-key="dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw"
-    nav-object-id="obj-cas-imm-73353c112dc7"
+    nav-path="library/_nav.json"
     tree-label="Library"
     version="v0.2.0"
     home-href="/en-gb/library/"
@@ -94,7 +95,7 @@
 
 <footer class="sub-site-footer">
   <span class="sub-site-footer__copy">© 2026 SGraph AI Ltd.</span>
-  <span class="sub-site-footer__meta">sgraph.ai/library · site v0.2.0 · content nav v3.16</span>
+  <span class="sub-site-footer__meta">sgraph.ai/library · site v0.2.0 · nav: dynamic (library/_nav.json)</span>
 </footer>
 
 <sg-debug-panel></sg-debug-panel>
