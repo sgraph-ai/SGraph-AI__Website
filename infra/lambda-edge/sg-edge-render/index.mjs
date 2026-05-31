@@ -71,8 +71,9 @@ export const handler = async (event) => {
       headers: {
         'content-type':  [{ key: 'Content-Type',  value: out.content_type }],
         'cache-control': [{ key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' }],
-        'x-sg-commit':   [{ key: 'X-Sg-Commit',   value: out.commit ?? '' }],
-        'x-sg-version':  [{ key: 'X-Sg-Version',  value: VERSION }],
+        'x-sg-commit':      [{ key: 'X-Sg-Commit',      value: out.commit ?? '' }],
+        'x-sg-version':     [{ key: 'X-Sg-Version',     value: VERSION }],
+        'x-sg-site-host':   [{ key: 'X-Sg-Site-Host',   value: host }],
       },
       body: out.body,
     }
@@ -81,8 +82,9 @@ export const handler = async (event) => {
       status: '502',
       statusDescription: 'Bad Gateway',
       headers: {
-        'content-type': [{ key: 'Content-Type', value: 'text/plain; charset=utf-8' }],
-        'x-sg-version': [{ key: 'X-Sg-Version', value: VERSION }],
+        'content-type':   [{ key: 'Content-Type',   value: 'text/plain; charset=utf-8' }],
+        'x-sg-version':   [{ key: 'X-Sg-Version',   value: VERSION }],
+        'x-sg-site-host': [{ key: 'X-Sg-Site-Host', value: host }],
       },
       body: `edge-render failed: ${err.message}\n`,
     }
