@@ -30,9 +30,11 @@ const RENDER_PATH = '/core/edge-render/v1/sg-edge-render.mjs'
 // Which requests this function answers. Everything else passes straight through
 // to the SPA / S3 origin untouched.
 const INTERCEPT = uri =>
-  uri === '/llms.txt' ||
-  uri.endsWith('.md') ||
-  uri.endsWith('.llm.json')
+  typeof uri === 'string' && (
+    uri === '/llms.txt' ||
+    uri.endsWith('.md') ||
+    uri.endsWith('.llm.json')
+  )
 
 // Caching DISABLED for now (dev phase): the orchestrator is re-fetched on every
 // invocation so code/manifest changes appear immediately. Re-enable the per-host
