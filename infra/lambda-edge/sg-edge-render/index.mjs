@@ -56,9 +56,10 @@ export const handler = async (event) => {
   if (!req || !INTERCEPT(req.uri)) return req ?? event // ← pass through
 
   // At origin-request, CloudFront rewrites Host to the S3/origin domain.
-  // Each distribution sets X-Sg-Site-Host as a custom origin header so we
-  // know the real public hostname (qa.sgraph.ai, dev.sgraph.ai, etc).
+  // Each distribution's viewer-request function stamps the real public hostname
+  // into X-Sg-Site-Host (url-rewrite) or X-Forwarded-Host (vault-publish).
   const host = req.headers?.['x-sg-site-host']?.[0]?.value
+            ?? req.headers?.['x-forwarded-host']?.[0]?.value
             ?? req.headers?.host?.[0]?.value
   if (!host) return req // can't derive orchestrator URL — pass through
 
