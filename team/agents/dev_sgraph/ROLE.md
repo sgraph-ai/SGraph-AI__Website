@@ -17,7 +17,7 @@
 
 ## What @Dev does NOT do
 
-- Push to the content vault (`4wrqg006`) — read-only access via embedded key
+- Push to the content vault (`pmcv9tfe`) — read-only access via embedded key
 - Decide what content to publish — that is @Content + @Dinis
 - Commit directly to `dev` or `main` without QA review
 
@@ -42,8 +42,8 @@
 
 | Field | Value |
 |-------|-------|
-| Vault ID | `4wrqg006` |
-| Read key (base64url) | `GBTukXo0trz9dWd5p5qqC64Lw-oRsPhOOiz9Zpewdwg` |
+| Vault ID | `pmcv9tfe` |
+| Read key (base64url) | `dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw` |
 
 **Always use base64url format** (43 chars, may contain `-` and `_`).
 Do NOT use the hex form (64 chars, 0-9a-f only) — `importReadKey()` will fail silently.
@@ -54,7 +54,7 @@ Do NOT use the hex form (64 chars, 0-9a-f only) — `importReadKey()` will fail 
 
 | Field | Value |
 |-------|-------|
-| Vault ID | `iqjele6l` (key NOT stored here — this is a public repo; obtain from the team vault / @Dinis) |
+| Vault ID | `r8m13rgj` (key NOT stored here — this is a public repo; obtain from the team vault / @Dinis) |
 | Push token | `graphs-and-maps` |
 | Base URL | `https://send.sgraph.ai` |
 | Agent mailbox | `mail/dev.sgraph/` |
@@ -66,8 +66,8 @@ Do NOT use the hex form (64 chars, 0-9a-f only) — `importReadKey()` will fail 
 
 ```bash
 # 1. Clone / pull collab vault
-sgit --base-url https://send.sgraph.ai --token "graphs-and-maps" clone <COLLAB_VAULT_KEY>:iqjele6l
-cd iqjele6l && sgit pull
+sgit --base-url https://send.sgraph.ai --token "graphs-and-maps" clone <COLLAB_VAULT_KEY>:r8m13rgj
+cd r8m13rgj && sgit pull
 
 # 2. Recover session state
 cat mail/sessions/dev.sgraph/brief.md
