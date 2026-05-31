@@ -25,7 +25,7 @@
 import { writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
-const VERSION = 'v0.1.3'
+const VERSION = 'v0.1.5'
 const RENDER_PATH = '/core/edge-render/v1/sg-edge-render.mjs'
 
 // Which requests this function answers. Everything else passes straight through
@@ -55,8 +55,12 @@ export const handler = async (event) => {
   const req = event?.Records?.[0]?.cf?.request
   if (!req || !INTERCEPT(req.uri)) return req ?? event // ← pass through
 
-  const host = req.headers?.host?.[0]?.value
-  if (!host) return req // no host header — pass through, can't derive orchestrator URL
+  // At origin-request, CloudFront rewrites Host to the S3/origin domain.
+  // Each distribution sets X-Sg-Site-Host as a custom origin header so we
+  // know the real public hostname (qa.sgraph.ai, dev.sgraph.ai, etc).
+  const host = req.headers?.['x-sg-site-host']?.[0]?.value
+            ?? req.headers?.host?.[0]?.value
+  if (!host) return req // can't derive orchestrator URL — pass through
 
   try {
     const mod = await loadModule(`https://${host}${RENDER_PATH}`)
