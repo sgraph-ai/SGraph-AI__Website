@@ -52,13 +52,14 @@ async function loadModule(url) {
 }
 
 export const handler = async (event) => {
-  const req = event.Records[0].cf.request
-  if (!INTERCEPT(req.uri)) return req // ← pass through
+  const req = event?.Records?.[0]?.cf?.request
+  if (!req || !INTERCEPT(req.uri)) return req ?? event // ← pass through
 
-  const host = req.headers.host[0].value
-  const mod = await loadModule(`https://${host}${RENDER_PATH}`) // always fresh (no cache)
+  const host = req.headers?.host?.[0]?.value
+  if (!host) return req // no host header — pass through, can't derive orchestrator URL
 
   try {
+    const mod = await loadModule(`https://${host}${RENDER_PATH}`)
     const out = await mod.render(req.uri, { host })
     return {
       status: '200',
