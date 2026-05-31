@@ -34,6 +34,10 @@ function handler(event) {
     var request = event.request;
     var uri = request.uri;
 
+    // Stamp the real public hostname before CloudFront rewrites Host to the S3 origin.
+    // Lambda@Edge at origin-request reads this to derive the orchestrator URL.
+    request.headers['x-sg-site-host'] = { value: event.request.headers.host.value };
+
     // SPA sub-site rewrites — must run before the generic index.html append.
     // Only apply to trailing-slash URIs (bare paths are handled below with a redirect).
 
