@@ -47,8 +47,14 @@ attached by **versioned ARN**.
    - dedicated behaviors with path patterns `/llms.txt`, `*.md`, `*.llm.json`
      (preferred — scopes the Lambda to exactly the intercepted paths).
 
-3. Caching: responses set `Cache-Control: public, max-age=60` (near-live). Ensure
-   the cache policy forwards the `Host` header and honors origin Cache-Control.
+3. Caching: **disabled for now** (dev phase). The function returns
+   `Cache-Control: no-store, no-cache, must-revalidate` and re-fetches the
+   orchestrator on every invocation, so code/manifest changes appear immediately.
+   Attach the managed **CachingDisabled** cache policy to the behavior so
+   CloudFront doesn't cache either. Still ensure the policy **forwards the `Host`
+   header** (the function needs it to pick the environment).
+   Re-enable later: restore the per-host TTL module cache + `max-age` and switch
+   to a caching policy.
 
 ## Intercepted paths
 
