@@ -25,14 +25,17 @@
 import { writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
+const VERSION = 'v0.1.6'
 const RENDER_PATH = '/core/edge-render/v1/sg-edge-render.mjs'
 
 // Which requests this function answers. Everything else passes straight through
 // to the SPA / S3 origin untouched.
 const INTERCEPT = uri =>
-  uri === '/llms.txt' ||
-  uri.endsWith('.md') ||
-  uri.endsWith('.llm.json')
+  typeof uri === 'string' && (
+    uri === '/llms.txt' ||
+    uri.endsWith('.md') ||
+    uri.endsWith('.llm.json')
+  )
 
 // Caching DISABLED for now (dev phase): the orchestrator is re-fetched on every
 // invocation so code/manifest changes appear immediately. Re-enable the per-host
@@ -49,21 +52,31 @@ async function loadModule(url) {
 }
 
 export const handler = async (event) => {
-  const req = event.Records[0].cf.request
-  if (!INTERCEPT(req.uri)) return req // ← pass through
+  const req = event?.Records?.[0]?.cf?.request
+  if (!req || !INTERCEPT(req.uri)) return req ?? event // ← pass through
 
-  const host = req.headers.host[0].value
-  const mod = await loadModule(`https://${host}${RENDER_PATH}`) // always fresh (no cache)
+  // At origin-request, CloudFront rewrites Host to the S3/origin domain.
+  // Each distribution's viewer-request function stamps the real public hostname
+  // into X-Sg-Site-Host (url-rewrite) or X-Forwarded-Host (vault-publish).
+  const host   = req.headers?.['x-sg-site-host']?.[0]?.value
+             ?? req.headers?.['x-forwarded-host']?.[0]?.value
+             ?? req.headers?.host?.[0]?.value
+  const cfVer  = req.headers?.['x-sg-cf-version']?.[0]?.value ?? ''
+  if (!host) return req // can't derive orchestrator URL — pass through
 
   try {
+    const mod = await loadModule(`https://${host}${RENDER_PATH}`)
     const out = await mod.render(req.uri, { host })
     return {
       status: '200',
       statusDescription: 'OK',
       headers: {
-        'content-type':  [{ key: 'Content-Type',  value: out.content_type }],
-        'cache-control': [{ key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' }],
-        'x-sg-commit':   [{ key: 'X-Sg-Commit',   value: out.commit ?? '' }],
+        'content-type':     [{ key: 'Content-Type',     value: out.content_type }],
+        'cache-control':    [{ key: 'Cache-Control',    value: 'no-store, no-cache, must-revalidate' }],
+        'x-sg-commit':      [{ key: 'X-Sg-Commit',      value: out.commit ?? '' }],
+        'x-sg-version':     [{ key: 'X-Sg-Version',     value: VERSION }],
+        'x-sg-cf-version':  [{ key: 'X-Sg-Cf-Version',  value: cfVer }],
+        'x-sg-site-host':   [{ key: 'X-Sg-Site-Host',   value: host }],
       },
       body: out.body,
     }
@@ -71,7 +84,12 @@ export const handler = async (event) => {
     return {
       status: '502',
       statusDescription: 'Bad Gateway',
-      headers: { 'content-type': [{ key: 'Content-Type', value: 'text/plain; charset=utf-8' }] },
+      headers: {
+        'content-type':     [{ key: 'Content-Type',     value: 'text/plain; charset=utf-8' }],
+        'x-sg-version':     [{ key: 'X-Sg-Version',     value: VERSION }],
+        'x-sg-cf-version':  [{ key: 'X-Sg-Cf-Version',  value: cfVer }],
+        'x-sg-site-host':   [{ key: 'X-Sg-Site-Host',   value: host }],
+      },
       body: `edge-render failed: ${err.message}\n`,
     }
   }
