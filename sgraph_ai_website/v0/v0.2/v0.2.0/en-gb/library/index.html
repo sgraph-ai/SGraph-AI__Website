@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Library — sgraph.ai</title>
+  <base href="/en-gb/library/">
+  <link rel="icon"       href="../../_common/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap">
+  <link rel="stylesheet" href="../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../_common/css/style.css">
+
+  <script type="importmap">
+  {
+    "imports": {
+      "/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js":
+          "https://dev.tools.sgraph.ai/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js"
+    }
+  }
+  </script>
+
+  <script type="module" src="../../_common/js/components/sg-article-viewer/v0/v0.1/v0.1.0/sg-article-viewer.js"></script>
+</head>
+<body class="sub-site-page">
+
+<!-- ═══ PERSISTENT HEADER ════════════════════════════════════ -->
+<sg-site-header site="Send">
+  <div slot="locale" id="locale-picker"></div>
+</sg-site-header>
+
+<!-- Gap between dark site header and light sub-site shell -->
+<div class="sub-site-gap"></div>
+
+<!-- ═══ LIBRARY SUB-SITE BAND ════════════════════════════════ -->
+<!--
+  Vault: pmcv9tfe  |  nav resolved at runtime via tree walk: library/_nav.json
+  (Approach A — no hardcoded nav-object-id; vault-client v1.2.2 resolves HEAD → tree → blob_id)
+-->
+<sg-sub-nav
+  site-title="Library"
+  site-description="A growing public knowledge base. How sgraph.ai delivers content from encrypted vaults — the cryptography, the components, and the trust boundaries."
+  vault-id="pmcv9tfe"
+  read-key="dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw"
+  nav-path="library/_nav.json">
+</sg-sub-nav>
+
+<!-- ═══ THREE-COLUMN SHELL ════════════════════════════════════ -->
+<!--
+  Col 1: sg-side-nav (sticky file-tree)
+  Col 2: landing page OR article content
+  Col 3: article TOC (hidden on landing, shown with .with-toc class when article has headings)
+-->
+<div class="sub-site" id="sub-site-shell">
+
+  <sg-side-nav
+    vault-id="pmcv9tfe"
+    read-key="dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw"
+    nav-path="library/_nav.json"
+    tree-label="Library"
+    version="v0.2.0"
+    home-href="/en-gb/library/"
+    auto-select
+    extra-links="[
+      {&quot;section&quot;:&quot;Blog&quot;,&quot;title&quot;:&quot;Introducing @Journalist&quot;,&quot;slug&quot;:&quot;blog/introducing-journalist&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-684e59d65e77a25d6846245eee2291e9a1767860ef80dcb6351e4e78607ad123&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;},
+      {&quot;section&quot;:&quot;Blog&quot;,&quot;title&quot;:&quot;Agentics London Session&quot;,&quot;slug&quot;:&quot;blog/agentics-london-session&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-77c47abb9be86ebfcd7f826f275856f8849914377aa9dab015145c1a9af1cf8e&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;},
+      {&quot;section&quot;:&quot;What&#39;s New&quot;,&quot;title&quot;:&quot;Team Expansion — Seven Agents&quot;,&quot;slug&quot;:&quot;whats-new/team-expansion-seven-agents&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-f678dd3857795479a88c8064c138330732c9ff2ee9ed8d4782904af861847355&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;}
+    ]">
+  </sg-side-nav>
+
+  <!-- Landing page — shown at /en-gb/library/ (no article selected) -->
+  <div class="sub-site__landing" id="landing" hidden>
+    <p class="sub-site__landing-eyebrow">sgraph.ai / Library</p>
+    <h1 class="sub-site__landing-title">Library</h1>
+    <p class="sub-site__landing-desc">Technical knowledge base — how sgraph.ai works, the underlying concepts, security model, and integration guides.</p>
+    <div class="sub-site__section-cards" id="landing-sections"></div>
+  </div>
+
+  <!-- Article content — shown when an article is selected -->
+  <div class="sub-site__content" id="article-content" hidden>
+    <div class="sub-site__crumbs" id="article-crumbs"></div>
+    <div id="article-render"></div>
+    <div class="sub-site__next-prev" id="next-prev"></div>
+  </div>
+
+  <!-- Right TOC — built from rendered article headings, hidden until populated -->
+  <div class="sub-site__toc" id="article-toc" hidden>
+    <button class="sub-site__toc-toggle" id="toc-toggle" title="Toggle table of contents"></button>
+    <div class="sub-site__toc-label">On this page</div>
+    <ul class="sub-site__toc-list" id="toc-list"></ul>
+  </div>
+
+</div>
+
+<footer class="sub-site-footer">
+  <span class="sub-site-footer__copy">© 2026 SGraph AI Ltd.</span>
+  <span class="sub-site-footer__meta">sgraph.ai/library · site v0.2.0 · nav: dynamic (library/_nav.json)</span>
+</footer>
+
+<sg-debug-panel></sg-debug-panel>
+<script type="module" src="../../_common/js/components/sg-debug-panel/v0/v0.1/v0.1.0/sg-debug-panel.js"></script>
+
+<script type="module">
+  const VAULT_ID = 'pmcv9tfe';
+  const READ_KEY = 'dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw';
+
+  function slugFromPath() {
+    const segments = location.pathname.split('/').filter(Boolean);
+    return segments.length > 2 ? segments.slice(2).join('/') : '';
+  }
+
+  function toSlug(title) {
+    return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
+  }
+
+  function compoundSlug(parentSlug, childSlug) {
+    if (!childSlug || !parentSlug) return childSlug;
+    return childSlug.startsWith(parentSlug + '/') ? childSlug : `${parentSlug}/${childSlug}`;
+  }
+
+  // Walk full nav tree (sections → children → children) to find an article by slug.
+  // Returns the article object augmented with sectionTitle and parentTitle, or null.
+  function findArticleBySlug(sections, slug) {
+    for (const s of sections) {
+      for (const a of (s.children ?? [])) {
+        if (a.slug === slug) return { ...a, sectionTitle: s.title, parentTitle: null };
+        for (const c of (a.children ?? [])) {
+          const cs = compoundSlug(a.slug, c.slug);
+          if (cs === slug) return { ...c, slug: cs, sectionTitle: s.title, parentTitle: a.title };
+        }
+      }
+    }
+    return null;
+  }
+
+  const shell      = document.getElementById('sub-site-shell');
+  const sideNav    = document.querySelector('sg-side-nav');
+  const landing    = document.getElementById('landing');
+  const articleEl  = document.getElementById('article-content');
+  const articleToc = document.getElementById('article-toc');
+
+  // Restore panel collapse states immediately (before nav loads)
+  // On mobile (≤900px) default to collapsed unless user has explicitly expanded
+  const _savedNav = localStorage.getItem('sg-nav-collapsed');
+  if (_savedNav === 'true' || (_savedNav === null && window.innerWidth <= 900)) {
+    shell.classList.add('nav-collapsed');
+  }
+  if (localStorage.getItem('sg-toc-collapsed') === 'true') shell.classList.add('toc-collapsed');
+
+  document.getElementById('toc-toggle')?.addEventListener('click', () => {
+    const collapsed = shell.classList.toggle('toc-collapsed');
+    localStorage.setItem('sg-toc-collapsed', collapsed);
+  });
+
+  let allArticles = [];
+  let allSections = [];
+  let headingObserver = null;
+
+  const initialSlug = slugFromPath();
+  if (initialSlug) sideNav.setAttribute('active-slug', initialSlug);
+
+  document.addEventListener('nav:loaded', e => {
+    const { sections } = e.detail;
+    allSections = sections;
+    // Flatten into a linear reading order: each section's articles, and for any
+    // parent article with children[], the parent followed by its child pages
+    // (with compound slugs). Drives prev/next navigation on every page type.
+    allArticles = sections.flatMap(s =>
+      (s.children ?? []).flatMap(a => {
+        const self = { ...a, sectionTitle: s.title };
+        const kids = (a.children ?? []).map(c => ({
+          ...c,
+          slug: compoundSlug(a.slug, c.slug),
+          sectionTitle: s.title,
+          parentTitle: a.title,
+        }));
+        return [self, ...kids];
+      })
+    );
+    // Emit full nav tree to debug panel
+    document.dispatchEvent(new CustomEvent('debug:nav-json',
+      { detail: { json: { sections }, src: 'library nav (live)' } }));
+    buildLandingCards(sections);
+
+    const slug = slugFromPath();
+    if (!slug) {
+      showLanding();
+    } else {
+      const matchedSection = sections.find(s => toSlug(s.title) === slug);
+      if (matchedSection) {
+        showSectionIndex(matchedSection);
+      } else {
+        // Explicit slug routing: walk full nav tree to find article or child article.
+        // This fires before auto-select (which also calls showArticle via nav:select).
+        // The article-viewer sequence counter ensures only the final load renders.
+        const found = findArticleBySlug(sections, slug);
+        if (found) {
+          setBreadcrumbs('Library', found.sectionTitle, found.parentTitle || null, found.title);
+          showArticle(found.content_object_id, found.render ?? 'markdown', found.vault_id ?? null, found.read_key ?? null);
+          buildNextPrev(slug);
+        }
+      }
+    }
+  });
+
+  // Article selected via sidebar
+  document.addEventListener('nav:select', e => {
+    const { title, slug, sectionTitle, parentTitle, content_object_id, render, vault_id, read_key } = e.detail;
+    const targetPath = `/en-gb/library/${slug}/`;
+    if (location.pathname !== targetPath) {
+      history.pushState({ slug }, '', targetPath);
+    }
+    setBreadcrumbs('Library', sectionTitle, parentTitle || null, title);
+    showArticle(content_object_id, render ?? 'markdown', vault_id, read_key);
+    buildNextPrev(slug);
+    // Auto-collapse nav on mobile so content is immediately visible
+    if (window.innerWidth <= 900) {
+      shell.classList.add('nav-collapsed');
+      localStorage.setItem('sg-nav-collapsed', 'true');
+    }
+  });
+
+  // Section folder label clicked — show section index page
+  document.addEventListener('nav:section', e => {
+    const { title, sectionSlug } = e.detail;
+    const targetPath = `/en-gb/library/${sectionSlug}/`;
+    if (location.pathname !== targetPath) {
+      history.pushState({ sectionSlug }, '', targetPath);
+    }
+    const section = allSections.find(s => s.title === title);
+    if (section) showSectionIndex(section);
+  });
+
+  // Browser back/forward
+  window.addEventListener('popstate', () => {
+    const slug = slugFromPath();
+    if (!slug) { showLanding(); return; }
+
+    const matchedSection = allSections.find(s => toSlug(s.title) === slug);
+    if (matchedSection) { showSectionIndex(matchedSection); return; }
+
+    const btn = sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`);
+    if (btn) btn.click();
+    else sideNav.setAttribute('active-slug', slug);
+  });
+
+  function showLanding() {
+    articleEl.hidden = true;
+    articleToc.hidden = true;
+    shell.classList.remove('with-toc');
+    landing.hidden = false;
+  }
+
+  function showSectionIndex(section) {
+    // If the section declares an index article, load it as the landing page
+    if (section.index) {
+      const indexArticle = (section.children ?? []).find(a => a.slug === section.index);
+      if (indexArticle?.content_object_id) {
+        setBreadcrumbs('Library', section.title, null);
+        showArticle(indexArticle.content_object_id, indexArticle.render ?? 'markdown',
+                    indexArticle.vault_id, indexArticle.read_key);
+        buildNextPrev(indexArticle.slug);
+        return;
+      }
+    }
+
+    landing.hidden = true;
+    articleToc.hidden = true;
+    shell.classList.remove('with-toc');
+    articleEl.hidden = false;
+
+    setBreadcrumbs('Library', section.title, null);
+
+    const articles = section.children ?? [];
+    document.getElementById('article-render').innerHTML = `
+      <div class="article-viewer">
+        <div class="article-body">
+          <h1>${section.title}</h1>
+          ${section.description ? `<p class="section-index-desc">${section.description}</p>` : ''}
+          <ul class="section-index-list">
+            ${articles.map(a => {
+              const kids = (a.children ?? []);
+              const childList = kids.length ? `
+                <ul class="section-index-list section-index-list--nested">
+                  ${kids.map(c => `
+                    <li class="section-index-list__item">
+                      <button class="section-index-list__link" data-slug="${compoundSlug(a.slug, c.slug)}">
+                        <span class="section-index-list__title">${c.title}</span>
+                        ${c.description ? `<span class="section-index-list__desc">${c.description}</span>` : ''}
+                      </button>
+                    </li>`).join('')}
+                </ul>` : '';
+              return `
+              <li class="section-index-list__item">
+                <button class="section-index-list__link" data-slug="${a.slug ?? ''}">
+                  <span class="section-index-list__title">${a.title}</span>
+                  ${a.description ? `<span class="section-index-list__desc">${a.description}</span>` : ''}
+                </button>
+                ${childList}
+              </li>`;
+            }).join('')}
+          </ul>
+        </div>
+      </div>`;
+
+    document.getElementById('next-prev').innerHTML = '';
+
+    document.querySelectorAll('.section-index-list__link').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slug = btn.dataset.slug;
+        if (!slug) return;
+        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`)?.click();
+      });
+    });
+  }
+
+  function showArticle(objectId, render, vaultId, readKey) {
+    landing.hidden = true;
+    articleEl.hidden = false;
+
+    const renderEl = document.getElementById('article-render');
+    renderEl.innerHTML = '';
+
+    const el = document.createElement('sg-article-viewer');
+    el.setAttribute('vault-id',  vaultId  || VAULT_ID);
+    el.setAttribute('read-key',  readKey  || READ_KEY);
+    el.setAttribute('object-id', objectId);
+    el.setAttribute('render',    render   || 'markdown');
+    renderEl.appendChild(el);
+
+    // Build TOC once content renders
+    if (headingObserver) headingObserver.disconnect();
+    articleToc.hidden = true;
+    shell.classList.remove('with-toc');
+    document.getElementById('toc-list').innerHTML = '';
+
+    headingObserver = new MutationObserver(() => {
+      clearTimeout(headingObserver._t);
+      headingObserver._t = setTimeout(() => buildToc(renderEl), 150);
+    });
+    headingObserver.observe(renderEl, { childList: true, subtree: true });
+  }
+
+  function setBreadcrumbs(site, section, parent, article) {
+    const siteHref    = '/en-gb/library/';
+    const sectionHref = section ? `/en-gb/library/${toSlug(section)}/` : null;
+    const el = document.getElementById('article-crumbs');
+    const parts = [site, section, parent, article].filter(Boolean);
+    el.innerHTML = parts.map((p, i) => {
+      if (i === 0) return `<a class="sub-site__crumbs-link" href="${siteHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
+      if (i === 1 && parts.length > 2) return `<a class="sub-site__crumbs-link" href="${sectionHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
+      if (i < parts.length - 1) return `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`;
+      return `<span class="sub-site__crumbs-here">${p}</span>`;
+    }).join('');
+  }
+
+  function buildToc(container) {
+    const headings = Array.from(container.querySelectorAll('h2, h3'));
+    if (headings.length < 2) return; // not worth showing TOC for < 2 headings
+
+    headings.forEach((h, i) => { if (!h.id) h.id = `h-${i}`; });
+
+    const tocList = document.getElementById('toc-list');
+    tocList.innerHTML = headings.map(h => `
+      <li class="${h.tagName === 'H3' ? 'h3' : ''}">
+        <a class="sub-site__toc-link" href="#${h.id}">${h.textContent}</a>
+      </li>`).join('');
+
+    shell.classList.add('with-toc');
+    articleToc.hidden = false;
+
+    // Highlight active section on scroll
+    const links = Array.from(tocList.querySelectorAll('.sub-site__toc-link'));
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          links.forEach(l => l.classList.remove('active'));
+          tocList.querySelector(`a[href="#${entry.target.id}"]`)
+                 ?.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-15% 0px -70% 0px' });
+    headings.forEach(h => io.observe(h));
+  }
+
+  function buildLandingCards(sections) {
+    const container = document.getElementById('landing-sections');
+    container.innerHTML = sections.map(section => {
+      const articles = section.children ?? [];
+      const shown    = articles.slice(0, 4);
+      const overflow = articles.length - shown.length;
+      return `
+        <div class="section-card">
+          <div class="section-card__header">
+            <button class="section-card__title" data-section="${section.title}">${section.title}</button>
+            <span class="section-card__count">${articles.length}</span>
+          </div>
+          ${section.description ? `<p class="section-card__desc">${section.description}</p>` : ''}
+          <ul class="section-card__articles">
+            ${shown.map(a => `
+              <li><button class="section-card__article"
+                          data-slug="${a.slug ?? ''}">${a.title}</button></li>
+            `).join('')}
+            ${overflow > 0 ? `<li><span class="section-card__more">+${overflow} more</span></li>` : ''}
+          </ul>
+        </div>`;
+    }).join('');
+
+    container.querySelectorAll('.section-card__title[data-section]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sectionTitle = btn.dataset.section;
+        const sectionSlug  = toSlug(sectionTitle);
+        history.pushState({ sectionSlug }, '', `/en-gb/library/${sectionSlug}/`);
+        const section = allSections.find(s => s.title === sectionTitle);
+        if (section) showSectionIndex(section);
+      });
+    });
+
+    container.querySelectorAll('.section-card__article[data-slug]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slug = btn.dataset.slug;
+        if (!slug) return;
+        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`)?.click();
+      });
+    });
+  }
+
+  function buildNextPrev(currentSlug) {
+    const container = document.getElementById('next-prev');
+    const idx  = allArticles.findIndex(a => a.slug === currentSlug);
+    const prev = idx > 0 ? allArticles[idx - 1] : null;
+    const next = idx >= 0 && idx < allArticles.length - 1 ? allArticles[idx + 1] : null;
+
+    if (!prev && !next) { container.innerHTML = ''; return; }
+
+    container.innerHTML = `
+      <div class="sub-site__nav-card sub-site__nav-card--prev${prev ? '' : ' sub-site__nav-card--empty'}"
+           ${prev ? '' : 'aria-hidden="true"'}>
+        ${prev ? `<div class="sub-site__nav-label">← Previous</div>
+                  <div class="sub-site__nav-title">${prev.title}</div>` : ''}
+      </div>
+      <div class="sub-site__nav-card sub-site__nav-card--next${next ? '' : ' sub-site__nav-card--empty'}"
+           ${next ? '' : 'aria-hidden="true"'}>
+        ${next ? `<div class="sub-site__nav-label">Next →</div>
+                  <div class="sub-site__nav-title">${next.title}</div>` : ''}
+      </div>`;
+
+    if (prev) {
+      container.querySelector('.sub-site__nav-card--prev')
+               .addEventListener('click', () => {
+        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(prev.slug)}"]`)?.click();
+      });
+    }
+    if (next) {
+      container.querySelector('.sub-site__nav-card--next')
+               .addEventListener('click', () => {
+        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(next.slug)}"]`)?.click();
+      });
+    }
+  }
+</script>
+
+<script src="../../_common/js/nav.js"></script>
+<script>
+  // Reload if browser restores page from bfcache (back/forward cache).
+  // Prevents stale HTML shell being shown after navigation on mobile.
+  window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
+</script>
+<script type="module" src="../../_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
+<script type="module" src="../../_common/js/components/sg-sub-nav/v0/v0.1/v0.1.0/sg-sub-nav.js"></script>
+<script type="module" src="../../_common/js/components/sg-side-nav/v0/v0.1/v0.1.0/sg-side-nav.js"></script>
+
+</body>
+</html>

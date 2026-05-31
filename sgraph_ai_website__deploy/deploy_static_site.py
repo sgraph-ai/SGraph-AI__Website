@@ -63,9 +63,9 @@ CONTENT_TYPE_MAP = {
 }
 
 CACHE_CONTROL = {
-    "html":   "public, max-age=300",       # 5 minutes
-    "css_js": "public, max-age=86400",     # 1 day
-    "image":  "public, max-age=604800",    # 1 week
+    "html":   "no-store, no-cache",
+    "css_js": "no-store, no-cache",
+    "image":  "no-store, no-cache",
 }
 
 HTML_EXTENSIONS  = {".html"}

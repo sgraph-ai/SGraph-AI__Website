@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Style Guide — sgraph.ai Dev</title>
+  <link rel="icon" href="../../../_common/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap">
+  <link rel="stylesheet" href="../../../_common/fonts/fonts.css">
+  <link rel="stylesheet" href="../../../_common/css/style.css">
+  <style>
+    .sg-page {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 48px 32px 96px;
+    }
+    .sg-page h1 {
+      font-size: 2rem; font-weight: 700;
+      margin: 0 0 6px;
+    }
+    .sg-page > .sg-eyebrow {
+      font-size: 0.8125rem; color: var(--ss-fg-faint, #aaa);
+      font-family: var(--font-mono); margin-bottom: 4px;
+    }
+    .sg-page > .sg-subtitle {
+      font-size: 1rem; color: var(--ss-fg-soft, #555);
+      margin: 0 0 56px;
+    }
+    .sg-section {
+      margin-bottom: 72px;
+    }
+    .sg-section-title {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--ss-fg-faint, #aaa);
+      font-family: var(--font-mono);
+      border-bottom: 1px solid var(--ss-border, #e5e5e3);
+      padding-bottom: 10px; margin-bottom: 32px;
+    }
+    .sg-subsection { margin-bottom: 40px; }
+    .sg-subsection-label {
+      font-size: 0.8rem; font-weight: 600; color: var(--ss-fg-soft);
+      margin-bottom: 12px;
+    }
+    .sg-demo-box {
+      padding: 24px 28px;
+      border: 1px solid var(--ss-border, #e5e5e3);
+      border-radius: 10px;
+      background: var(--ss-bg, #fff);
+    }
+    .sg-back {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.875rem; color: var(--accent); text-decoration: none;
+      margin-bottom: 32px;
+    }
+    .sg-back:hover { text-decoration: underline; }
+
+    /* ── Link color experiments ───────────────────────────── */
+    .link-palette {
+      display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+    }
+    .link-opt {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px;
+      border: 2px solid var(--ss-border, #e5e5e3);
+      border-radius: 8px; cursor: pointer;
+      background: var(--ss-bg, #fff);
+      transition: border-color 0.15s;
+      user-select: none;
+    }
+    .link-opt.active { border-color: var(--ss-fg, #222); }
+    .link-opt__swatch {
+      width: 18px; height: 18px; border-radius: 4px;
+      flex-shrink: 0; border: 1px solid rgba(0,0,0,0.08);
+    }
+    .link-opt__name { font-size: 0.875rem; font-weight: 500; }
+    .link-opt__hex  { font-size: 0.75rem; color: var(--ss-fg-faint); font-family: var(--font-mono); }
+    .link-demo {
+      padding: 20px 24px;
+      border: 1px solid var(--ss-border, #e5e5e3);
+      border-radius: 8px;
+      font-size: 0.9375rem; line-height: 1.7;
+      color: var(--ss-fg, #222);
+    }
+    .link-demo a { color: var(--link-color); text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 2px; transition: text-decoration-color 0.15s, color 0.15s; }
+    .link-demo a:hover { color: var(--link-color-hover, var(--link-color)); text-decoration-color: currentColor; }
+
+    /* ── Typography ───────────────────────────────────────── */
+    .typo-demo { display: flex; flex-direction: column; gap: 16px; }
+    .typo-row  { display: flex; align-items: baseline; gap: 24px; }
+    .typo-label { font-size: 0.72rem; font-family: var(--font-mono); color: var(--ss-fg-faint); width: 80px; flex-shrink: 0; }
+
+    /* ── Color swatches ───────────────────────────────────── */
+    .color-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+    .color-chip {
+      width: 120px;
+    }
+    .color-chip__block {
+      height: 52px; border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.08);
+      margin-bottom: 6px;
+    }
+    .color-chip__name { font-size: 0.75rem; font-weight: 600; color: var(--ss-fg); }
+    .color-chip__var  { font-size: 0.7rem; color: var(--ss-fg-faint); font-family: var(--font-mono); }
+
+    /* ── Badge / pill demos ───────────────────────────────── */
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .badge {
+      display: inline-block; padding: 3px 10px;
+      border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+    }
+
+    /* ── Component dividers ───────────────────────────────── */
+    .sg-component-wrap { margin-bottom: 48px; }
+    .sg-component-label {
+      font-size: 0.75rem; font-family: var(--font-mono);
+      color: var(--accent); margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .sg-component-label::after {
+      content: ""; flex: 1; height: 1px;
+      background: var(--ss-border);
+    }
+  </style>
+</head>
+<body class="sub-site-page">
+
+<div class="sg-page">
+  <a class="sg-back" href="/en-gb/dev/">← Dev</a>
+  <p class="sg-eyebrow">sgraph.ai / dev / style-guide</p>
+  <h1>Style Guide</h1>
+  <p class="sg-subtitle">Typography, colours, and all rich components — living reference for the Library.</p>
+
+  <!-- ═══ LINK COLOURS ═══════════════════════════════════════════ -->
+  <section class="sg-section">
+    <div class="sg-section-title">Link colour experiments</div>
+    <p style="font-size:0.875rem;color:var(--ss-fg-soft);margin:0 0 20px;">
+      Click a swatch to apply it to the demo text below. The active colour updates <code>--link-color</code> globally.
+      Article prose links use this variable independently of the UI accent.
+    </p>
+
+    <div class="link-palette" id="link-palette">
+      <div class="link-opt active" data-color="#0d9488" data-hover="#0f766e">
+        <div class="link-opt__swatch" style="background:#0d9488"></div>
+        <div>
+          <div class="link-opt__name">Deep Teal</div>
+          <div class="link-opt__hex">#0d9488 · current default</div>
+        </div>
+      </div>
+      <div class="link-opt" data-color="#4ECDC4" data-hover="#3DB8B0">
+        <div class="link-opt__swatch" style="background:#4ECDC4"></div>
+        <div>
+          <div class="link-opt__name">Teal (original)</div>
+          <div class="link-opt__hex">#4ECDC4 · accent colour</div>
+        </div>
+      </div>
+      <div class="link-opt" data-color="#2563eb" data-hover="#1d4ed8">
+        <div class="link-opt__swatch" style="background:#2563eb"></div>
+        <div>
+          <div class="link-opt__name">Classic Blue</div>
+          <div class="link-opt__hex">#2563eb · high contrast</div>
+        </div>
+      </div>
+      <div class="link-opt" data-color="#4f46e5" data-hover="#4338ca">
+        <div class="link-opt__swatch" style="background:#4f46e5"></div>
+        <div>
+          <div class="link-opt__name">Indigo</div>
+          <div class="link-opt__hex">#4f46e5 · distinctive</div>
+        </div>
+      </div>
+      <div class="link-opt" data-color="#7c3aed" data-hover="#6d28d9">
+        <div class="link-opt__swatch" style="background:#7c3aed"></div>
+        <div>
+          <div class="link-opt__name">Purple</div>
+          <div class="link-opt__hex">#7c3aed · bold</div>
+        </div>
+      </div>
+      <div class="link-opt" data-color="#0369a1" data-hover="#075985">
+        <div class="link-opt__swatch" style="background:#0369a1"></div>
+        <div>
+          <div class="link-opt__name">Ocean Blue</div>
+          <div class="link-opt__hex">#0369a1 · muted</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="link-demo">
+      <p>
+        The <a href="#">Agentic JS API</a> pattern lets Claude interact with any tool
+        that exposes a <a href="#">JS Tool API</a> — a small JavaScript object on
+        <code>window.__tool</code> with a <a href="#">self-describing manifest</a>
+        and typed methods. See the <a href="#">full walkthrough</a> for a step-by-step
+        example using Claude + Playwright.
+      </p>
+      <p>
+        Related: <a href="#">vault delivery model</a> ·
+        <a href="#">sg-article-viewer</a> ·
+        <a href="#">how it works</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ TYPOGRAPHY ═════════════════════════════════════════════ -->
+  <section class="sg-section">
+    <div class="sg-section-title">Typography</div>
+
+    <div class="sg-subsection">
+      <div class="sg-subsection-label">Headings — Source Serif 4</div>
+      <div class="typo-demo article-body">
+        <div class="typo-row">
+          <span class="typo-label">h1</span>
+          <h1 style="margin:0;font-size:2.25rem;">The Agentic JS API Pattern</h1>
+        </div>
+        <div class="typo-row">
+          <span class="typo-label">h2</span>
+          <h2 style="margin:0;font-size:1.5rem;">How the Pattern Works</h2>
+        </div>
+        <div class="typo-row">
+          <span class="typo-label">h3</span>
+          <h3 style="margin:0;font-size:1.125rem;">The Three Skill Files</h3>
+        </div>
+        <div class="typo-row">
+          <span class="typo-label">h4</span>
+          <h4 style="margin:0;font-size:1rem;">Configuration options</h4>
+        </div>
+      </div>
+    </div>
+
+    <div class="sg-subsection">
+      <div class="sg-subsection-label">Body prose — Inter</div>
+      <div class="sg-demo-box article-body">
+        <p>sgraph.ai delivers content from encrypted vaults. Each article is a
+        vault object — fetched, decrypted, and rendered entirely in the browser.
+        No server sees the plaintext. The <a href="#">vault client</a> handles key
+        derivation using a base64url AES-256-GCM read key embedded in the page.</p>
+        <p>Inline <code>code looks like this</code> in running prose. A longer
+        <strong>strong phrase</strong> and an <em>italic emphasis</em> for comparison.</p>
+        <blockquote>A blockquote. Used for callouts, quotes, or highlighted context that
+        sits slightly outside the main flow.</blockquote>
+      </div>
+    </div>
+
+    <div class="sg-subsection">
+      <div class="sg-subsection-label">Code block</div>
+      <div class="sg-demo-box" style="padding:0;overflow:hidden;">
+        <pre style="margin:0;padding:20px 24px;background:#1e1e2e;color:#cdd6f4;font-family:var(--font-mono);font-size:0.85rem;line-height:1.6;border-radius:10px;overflow-x:auto;"><code>const tool = window.__tool;
+const manifest = await tool.meta.getManifest();
+const skills   = await tool.meta.getSkills();
+
+// Generate an infographic
+const png = await tool.generate({ prompt: 'API architecture' });
+</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ COLOURS ════════════════════════════════════════════════ -->
+  <section class="sg-section">
+    <div class="sg-section-title">Colour tokens</div>
+    <div class="color-grid">
+      <div class="color-chip">
+        <div class="color-chip__block" style="background:var(--accent)"></div>
+        <div class="color-chip__name">Accent</div>
+        <div class="color-chip__var">--accent</div>
+      </div>
+      <div class="color-chip">
+        <div class="color-chip__block" style="background:#0d9488"></div>
+        <div class="color-chip__name">Link (default)</div>
+        <div class="color-chip__var">--link-color</div>
+      </div>
+      <div class="color-chip">
+        <div class="color-chip__block" style="background:var(--ss-fg,#222)"></div>
+        <div class="color-chip__name">Foreground</div>
+        <div class="color-chip__var">--ss-fg</div>
+      </div>
+      <div class="color-chip">
+        <div class="color-chip__block" style="background:var(--ss-fg-soft,#555)"></div>
+        <div class="color-chip__name">Fg Soft</div>
+        <div class="color-chip__var">--ss-fg-soft</div>
+      </div>
+      <div class="color-chip">
+        <div class="color-chip__block" style="background:var(--ss-fg-faint,#aaa)"></div>
+        <div class="color-chip__name">Fg Faint</div>
+        <div class="color-chip__var">--ss-fg-faint</div>
+      </div>
+      <div class="color-chip">
+        <div class="color-chip__block" style="background:var(--ss-border,#e5e5e3);border:1px solid #ddd"></div>
+        <div class="color-chip__name">Border</div>
+        <div class="color-chip__var">--ss-border</div>
+      </div>
+      <div class="color-chip">
+        <div class="color-chip__block" style="background:#d97706"></div>
+        <div class="color-chip__name">Warning</div>
+        <div class="color-chip__var">#d97706</div>
+      </div>
+      <div class="color-chip">
+        <div class="color-chip__block" style="background:#16a34a"></div>
+        <div class="color-chip__name">Success</div>
+        <div class="color-chip__var">#16a34a</div>
+      </div>
+      <div class="color-chip">
+        <div class="color-chip__block" style="background:#dc2626"></div>
+        <div class="color-chip__name">Error</div>
+        <div class="color-chip__var">#dc2626</div>
+      </div>
+      <div class="color-chip">
+        <div class="color-chip__block" style="background:#2563eb"></div>
+        <div class="color-chip__name">Blue</div>
+        <div class="color-chip__var">#2563eb</div>
+      </div>
+      <div class="color-chip">
+        <div class="color-chip__block" style="background:#7c3aed"></div>
+        <div class="color-chip__name">Purple</div>
+        <div class="color-chip__var">#7c3aed</div>
+      </div>
+    </div>
+
+    <div style="margin-top:28px;">
+      <div class="sg-subsection-label">Status / priority badges</div>
+      <div class="badge-row">
+        <span class="badge" style="background:#FEF3C7;color:#92400E">Draft</span>
+        <span class="badge" style="background:#D1FAE5;color:#065F46">Published</span>
+        <span class="badge" style="background:#fee2e2;color:#dc2626">Critical</span>
+        <span class="badge" style="background:#fef3c7;color:#d97706">High</span>
+        <span class="badge" style="background:#dbeafe;color:#1d4ed8">Medium</span>
+        <span class="badge" style="background:#f3f4f6;color:#6b7280">Low</span>
+        <span class="badge" style="background:#dcfce7;color:#16a34a">Done</span>
+        <span class="badge" style="background:#fef3c7;color:#d97706">In Progress</span>
+        <span class="badge" style="background:#f3f4f6;color:#6b7280">Proposed</span>
+        <span class="badge" style="background:#f3f4f6;color:#6b7280">None</span>
+        <span class="badge" style="background:#fef3c7;color:#d97706">Partial</span>
+        <span class="badge" style="background:#dcfce7;color:#16a34a">Full</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ RICH COMPONENTS ════════════════════════════════════════ -->
+  <section class="sg-section">
+    <div class="sg-section-title">Rich components (fenced-block renderers)</div>
+    <p style="font-size:0.875rem;color:var(--ss-fg-soft);margin:0 0 32px;">
+      These components are rendered from typed fenced blocks in article markdown.
+      Use <code>```type … ```</code> with YAML data inside.
+    </p>
+
+    <!-- comparison -->
+    <div class="sg-component-wrap">
+      <div class="sg-component-label">comparison</div>
+      <div class="cmp-card">
+        <div class="cmp-col cmp-col--warning">
+          <div class="cmp-col__header">
+            <div class="cmp-col__title">JS HTML approach</div>
+            <div class="cmp-col__subtitle">Browser renders everything</div>
+          </div>
+          <dl class="cmp-col__items">
+            <div class="cmp-item">
+              <dt class="cmp-item__label">Rendering</dt>
+              <dd class="cmp-item__value">Full HTML page, JS modifies DOM</dd>
+            </div>
+            <div class="cmp-item">
+              <dt class="cmp-item__label">Claude interaction</dt>
+              <dd class="cmp-item__value">Playwright clicks buttons, reads text</dd>
+            </div>
+            <div class="cmp-item">
+              <dt class="cmp-item__label">Skill discovery</dt>
+              <dd class="cmp-item__value">None — Claude infers from page</dd>
+            </div>
+          </dl>
+        </div>
+        <div class="cmp-sep"></div>
+        <div class="cmp-col cmp-col--accent">
+          <div class="cmp-col__header">
+            <div class="cmp-col__title">JS API approach</div>
+            <div class="cmp-col__subtitle">Structured methods on window</div>
+          </div>
+          <dl class="cmp-col__items">
+            <div class="cmp-item">
+              <dt class="cmp-item__label">Rendering</dt>
+              <dd class="cmp-item__value">Headless — no DOM required</dd>
+            </div>
+            <div class="cmp-item">
+              <dt class="cmp-item__label">Claude interaction</dt>
+              <dd class="cmp-item__value">Calls typed methods directly</dd>
+            </div>
+            <div class="cmp-item">
+              <dt class="cmp-item__label">Skill discovery</dt>
+              <dd class="cmp-item__value">getSkills() returns full manifest</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- feature-cards -->
+    <div class="sg-component-wrap">
+      <div class="sg-component-label">feature-cards</div>
+      <div class="feat-cards">
+        <div class="feat-card">
+          <div class="feat-card__icon">🔍</div>
+          <div class="feat-card__title">Self-describing</div>
+          <div class="feat-card__body">Claude calls getSkills() to discover what the tool can do — no guessing from page layout.</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-card__icon">⚡</div>
+          <div class="feat-card__title">Typed methods</div>
+          <div class="feat-card__body">Each action is a named JS function with typed parameters and a predictable return value.</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-card__icon">🛡️</div>
+          <div class="feat-card__title">Headless-ready</div>
+          <div class="feat-card__body">Works without rendering — Claude can drive the tool from a Playwright script with no visible UI.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- code-comparison -->
+    <div class="sg-component-wrap">
+      <div class="sg-component-label">code-comparison</div>
+      <div class="code-cmp">
+        <div class="code-cmp__panel">
+          <div class="code-cmp__title">JS HTML (Playwright)</div>
+          <pre class="code-cmp__pre"><code>await page.click('#generate-btn');
+const result = await page.waitForSelector('.output');
+const text = await result.innerText();</code></pre>
+        </div>
+        <div class="code-cmp__panel">
+          <div class="code-cmp__title">JS API (direct call)</div>
+          <pre class="code-cmp__pre"><code>const png = await window.__tool.generate({
+  prompt: 'API architecture diagram'
+});</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- timeline -->
+    <div class="sg-component-wrap">
+      <div class="sg-component-label">timeline</div>
+      <div class="tl-track">
+        <div class="tl-node tl-node--success">
+          <div class="tl-node__label">Connect</div>
+          <div class="tl-node__dot"></div>
+          <div class="tl-node__meta">
+            <span class="tl-node__dur">0.3s</span>
+            <span class="tl-node__badge">success</span>
+          </div>
+        </div>
+        <div class="tl-node tl-node--success">
+          <div class="tl-node__label">getSkills</div>
+          <div class="tl-node__dot"></div>
+          <div class="tl-node__meta">
+            <span class="tl-node__dur">0.1s</span>
+            <span class="tl-node__badge">success</span>
+          </div>
+        </div>
+        <div class="tl-node tl-node--partial">
+          <div class="tl-node__label">generate()</div>
+          <div class="tl-node__dot"></div>
+          <div class="tl-node__meta">
+            <span class="tl-node__dur">12.4s</span>
+            <span class="tl-node__badge">partial</span>
+          </div>
+          <div class="tl-node__detail">Timeout on first attempt; retried.</div>
+        </div>
+        <div class="tl-node tl-node--success">
+          <div class="tl-node__label">PNG returned</div>
+          <div class="tl-node__dot"></div>
+          <div class="tl-node__meta">
+            <span class="tl-node__dur">8.1s</span>
+            <span class="tl-node__badge">success</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- checklist -->
+    <div class="sg-component-wrap">
+      <div class="sg-component-label">checklist</div>
+      <ul class="check-list">
+        <li class="check-item check-item--done">
+          <span class="check-item__icon">✅</span>
+          <div class="check-item__body">
+            <div class="check-item__label">Expose window.__tool with a manifest</div>
+            <div class="check-item__detail">Include version, description, and method list in getManifest().</div>
+          </div>
+        </li>
+        <li class="check-item check-item--done">
+          <span class="check-item__icon">✅</span>
+          <div class="check-item__body">
+            <div class="check-item__label">Implement getSkills() returning the three skill files</div>
+          </div>
+        </li>
+        <li class="check-item check-item--todo">
+          <span class="check-item__icon">⬜</span>
+          <div class="check-item__body">
+            <div class="check-item__label">Add a health endpoint</div>
+            <div class="check-item__detail">meta.health() should return {status: "ok"} for liveness checks.</div>
+          </div>
+        </li>
+        <li class="check-item check-item--todo">
+          <span class="check-item__icon">⬜</span>
+          <div class="check-item__body">
+            <div class="check-item__label">Publish the browser skill file to the vault</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    <!-- skill-cards -->
+    <div class="sg-component-wrap">
+      <div class="sg-component-label">skill-cards</div>
+      <div class="skill-cards">
+        <div class="skill-card skill-card--blue">
+          <div class="skill-card__header">
+            <span class="skill-card__icon">🧠</span>
+            <span class="skill-card__title">Human skill</span>
+          </div>
+          <div class="skill-card__audience">For Claude and other LLMs</div>
+          <ul class="skill-card__contains">
+            <li>Natural language description</li>
+            <li>Method signatures in prose</li>
+            <li>Usage examples</li>
+          </ul>
+          <div class="skill-card__format"><code>Markdown · .md</code></div>
+        </div>
+        <div class="skill-card skill-card--teal">
+          <div class="skill-card__header">
+            <span class="skill-card__icon">🌐</span>
+            <span class="skill-card__title">Browser skill</span>
+          </div>
+          <div class="skill-card__audience">For Playwright / headless browsers</div>
+          <ul class="skill-card__contains">
+            <li>Injection script</li>
+            <li>DOM selectors</li>
+            <li>Interaction sequences</li>
+          </ul>
+          <div class="skill-card__format"><code>JavaScript · .js</code></div>
+        </div>
+        <div class="skill-card skill-card--purple">
+          <div class="skill-card__header">
+            <span class="skill-card__icon">⚙️</span>
+            <span class="skill-card__title">API skill</span>
+          </div>
+          <div class="skill-card__audience">For direct JS API callers</div>
+          <ul class="skill-card__contains">
+            <li>Typed method signatures</li>
+            <li>Parameter schemas</li>
+            <li>Return types</li>
+          </ul>
+          <div class="skill-card__format"><code>TypeScript types · .d.ts</code></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- component-gallery -->
+    <div class="sg-component-wrap">
+      <div class="sg-component-label">component-gallery</div>
+      <div class="comp-gallery">
+        <div class="comp-card">
+          <div class="comp-card__header">
+            <span class="comp-card__name">sg-article-viewer</span>
+            <span class="comp-card__api comp-card__api--full">full</span>
+          </div>
+          <code class="comp-card__tag">&lt;sg-article-viewer&gt;</code>
+          <div class="comp-card__role">Fetches, decrypts, and renders vault articles</div>
+          <em class="comp-card__use">Claude can call readObject() to read any article</em>
+        </div>
+        <div class="comp-card">
+          <div class="comp-card__header">
+            <span class="comp-card__name">sg-side-nav</span>
+            <span class="comp-card__api comp-card__api--partial">partial</span>
+          </div>
+          <code class="comp-card__tag">&lt;sg-side-nav&gt;</code>
+          <div class="comp-card__role">File-tree sidebar with vault-backed nav JSON</div>
+          <em class="comp-card__use">Claude can query nav:loaded event for section structure</em>
+        </div>
+        <div class="comp-card">
+          <div class="comp-card__header">
+            <span class="comp-card__name">sg-sub-nav</span>
+            <span class="comp-card__api comp-card__api--none">none</span>
+          </div>
+          <code class="comp-card__tag">&lt;sg-sub-nav&gt;</code>
+          <div class="comp-card__role">Top band with site identity and tab navigation</div>
+          <em class="comp-card__use">No agent API yet — pure UI chrome</em>
+        </div>
+        <div class="comp-card">
+          <div class="comp-card__header">
+            <span class="comp-card__name">sg-site-header</span>
+            <span class="comp-card__api comp-card__api--none">none</span>
+          </div>
+          <code class="comp-card__tag">&lt;sg-site-header&gt;</code>
+          <div class="comp-card__role">Persistent top navigation bar across all sites</div>
+          <em class="comp-card__use">No agent API — global UI only</em>
+        </div>
+      </div>
+    </div>
+
+    <!-- component-table -->
+    <div class="sg-component-wrap">
+      <div class="sg-component-label">component-table</div>
+      <table class="comp-table">
+        <thead>
+          <tr><th>Component</th><th>Event fired</th><th>Agent capabilities</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>sg-article-viewer</td><td>viewer:rendered</td><td class="comp-table__mono">readObject, render</td></tr>
+          <tr class="comp-table__odd"><td>sg-side-nav</td><td>nav:loaded, nav:select</td><td class="comp-table__mono">getSections, getArticles</td></tr>
+          <tr><td>sg-sub-nav</td><td>—</td><td class="comp-table__mono">none</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- proposal-card -->
+    <div class="sg-component-wrap">
+      <div class="sg-component-label">proposal-card</div>
+      <div class="proposal-card">
+        <div class="proposal-card__header">
+          <span class="proposal-card__title">sg-side-nav Agentic JS API</span>
+          <span class="proposal-card__status proposal-card__status--proposed">proposed</span>
+        </div>
+        <div class="proposal-card__methods">
+          <div class="proposal-method">
+            <code class="proposal-method__name">getSections()</code>
+            <code class="proposal-method__returns">Section[]</code>
+            <span class="proposal-method__use">Return all nav sections with article counts</span>
+          </div>
+          <div class="proposal-method">
+            <code class="proposal-method__name">getArticles(sectionTitle)</code>
+            <code class="proposal-method__returns">Article[]</code>
+            <span class="proposal-method__use">Return article list for a specific section</span>
+          </div>
+          <div class="proposal-method">
+            <code class="proposal-method__name">navigateTo(slug)</code>
+            <code class="proposal-method__returns">void</code>
+            <span class="proposal-method__use">Programmatically select an article by slug</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+</div><!-- /sg-page -->
+
+<script>
+  const palette = document.getElementById('link-palette');
+  palette.querySelectorAll('.link-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      palette.querySelectorAll('.link-opt').forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+      const color = opt.dataset.color;
+      const hover = opt.dataset.hover ?? color;
+      document.documentElement.style.setProperty('--link-color', color);
+      document.documentElement.style.setProperty('--link-color-hover', hover);
+    });
+  });
+</script>
+
+<script type="module" src="../../../_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
+</body>
+</html>
