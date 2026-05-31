@@ -25,6 +25,7 @@
 import { writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
+const VERSION = 'v0.1.3'
 const RENDER_PATH = '/core/edge-render/v1/sg-edge-render.mjs'
 
 // Which requests this function answers. Everything else passes straight through
@@ -66,6 +67,7 @@ export const handler = async (event) => {
         'content-type':  [{ key: 'Content-Type',  value: out.content_type }],
         'cache-control': [{ key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' }],
         'x-sg-commit':   [{ key: 'X-Sg-Commit',   value: out.commit ?? '' }],
+        'x-sg-version':  [{ key: 'X-Sg-Version',  value: VERSION }],
       },
       body: out.body,
     }
@@ -73,7 +75,10 @@ export const handler = async (event) => {
     return {
       status: '502',
       statusDescription: 'Bad Gateway',
-      headers: { 'content-type': [{ key: 'Content-Type', value: 'text/plain; charset=utf-8' }] },
+      headers: {
+        'content-type': [{ key: 'Content-Type', value: 'text/plain; charset=utf-8' }],
+        'x-sg-version': [{ key: 'X-Sg-Version', value: VERSION }],
+      },
       body: `edge-render failed: ${err.message}\n`,
     }
   }
