@@ -8,7 +8,9 @@
  *   src               — URL of a nav JSON file (reads cross_links)
  *   vault-id          — vault id for vault-sourced cross_links
  *   read-key          — AES-256-GCM read key (base64url)
- *   nav-object-id     — vault object id of the nav JSON
+ *   nav-object-id     — vault object id of the nav JSON (explicit; overrides nav-path)
+ *   nav-path          — stable path in vault tree (e.g. "library/_nav.json"); resolved
+ *                       via ref→commit→tree walk; reads cross_links from the resolved object
  *   search-placeholder — input placeholder override
  *
  * Fires:
@@ -20,7 +22,7 @@
 class SgSubNav extends HTMLElement {
   static get observedAttributes() {
     return ['site-title', 'site-description', 'links', 'src',
-            'vault-id', 'read-key', 'nav-object-id', 'search-placeholder'];
+            'vault-id', 'read-key', 'nav-object-id', 'nav-path', 'search-placeholder'];
   }
 
   connectedCallback() { this._render(); }
@@ -34,6 +36,7 @@ class SgSubNav extends HTMLElement {
     const vaultId     = this.getAttribute('vault-id');
     const readKey     = this.getAttribute('read-key');
     const navObjectId = this.getAttribute('nav-object-id');
+    const navPath     = this.getAttribute('nav-path');
     const placeholder = this.getAttribute('search-placeholder')
                         ?? `Search ${title.toLowerCase()}...`;
     const letter      = title.charAt(0).toUpperCase();
@@ -41,12 +44,15 @@ class SgSubNav extends HTMLElement {
     let crossLinks = [];
     if (linksAttr) {
       try { crossLinks = JSON.parse(linksAttr); } catch (_) {}
-    } else if (navObjectId && vaultId && readKey) {
+    } else if ((navObjectId || navPath) && vaultId && readKey) {
       try {
         const { importReadKey, readObject } =
           await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
+        const resolvedId = navPath && !navObjectId
+          ? await _sgSubNavResolve('https://send.sgraph.ai', vaultId, readKey, navPath)
+          : navObjectId;
         const cryptoKey = await importReadKey(readKey);
-        const buf = await readObject('https://send.sgraph.ai', vaultId, navObjectId, cryptoKey);
+        const buf = await readObject('https://send.sgraph.ai', vaultId, resolvedId, cryptoKey);
         const data = JSON.parse(new TextDecoder().decode(buf));
         crossLinks = data.cross_links
           ?? data.library?.cross_links
@@ -131,3 +137,35 @@ class SgSubNav extends HTMLElement {
 }
 
 customElements.define('sg-sub-nav', SgSubNav);
+
+// Resolve a stable vault file path to the current content-addressed object ID.
+// Uses sessionStorage cache keyed by commitId — automatic miss on new publish.
+async function _sgSubNavResolve(apiBaseUrl, vaultId, readKeyBase64Url, navPath) {
+  const client = await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
+  const b64  = readKeyBase64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const pad  = b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=');
+  const bstr = atob(pad);
+  const readKeyBytes = Uint8Array.from({ length: bstr.length }, (_, i) => bstr.charCodeAt(i));
+  const cryptoKey = await client.importReadKey(readKeyBase64Url);
+  const refHex    = await client.deriveFileIdHex(readKeyBytes, `sg-vault-v1:file-id:ref:${vaultId}`);
+  const refFileId = client.formatFileId('ref', 'pid', 'muw', refHex);
+  const vault = { keys: { readKey: cryptoKey, readKeyBytes, refFileId, vaultId },
+                  apiBaseUrl: apiBaseUrl.replace(/\/$/, ''), vaultId };
+  const ref      = await client.readFileAsJson(vault, refFileId);
+  const commitId = ref.commit_id ?? ref.commitId ?? ref.target;
+  const cacheKey = `sg-nav:${vaultId}:${navPath}:${commitId}`;
+  const cached   = sessionStorage.getItem(cacheKey);
+  if (cached) return cached;
+  const commit = await client.readFileAsJson(vault, commitId);
+  const treeId = commit.tree_id ?? commit.treeId ?? commit.tree;
+  let entries  = (await client.walkTree(vault, treeId)).entries ?? [];
+  for (const [i, part] of navPath.split('/').filter(Boolean).entries()) {
+    const entry = entries.find(e => e.name === part);
+    if (!entry) throw new Error(`sg-sub-nav: '${part}' not found in vault tree`);
+    if (i === navPath.split('/').filter(Boolean).length - 1) {
+      sessionStorage.setItem(cacheKey, entry.blob_id);
+      return entry.blob_id;
+    }
+    entries = (await client.walkTree(vault, entry.tree_id)).entries ?? [];
+  }
+}

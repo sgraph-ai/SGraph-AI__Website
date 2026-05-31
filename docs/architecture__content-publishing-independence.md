@@ -2,10 +2,12 @@
 title: "Architecture Brief — Content-Publishing Independence (eliminate the @Dev redeploy bottleneck)"
 author: "@Dev (dev.sgraph, Claude Opus 4.8)"
 date: 2026-05-30
-status: PROPOSED — map for a dedicated design session. Not yet implemented.
-audience: a fresh Claude session (with @Sgit input) to design + build the resolution layer.
+updated: 2026-05-31
+status: READY TO BUILD — all open questions resolved empirically; PoC shipped in PR #21.
+audience: a fresh Claude session to extend the resolution layer to articles, status boards, and journalist posts.
 related:
-  - mail/dev.sgraph/outbox/sgit.team/001-sgit-tree-nav-resolution-briefing.eml (the original ask to @Sgit — still unanswered)
+  - mail/dev.sgraph/outbox/sgit.team/001-sgit-tree-nav-resolution-briefing.eml (original ask to @Sgit — now answered empirically)
+  - mail/conductor.content/inbox/dev.sgraph/039-nav-v3.16-deployed-confirmed.eml (confirmed vault + tree walk)
 ---
 
 # Content-Publishing Independence
@@ -158,31 +160,151 @@ Pending @Sgit answers, the build is:
 
 ---
 
-## 4. OPEN QUESTIONS for @Sgit (blockers for Approach A)
+## 4. API ANSWERS — empirically confirmed 2026-05-31
 
-(Verbatim from the original briefing, still unanswered:)
+All seven questions from the original @Sgit briefing are now answered. No @Sgit
+response was needed — the vault client source code plus a live Node.js probe
+against the production vault (pmcv9tfe) gave definitive answers.
 
-  a) Commit object schema — fields (parent, tree ref, timestamp)?
-  b) Tree object schema — flat {path→id} or recursive? full paths or segments?
-  c) API to fetch current HEAD commit ID for a named branch — browser-callable?
-  d) Auth — does resolving HEAD need the read key, or is the ref separately
-     credentialed / public?
-  e) The exact stable path of @Content's nav JSON in the content-vault tree.
-  f) Perf — is commit→tree→path resolution per page load acceptable, or must we
-     cache aggressively?
-  g) Do all vault objects in one tree resolve via the same mechanism?
+### a) Commit object schema
+
+    {
+      "schema":           "commit_v1",
+      "tree_id":          "obj-cas-imm-...",   ← root tree reference
+      "parents":          ["obj-cas-imm-..."],  ← parent commit(s)
+      "timestamp_ms":     1748727600000,
+      "branch_id":        "...",
+      "message_enc":      "...",               ← AES-GCM encrypted
+      "signature":        "...",
+      "author_key_id":    "...",
+      "author_signature": "...",
+      "attestations":     [...]
+    }
+
+Key fields for resolution: `tree_id` (also accepted as `treeId` or `tree`).
+The commit itself is a normal vault object — fetched via `readObject`.
+
+### b) Tree object schema
+
+    {
+      "schema": "tree_v1",
+      "entries": [
+        { "name_enc": "<base64 AES-GCM>", "blob_id":  "obj-cas-imm-..." },
+        { "name_enc": "<base64 AES-GCM>", "tree_id":  "obj-cas-imm-..." }
+      ]
+    }
+
+- **Recursive, not flat.** Each directory level is a separate tree object.
+- Names are **encrypted** (AES-256-GCM, same read key). `walkTree()` decrypts
+  all `name_enc` fields and adds a `name` property to each entry.
+- `blob_id` = leaf file; `tree_id` = subdirectory.
+
+### c) API for branch HEAD
+
+No separate branch endpoint. The HEAD ref is stored as a vault file at a
+**deterministic file ID** derived from the read key:
+
+    HMAC-SHA256(readKeyBytes, "sg-vault-v1:file-id:ref:{vaultId}") → first 12 hex chars
+    → formatted as: ref-pid-muw-{hex12}
+
+The ref file's JSON payload contains `{ commit_id: "obj-cas-imm-..." }`.
+Named branches use domain `sg-vault-v1:file-id:branch-ref:{vaultId}:{branchName}`.
+The default (HEAD) ref uses the shorter domain (no branch name suffix).
+
+Fetched the same way as any vault object: `GET /api/vault/read/{vaultId}/{path}`.
+Fully browser-callable with no extra credentials.
+
+### d) Auth
+
+The read key is sufficient for the entire resolution chain — ref, commit, tree,
+and blob are all encrypted with the same AES-256-GCM read key. No separate
+credential is needed to resolve HEAD or walk the tree.
+The read key is public-by-design on the content vault (by @Content's choice).
+
+### e) Stable path for @Content's nav JSON
+
+    library/_nav.json
+
+Root tree → entry with `name == "library"` (has `tree_id`) → sub-tree entry
+with `name == "_nav.json"` (has `blob_id`). Confirmed by live tree walk:
+`blob_id` resolved to `obj-cas-imm-73353c112dc7` (nav v3.16 ✓).
+
+### f) Performance
+
+Round-trip count for a full resolution (cold, no cache):
+  1. Ref file        (determines commitId)
+  2. Commit object   (determines treeId)
+  3. Root tree       (finds "library" subtree)
+  4. "library" tree  (finds "_nav.json" → blob_id)
+
+With **sessionStorage caching keyed on `${vaultId}:${navPath}:${commitId}`**:
+  - Subsequent same-session loads cost only 1 request (the ref fetch).
+  - Cache automatically misses on new publish (commitId changes).
+  - Cold load: 4 requests before nav fetch; all parallel-eligible within each
+    level. Latency is comparable to one round-trip plus network jitter.
+
+Verdict: acceptable for a public library load. The nav content fetch (request 5)
+dominates; 4 tiny JSON requests are negligible.
+
+### g) Resolution mechanism for other vault objects
+
+Identical. The same chain (ref → commit → tree walk → blob_id) resolves any
+file in the vault — articles, status boards, journalist posts, sub-nav JSONs.
+The only difference is the `navPath` argument passed to the walker.
 
 ---
 
-## 5. RECOMMENDATION
+## 5. RECOMMENDATION — updated 2026-05-31
 
-- **If @Sgit can answer §4 quickly:** build Approach A. It's the clean,
-  permanent fix and one mechanism covers nav + articles + boards + posts.
-- **If @Sgit is blocked/slow:** ship Approach C (CI auto-rewrites IDs) as an
-  interim — it removes the @Dev human immediately with no schema dependency,
-  and Approach A can replace it later without user-visible change.
-- **Approach B** only if the vault host already offers a mutable pointer file;
-  otherwise it's net-new infra we'd have to own.
+**Build Approach A now. Skip Approach C entirely.**
 
-Suggested first step for the design session: get §4 answered by @Sgit, then
-decide A-now vs C-then-A.
+The original concern was dependency on @Sgit schema knowledge. That's gone —
+§4 answers are confirmed. More importantly:
+
+> **vault-client v1.2.2 already ships the full resolution chain.**
+>
+>   - `importReadKey` → import AES-256-GCM read key from base64url
+>   - `deriveFileIdHex` → derive ref file ID via HMAC
+>   - `openVaultTree` → ref → commit → root tree (3 requests)
+>   - `walkTree` → decrypt tree entries and expose `name` fields
+>   - `readObject` → fetch and decrypt any vault object by ID
+
+No new infrastructure. No new @Sgit work. No new vault client version. The
+browser already has everything it needs.
+
+### What was built (PoC — PR #21)
+
+A `_resolveNavObjectId(apiBaseUrl, vaultId, readKey, navPath)` function was
+added to `sg-side-nav.js`. It:
+
+  1. Derives the vault's default ref file ID from the read key
+  2. Fetches the ref to get the current HEAD commit ID
+  3. Checks sessionStorage for a cached blob ID keyed by `sg-nav:{vaultId}:{navPath}:{commitId}`
+  4. On cache miss: walks commit → root tree → path segments → returns `blob_id`
+  5. Caches the result; cache automatically misses when @Content publishes (new commitId)
+
+`library/index.html` now uses:
+
+    <sg-side-nav nav-path="library/_nav.json" vault-id="pmcv9tfe" read-key="..." ...>
+
+instead of the previously hardcoded `nav-object-id="obj-cas-imm-..."`.
+
+### What to extend next
+
+- Apply the same `nav-path` pattern to `<sg-sub-nav>` (reads `cross_links`)
+- Apply to `<sg-article-viewer>` (replace hardcoded `content_object_id` with
+  a stable content path, enabling @Content to update articles without @Dev)
+- Apply to the status boards (`dev/index.html`) and journalist post links
+- Optional: add a `nav-branch` attribute (currently always uses the vault's
+  default ref; named branches would use `sg-vault-v1:file-id:branch-ref:...`)
+
+### Approach C (CI auto-rewrite) — no longer recommended
+
+With Approach A live, Approach C would add CI complexity for zero user benefit.
+The vault client already does at runtime what CI would have done at build time,
+with the added benefit that content updates are live immediately (no redeploy at all).
+
+### Approach B — still not recommended
+
+The vault host does not offer a mutable pointer file. Approach B would require
+new infrastructure that sgit already replaces cleanly.

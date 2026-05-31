@@ -5,7 +5,10 @@
  *   src              — URL of a nav JSON file
  *   vault-id         — content vault id
  *   read-key         — base64url AES-256-GCM read key
- *   nav-object-id    — vault object-id of the nav JSON
+ *   nav-object-id    — vault object-id of the nav JSON (explicit; overrides nav-path)
+ *   nav-path         — stable file path in the vault tree (e.g. "library/_nav.json");
+ *                      resolved at load time via ref→commit→tree walk; cached in
+ *                      sessionStorage keyed by commitId so a new publish is a cache miss
  *   active-slug      — slug of the currently active article
  *   auto-select      — boolean; fires nav:select for active-slug on first load
  *   tree-label       — sidebar header label (default: "Contents")
@@ -35,7 +38,7 @@
  */
 class SgSideNav extends HTMLElement {
   static get observedAttributes() {
-    return ['src', 'vault-id', 'read-key', 'nav-object-id',
+    return ['src', 'vault-id', 'read-key', 'nav-object-id', 'nav-path',
             'active-slug', 'auto-select', 'tree-label', 'version', 'extra-links', 'home-href'];
   }
 
@@ -51,14 +54,20 @@ class SgSideNav extends HTMLElement {
     const vaultId     = this.getAttribute('vault-id');
     const readKey     = this.getAttribute('read-key');
     const navObjectId = this.getAttribute('nav-object-id');
+    const navPath     = this.getAttribute('nav-path');
 
     try {
       let data;
-      if (navObjectId && vaultId && readKey) {
+      // Resolve stable path → current object ID, then fetch as normal
+      const resolvedId = navPath && vaultId && readKey && !navObjectId
+        ? await _resolveNavObjectId('https://send.sgraph.ai', vaultId, readKey, navPath)
+        : navObjectId;
+
+      if (resolvedId && vaultId && readKey) {
         const { importReadKey, readObject } =
           await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
         const cryptoKey = await importReadKey(readKey);
-        const buf = await readObject('https://send.sgraph.ai', vaultId, navObjectId, cryptoKey);
+        const buf = await readObject('https://send.sgraph.ai', vaultId, resolvedId, cryptoKey);
         data = JSON.parse(new TextDecoder().decode(buf));
       } else if (src) {
         const res = await fetch(src);
@@ -68,7 +77,7 @@ class SgSideNav extends HTMLElement {
       }
       this._lastSync = Date.now();
       const sections = (data.library ?? data.dev ?? data).sections ?? [];
-      this._injectExtraLinks(sections);
+      await this._injectExtraLinks(sections);
       this._render(sections);
     } catch (err) {
       this.innerHTML = `<p class="sg-side-nav__error">Nav failed to load.</p>`;
@@ -99,11 +108,25 @@ class SgSideNav extends HTMLElement {
     }
   }
 
-  _injectExtraLinks(sections) {
+  async _injectExtraLinks(sections) {
     const raw = this.getAttribute('extra-links');
     if (!raw) return;
     let extras;
     try { extras = JSON.parse(raw); } catch { return; }
+
+    // Resolve nav_path items: items with a stable path but no explicit object_id
+    await Promise.all(extras.map(async item => {
+      if (!item.object_id && item.nav_path && item.vault_id && item.read_key) {
+        try {
+          item.object_id = await _resolveNavObjectId(
+            'https://send.sgraph.ai', item.vault_id, item.read_key, item.nav_path
+          );
+        } catch (err) {
+          console.warn('sg-side-nav extra-links: nav_path resolution failed for', item.nav_path, err);
+        }
+      }
+    }));
+
     for (const item of extras) {
       const section = sections.find(s => s.title === item.section);
       const entry = item.object_id
@@ -442,6 +465,73 @@ class SgSideNav extends HTMLElement {
 function _compoundSlug(parentSlug, childSlug) {
   if (!childSlug || !parentSlug) return childSlug;
   return childSlug.startsWith(parentSlug + '/') ? childSlug : `${parentSlug}/${childSlug}`;
+}
+
+/**
+ * Resolve a stable vault file path to its current content-addressed object ID.
+ *
+ * Walk: default ref → commit → root tree → path segments → blob_id.
+ * Caches the result in sessionStorage keyed by commitId so a new @Content
+ * publish (new HEAD commit) is automatically a cache miss on the next load.
+ *
+ * @param {string} apiBaseUrl       - e.g. 'https://send.sgraph.ai'
+ * @param {string} vaultId          - vault ID (e.g. 'pmcv9tfe')
+ * @param {string} readKeyBase64Url - base64url AES-256-GCM read key
+ * @param {string} navPath          - stable path in tree (e.g. 'library/_nav.json')
+ * @returns {Promise<string>}        content-addressed object ID (obj-cas-imm-...)
+ */
+async function _resolveNavObjectId(apiBaseUrl, vaultId, readKeyBase64Url, navPath) {
+  const client = await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
+
+  // Decode base64url read key → raw bytes (needed for HMAC-based ID derivation)
+  const b64  = readKeyBase64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const pad  = b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=');
+  const bstr = atob(pad);
+  const readKeyBytes = Uint8Array.from({ length: bstr.length }, (_, i) => bstr.charCodeAt(i));
+
+  const cryptoKey = await client.importReadKey(readKeyBase64Url);
+
+  // Derive the vault's default ref file ID via HMAC
+  const refHex    = await client.deriveFileIdHex(readKeyBytes, `sg-vault-v1:file-id:ref:${vaultId}`);
+  const refFileId = client.formatFileId('ref', 'pid', 'muw', refHex);
+
+  const vault = {
+    keys:       { readKey: cryptoKey, readKeyBytes, refFileId, vaultId },
+    apiBaseUrl: apiBaseUrl.replace(/\/$/, ''),
+    vaultId,
+  };
+
+  // Fetch the ref to learn current HEAD commit ID (1 request — used for cache key)
+  const ref      = await client.readFileAsJson(vault, refFileId);
+  const commitId = ref.commit_id ?? ref.commitId ?? ref.target;
+  if (!commitId) throw new Error('sg-side-nav: vault ref has no commit ID');
+
+  const cacheKey = `sg-nav:${vaultId}:${navPath}:${commitId}`;
+  const cached   = sessionStorage.getItem(cacheKey);
+  if (cached) return cached;
+
+  // Cache miss: walk commit → root tree → path
+  const commit = await client.readFileAsJson(vault, commitId);
+  const treeId = commit.tree_id ?? commit.treeId ?? commit.tree;
+  if (!treeId) throw new Error('sg-side-nav: commit has no tree ID');
+
+  let entries = (await client.walkTree(vault, treeId)).entries ?? [];
+  const parts = navPath.split('/').filter(Boolean);
+
+  for (let i = 0; i < parts.length; i++) {
+    const entry = entries.find(e => e.name === parts[i]);
+    if (!entry) throw new Error(`sg-side-nav: path segment '${parts[i]}' not found in vault tree`);
+    if (i === parts.length - 1) {
+      const blobId = entry.blob_id;
+      if (!blobId) throw new Error(`sg-side-nav: '${navPath}' resolves to a subtree, not a file`);
+      sessionStorage.setItem(cacheKey, blobId);
+      return blobId;
+    }
+    if (!entry.tree_id) throw new Error(`sg-side-nav: '${parts[i]}' is not a directory`);
+    entries = (await client.walkTree(vault, entry.tree_id)).entries ?? [];
+  }
+
+  throw new Error(`sg-side-nav: '${navPath}' could not be fully resolved`);
 }
 
 customElements.define('sg-side-nav', SgSideNav);
