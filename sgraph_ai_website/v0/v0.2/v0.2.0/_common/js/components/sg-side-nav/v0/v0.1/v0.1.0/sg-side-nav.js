@@ -77,7 +77,7 @@ class SgSideNav extends HTMLElement {
       }
       this._lastSync = Date.now();
       const sections = (data.library ?? data.dev ?? data).sections ?? [];
-      this._injectExtraLinks(sections);
+      await this._injectExtraLinks(sections);
       this._render(sections);
     } catch (err) {
       this.innerHTML = `<p class="sg-side-nav__error">Nav failed to load.</p>`;
@@ -108,11 +108,25 @@ class SgSideNav extends HTMLElement {
     }
   }
 
-  _injectExtraLinks(sections) {
+  async _injectExtraLinks(sections) {
     const raw = this.getAttribute('extra-links');
     if (!raw) return;
     let extras;
     try { extras = JSON.parse(raw); } catch { return; }
+
+    // Resolve nav_path items: items with a stable path but no explicit object_id
+    await Promise.all(extras.map(async item => {
+      if (!item.object_id && item.nav_path && item.vault_id && item.read_key) {
+        try {
+          item.object_id = await _resolveNavObjectId(
+            'https://send.sgraph.ai', item.vault_id, item.read_key, item.nav_path
+          );
+        } catch (err) {
+          console.warn('sg-side-nav extra-links: nav_path resolution failed for', item.nav_path, err);
+        }
+      }
+    }));
+
     for (const item of extras) {
       const section = sections.find(s => s.title === item.section);
       const entry = item.object_id
