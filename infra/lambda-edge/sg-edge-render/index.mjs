@@ -34,11 +34,9 @@ const INTERCEPT = uri =>
   uri.endsWith('.md') ||
   uri.endsWith('.llm.json')
 
-// Per-host module cache with a short TTL so CI deploys propagate within ~1 min
-// without waiting for the warm container to cycle.
-const cache = new Map() // host -> { mod, at }
-const TTL_MS = 60_000
-
+// Caching DISABLED for now (dev phase): the orchestrator is re-fetched on every
+// invocation so code/manifest changes appear immediately. Re-enable the per-host
+// TTL cache (e.g. 60_000ms) once behaviour is stable.
 async function loadModule(url) {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`load orchestrator ${url}: ${res.status}`)
@@ -55,20 +53,16 @@ export const handler = async (event) => {
   if (!INTERCEPT(req.uri)) return req // ← pass through
 
   const host = req.headers.host[0].value
-  let hit = cache.get(host)
-  if (!hit || Date.now() - hit.at > TTL_MS) {
-    hit = { mod: await loadModule(`https://${host}${RENDER_PATH}`), at: Date.now() }
-    cache.set(host, hit)
-  }
+  const mod = await loadModule(`https://${host}${RENDER_PATH}`) // always fresh (no cache)
 
   try {
-    const out = await hit.mod.render(req.uri, { host })
+    const out = await mod.render(req.uri, { host })
     return {
       status: '200',
       statusDescription: 'OK',
       headers: {
         'content-type':  [{ key: 'Content-Type',  value: out.content_type }],
-        'cache-control': [{ key: 'Cache-Control', value: 'public, max-age=60' }],
+        'cache-control': [{ key: 'Cache-Control', value: 'no-store, no-cache, must-revalidate' }],
         'x-sg-commit':   [{ key: 'X-Sg-Commit',   value: out.commit ?? '' }],
       },
       body: out.body,
