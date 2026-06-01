@@ -75,8 +75,8 @@ class SgArticleViewer extends HTMLElement {
 /* Reopener */
 .sg-av__reopener {
   position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
+  bottom: 14px;
+  right: calc(14px + 26px + 8px);
   font-size: 0.75rem;
   color: #6b7280;
   background: rgba(255,255,255,0.9);
