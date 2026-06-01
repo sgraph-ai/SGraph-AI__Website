@@ -132,13 +132,27 @@ class SgArticleViewer extends HTMLElement {
 }
 .sg-av-l2__header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.875rem 1rem;
+  flex-direction: column;
+  padding: 0.75rem 1rem 0.625rem;
   border-bottom: 1px solid #f3f4f6;
   flex-shrink: 0;
+  gap: 0.25rem;
+}
+.sg-av-l2__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .sg-av-l2__title { font-weight: 600; font-size: 0.875rem; color: #111827; }
+.sg-av-l2__url {
+  font-size: 0.8rem;
+  font-family: ui-monospace, monospace;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
 .sg-av-l2__actions { display: flex; gap: 0.375rem; align-items: center; }
 .sg-av-l2__newtab {
   background: none;
@@ -576,11 +590,14 @@ class SgArticleViewer extends HTMLElement {
       <div class="sg-av-l2__resize-handle"></div>
       <div class="sg-av__layer2-inner">
         <div class="sg-av-l2__header">
-          <span class="sg-av-l2__title">Content load</span>
-          <div class="sg-av-l2__actions">
-            <button class="sg-av-l2__newtab">open in new tab &#8599;</button>
-            <button class="sg-av-l2__close" aria-label="Close">&#10005;</button>
+          <div class="sg-av-l2__header-row">
+            <span class="sg-av-l2__title">Content load</span>
+            <div class="sg-av-l2__actions">
+              <button class="sg-av-l2__newtab">open in new tab &#8599;</button>
+              <button class="sg-av-l2__close" aria-label="Close">&#10005;</button>
+            </div>
           </div>
+          <span class="sg-av-l2__url">${escHtml(window.location.pathname)}</span>
         </div>
         <div class="sg-av-l2__body"></div>
       </div>`;
@@ -610,6 +627,10 @@ class SgArticleViewer extends HTMLElement {
 
     const body = this._layer2El.querySelector('.sg-av-l2__body');
     if (!body) return;
+
+    // Keep URL current on SPA navigations
+    const urlEl = this._layer2El.querySelector('.sg-av-l2__url');
+    if (urlEl) urlEl.textContent = window.location.pathname;
 
     const isLoading = trace.status === 'loading';
     const elapsed   = isLoading ? Math.round(performance.now() - this._loadT0) : (trace.total_ms ?? 0);
@@ -732,10 +753,11 @@ class SgArticleViewer extends HTMLElement {
     // Re-wire object expand buttons
     body.querySelectorAll('.sg-av-l2__obj-expand').forEach(btn => {
       btn.addEventListener('click', () => {
-        const pre = document.getElementById(btn.dataset.target);
+        const pre = body.querySelector(`#${btn.dataset.target}`);
         if (!pre) return;
         pre.hidden = !pre.hidden;
         btn.innerHTML = pre.hidden ? 'view &#8599;' : 'close ✕';
+        if (!pre.hidden) pre.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       });
     });
   }
