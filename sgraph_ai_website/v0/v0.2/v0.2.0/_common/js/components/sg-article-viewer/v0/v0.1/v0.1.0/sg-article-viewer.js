@@ -487,7 +487,7 @@ class SgArticleViewer extends HTMLElement {
       let endStep;
 
       endStep = stepStart('module-import');
-      const { importReadKey, readObject } =
+      const { importReadKey, fileIdToPath } =
         await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
       endStep();
 
@@ -495,10 +495,28 @@ class SgArticleViewer extends HTMLElement {
       const cryptoKey = await importReadKey(readKey);
       endStep();
 
-      endStep = stepStart('blob-fetch-decrypt');
-      const buf = await readObject('https://send.sgraph.ai', vaultId, objectId, cryptoKey);
-      const size_bytes = buf.byteLength;
+      // Fetch — TTFB (connect + server + first byte)
+      const objUrl = `https://send.sgraph.ai/api/vault/read/${vaultId}/${encodeURIComponent(fileIdToPath(objectId))}`;
+      endStep = stepStart('fetch');
+      const response = await fetch(objUrl);
+      if (!response.ok) throw new Error(`Failed to fetch object ${objectId}: ${response.status} ${response.statusText}`);
+      endStep();
+
+      // Body — download encrypted bytes
+      endStep = stepStart('fetch-body');
+      const encrypted = await response.arrayBuffer();
+      const size_bytes = encrypted.byteLength;
       endStep({ size_bytes });
+
+      // Decrypt — AES-256-GCM (IV_LENGTH = 12 bytes, same as vault client)
+      endStep = stepStart('decrypt');
+      const _data = new Uint8Array(encrypted);
+      const buf = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: _data.slice(0, 12) },
+        cryptoKey,
+        _data.slice(12)
+      );
+      endStep({ size_bytes: buf.byteLength });
 
       if (seq !== this._loadSeq) return;
 
@@ -576,11 +594,13 @@ class SgArticleViewer extends HTMLElement {
   _updateLayer1Progress(completedStep) {
     if (!this._layer1El) return;
     const PHASES = {
-      'module-import':      { pct: 20, label: 'Loading vault client…' },
-      'key-import':         { pct: 30, label: 'Preparing decryption key…' },
-      'blob-fetch-decrypt': { pct: 72, label: 'Fetching and decrypting content…' },
-      'parse':              { pct: 83, label: 'Parsing content…' },
-      'render':             { pct: 97, label: 'Rendering…' },
+      'module-import': { pct: 18, label: 'Loading vault client…' },
+      'key-import':    { pct: 26, label: 'Preparing decryption key…' },
+      'fetch':         { pct: 55, label: 'Waiting for response…' },
+      'fetch-body':    { pct: 74, label: 'Downloading content…' },
+      'decrypt':       { pct: 84, label: 'Decrypting content…' },
+      'parse':         { pct: 92, label: 'Parsing content…' },
+      'render':        { pct: 97, label: 'Rendering…' },
     };
     const phase = PHASES[completedStep];
     if (!phase) return;
