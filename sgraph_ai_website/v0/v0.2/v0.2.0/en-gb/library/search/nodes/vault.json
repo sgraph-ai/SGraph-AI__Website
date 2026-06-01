@@ -1,0 +1,39 @@
+{
+  "v": 1,
+  "id": "vault",
+  "label": "Vault & Encryption",
+  "keys": [
+    "vault", "encryption", "decrypt", "key", "object", "security"
+  ],
+  "children": [],
+  "articles": [
+    {
+      "slug": "library/architecture/vault-overview",
+      "title": "Vault Architecture Overview",
+      "keys": [
+        "vault", "architecture", "overview", "content addressable", "cas",
+        "immutable", "objects", "storage", "how vault works"
+      ],
+      "snippet": "How the SGraph AI vault stores content — content-addressable immutable objects, key derivation, and why data is safe in transit and at rest."
+    },
+    {
+      "slug": "library/architecture/encryption",
+      "title": "Encryption Model",
+      "keys": [
+        "encryption", "aes-gcm", "aes", "gcm", "key", "read key",
+        "write key", "iv", "nonce", "decrypt", "crypto", "subtle",
+        "web crypto api", "browser", "client side"
+      ],
+      "snippet": "The AES-GCM encryption model used across the vault — key types, IV generation, client-side decryption via Web Crypto API, and trust boundaries."
+    },
+    {
+      "slug": "library/architecture/trust-boundaries",
+      "title": "Trust Boundaries",
+      "keys": [
+        "trust", "security", "boundaries", "public", "private",
+        "read key", "write key", "access", "auth", "token", "cookie"
+      ],
+      "snippet": "Where trust is enforced in the SGraph AI system — what the server knows, what the client knows, and why write keys must never reach published content."
+    }
+  ]
+}

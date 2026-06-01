@@ -22,6 +22,7 @@
   </script>
 
   <script type="module" src="../../_common/js/components/sg-article-viewer/v0/v0.1/v0.1.0/sg-article-viewer.js"></script>
+  <script type="module" src="../../_common/js/components/sg-search/v0/v0.1/v0.1.0/sg-search.js"></script>
 </head>
 <body class="sub-site-page">
 
@@ -54,20 +55,32 @@
 -->
 <div class="sub-site" id="sub-site-shell">
 
-  <sg-side-nav
-    vault-id="pmcv9tfe"
-    read-key="dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw"
-    nav-path="library/_nav.json"
-    tree-label="Library"
-    version="v0.2.0"
-    home-href="/en-gb/library/"
-    auto-select
-    extra-links="[
-      {&quot;section&quot;:&quot;Blog&quot;,&quot;title&quot;:&quot;Introducing @Journalist&quot;,&quot;slug&quot;:&quot;blog/introducing-journalist&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-684e59d65e77a25d6846245eee2291e9a1767860ef80dcb6351e4e78607ad123&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;},
-      {&quot;section&quot;:&quot;Blog&quot;,&quot;title&quot;:&quot;Agentics London Session&quot;,&quot;slug&quot;:&quot;blog/agentics-london-session&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-77c47abb9be86ebfcd7f826f275856f8849914377aa9dab015145c1a9af1cf8e&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;},
-      {&quot;section&quot;:&quot;What&#39;s New&quot;,&quot;title&quot;:&quot;Team Expansion — Seven Agents&quot;,&quot;slug&quot;:&quot;whats-new/team-expansion-seven-agents&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-f678dd3857795479a88c8064c138330732c9ff2ee9ed8d4782904af861847355&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;}
-    ]">
-  </sg-side-nav>
+  <!-- Left column: search bar + nav tree -->
+  <div class="sub-site__sidebar">
+    <div class="sub-site__search-bar">
+      <sg-search
+        id="sg-search"
+        root-url="/en-gb/library/search/root.json"
+        vault-id="pmcv9tfe"
+        read-key="dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw"
+        placeholder="Search library…">
+      </sg-search>
+    </div>
+    <sg-side-nav
+      vault-id="pmcv9tfe"
+      read-key="dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw"
+      nav-path="library/_nav.json"
+      tree-label="Library"
+      version="v0.2.0"
+      home-href="/en-gb/library/"
+      auto-select
+      extra-links="[
+        {&quot;section&quot;:&quot;Blog&quot;,&quot;title&quot;:&quot;Introducing @Journalist&quot;,&quot;slug&quot;:&quot;blog/introducing-journalist&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-684e59d65e77a25d6846245eee2291e9a1767860ef80dcb6351e4e78607ad123&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;},
+        {&quot;section&quot;:&quot;Blog&quot;,&quot;title&quot;:&quot;Agentics London Session&quot;,&quot;slug&quot;:&quot;blog/agentics-london-session&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-77c47abb9be86ebfcd7f826f275856f8849914377aa9dab015145c1a9af1cf8e&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;},
+        {&quot;section&quot;:&quot;What&#39;s New&quot;,&quot;title&quot;:&quot;Team Expansion — Seven Agents&quot;,&quot;slug&quot;:&quot;whats-new/team-expansion-seven-agents&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-f678dd3857795479a88c8064c138330732c9ff2ee9ed8d4782904af861847355&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;}
+      ]">
+    </sg-side-nav>
+  </div>
 
   <!-- Landing page — shown at /en-gb/library/ (no article selected) -->
   <div class="sub-site__landing" id="landing" hidden>
