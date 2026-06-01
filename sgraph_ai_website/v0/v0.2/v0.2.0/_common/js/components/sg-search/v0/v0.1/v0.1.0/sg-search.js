@@ -61,14 +61,25 @@ class SgSearch extends HTMLElement {
     this._injectStyles();
     this._buildTrigger();
     this._keyHandler = e => {
-      // '/' outside inputs, or Ctrl+K anywhere
-      if ((e.key === '/' && !['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)) ||
-          ((e.ctrlKey || e.metaKey) && e.key === 'k')) {
+      // '/' outside inputs opens overlay
+      if (e.key === '/' && !['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)) {
         e.preventDefault();
         this._open();
       }
     };
     document.addEventListener('keydown', this._keyHandler);
+
+    // Bridge: sg-sub-nav dispatches sub-nav:search when the header search bar is used
+    this._subNavSearchHandler = e => {
+      const query = e.detail?.query ?? '';
+      if (!this._overlay) this._open();
+      if (this._input) {
+        this._input.value = query;
+        clearTimeout(this._debounce);
+        this._debounce = setTimeout(() => this._runSearch(query.trim()), 180);
+      }
+    };
+    document.addEventListener('sub-nav:search', this._subNavSearchHandler);
 
     // Eagerly warm the root node (it's tiny)
     this._loadRootNode();
@@ -76,6 +87,7 @@ class SgSearch extends HTMLElement {
 
   disconnectedCallback() {
     document.removeEventListener('keydown', this._keyHandler);
+    document.removeEventListener('sub-nav:search', this._subNavSearchHandler);
     this._overlay?.remove();
   }
 
