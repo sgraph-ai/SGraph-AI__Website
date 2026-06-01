@@ -195,14 +195,18 @@
       if (matchedSection) {
         showSectionIndex(matchedSection);
       } else {
-        // Explicit slug routing: walk full nav tree to find article or child article.
+        // Explicit slug routing: walk full nav tree to find article or group node.
         // This fires before auto-select (which also calls showArticle via nav:select).
         // The article-viewer sequence counter ensures only the final load renders.
         const found = findArticleBySlug(sections, slug);
         if (found) {
           setBreadcrumbs('Library', found.sectionTitle, found.parentTitle || null, found.title);
-          showArticle(found.content_object_id, found.render ?? 'markdown', found.vault_id ?? null, found.read_key ?? null);
-          buildNextPrev(slug);
+          if (found.content_object_id) {
+            showArticle(found.content_object_id, found.render ?? 'markdown', found.vault_id ?? null, found.read_key ?? null);
+            buildNextPrev(slug);
+          } else if ((found.children ?? []).length) {
+            showGroupIndex(found);
+          }
         }
       }
     }
@@ -304,6 +308,49 @@
                 ${childList}
               </li>`;
             }).join('')}
+          </ul>
+        </div>
+      </div>`;
+
+    document.getElementById('next-prev').innerHTML = '';
+
+    document.querySelectorAll('.section-index-list__link').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const slug = btn.dataset.slug;
+        if (!slug) return;
+        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`)?.click();
+      });
+    });
+  }
+
+  // Show an index page for a nav group node that has children but no content_object_id
+  // (e.g. /en-gb/library/sg-teams/content-team/roles/).
+  function showGroupIndex(groupNode) {
+    landing.hidden = true;
+    articleToc.hidden = true;
+    shell.classList.remove('with-toc');
+    articleEl.hidden = false;
+
+    setBreadcrumbs('Library', groupNode.sectionTitle, groupNode.parentTitle || null, groupNode.title);
+
+    const children = (groupNode.children ?? []).map(c => ({
+      ...c,
+      slug: compoundSlug(groupNode.slug, c.slug),
+    }));
+
+    document.getElementById('article-render').innerHTML = `
+      <div class="article-viewer">
+        <div class="article-body">
+          <h1>${groupNode.title}</h1>
+          ${groupNode.description ? `<p class="section-index-desc">${groupNode.description}</p>` : ''}
+          <ul class="section-index-list">
+            ${children.map(c => `
+              <li class="section-index-list__item">
+                <button class="section-index-list__link" data-slug="${c.slug ?? ''}">
+                  <span class="section-index-list__title">${c.title}</span>
+                  ${c.description ? `<span class="section-index-list__desc">${c.description}</span>` : ''}
+                </button>
+              </li>`).join('')}
           </ul>
         </div>
       </div>`;
