@@ -95,19 +95,17 @@ class SgArticleViewer extends HTMLElement {
 .sg-av__reopener.sg-av__reopener--visible { opacity: 0.55; }
 .sg-av__reopener:hover { opacity: 1 !important; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
 
-/* Layer 2 — summary panel */
+/* ── Trace panel (merged Layer 2 + Layer 3) ─────────────────────── */
 .sg-av__layer2 {
   position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 340px;
+  top: 0; right: 0; bottom: 0;
+  width: 360px; min-width: 240px; max-width: 680px;
   background: #fff;
   border-left: 1px solid #e5e7eb;
   box-shadow: -4px 0 32px rgba(0,0,0,0.08);
   z-index: 100;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   font-size: 0.8125rem;
   animation: sg-av-slide-in 0.2s ease;
   overflow: hidden;
@@ -116,303 +114,209 @@ class SgArticleViewer extends HTMLElement {
   from { transform: translateX(100%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
 }
+.sg-av-l2__resize-handle {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+}
+.sg-av-l2__resize-handle:hover,
+.sg-av-l2__resize-handle--dragging { background: #3b82f6; }
+.sg-av__layer2-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
 .sg-av-l2__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
+  padding: 0.875rem 1rem;
   border-bottom: 1px solid #f3f4f6;
   flex-shrink: 0;
 }
-.sg-av-l2__title {
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: #111827;
-}
-.sg-av-l2__close {
+.sg-av-l2__title { font-weight: 600; font-size: 0.875rem; color: #111827; }
+.sg-av-l2__actions { display: flex; gap: 0.375rem; align-items: center; }
+.sg-av-l2__newtab {
   background: none;
-  border: none;
-  cursor: pointer;
-  color: #9ca3af;
-  font-size: 1rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
   padding: 0.25rem 0.5rem;
-  border-radius: 0.25rem;
-  transition: color 0.15s, background 0.15s;
-  line-height: 1;
+  font-size: 0.725rem;
+  cursor: pointer;
+  color: #6b7280;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.sg-av-l2__newtab:hover { background: #f9fafb; color: #374151; }
+.sg-av-l2__close {
+  background: none; border: none; cursor: pointer;
+  color: #9ca3af; font-size: 1rem;
+  padding: 0.25rem 0.5rem; border-radius: 0.25rem;
+  transition: color 0.15s, background 0.15s; line-height: 1;
 }
 .sg-av-l2__close:hover { color: #374151; background: #f3f4f6; }
+.sg-av-l2__body { flex: 1; overflow-y: auto; }
+
+/* Meta strip */
 .sg-av-l2__meta {
-  padding: 0.875rem 1.25rem;
+  padding: 0.75rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.3rem;
   border-bottom: 1px solid #f3f4f6;
-  flex-shrink: 0;
 }
 .sg-av-l2__meta > div { display: flex; gap: 0.5rem; align-items: baseline; }
-.sg-av-l2__key { color: #9ca3af; min-width: 76px; flex-shrink: 0; }
-.sg-av-l2__val { color: #374151; word-break: break-all; }
-.sg-av-l2__val--mono { font-family: ui-monospace, monospace; font-size: 0.725rem; }
-.sg-av-l2__steps {
-  width: 100%;
-  border-collapse: collapse;
-  flex-shrink: 0;
+.sg-av-l2__key { color: #9ca3af; min-width: 52px; flex-shrink: 0; font-size: 0.75rem; }
+.sg-av-l2__val { color: #374151; word-break: break-all; font-size: 0.75rem; }
+.sg-av-l2__val--mono { font-family: ui-monospace, monospace; font-size: 0.7rem; }
+
+/* Timeline bars */
+.sg-av-l2__tl-section {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
 }
+.sg-av-l2__section-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.sg-av-l2__tl-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: #d1d5db;
+  padding-left: 80px;
+  font-family: ui-monospace, monospace;
+  margin-bottom: 0.25rem;
+}
+.sg-av-l2__tl-row {
+  display: grid;
+  grid-template-columns: 76px 1fr 42px;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.2rem;
+}
+.sg-av-l2__tl-label {
+  font-size: 0.65rem;
+  font-family: ui-monospace, monospace;
+  color: #6b7280;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sg-av-l2__tl-track {
+  position: relative;
+  height: 13px;
+  background: #f3f4f6;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.sg-av-l2__tl-bar {
+  position: absolute; top: 0; height: 100%;
+  background: #3b82f6; border-radius: 3px; min-width: 2px;
+}
+.sg-av-l2__tl-bar--active { background: #93c5fd; animation: sg-av-pulse 1s ease-in-out infinite; }
+.sg-av-l2__tl-bar--pending { background: #e5e7eb; min-width: 0; width: 100% !important; }
+@keyframes sg-av-pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+.sg-av-l2__tl-dur {
+  font-size: 0.65rem;
+  font-family: ui-monospace, monospace;
+  color: #9ca3af;
+  text-align: right;
+  white-space: nowrap;
+}
+.sg-av-l2__tl-dur--pending { color: #d1d5db; }
+
+/* Steps table */
+.sg-av-l2__steps-section { border-bottom: 1px solid #f3f4f6; }
+.sg-av-l2__steps { width: 100%; border-collapse: collapse; }
 .sg-av-l2__steps th {
   text-align: left;
-  padding: 0.5rem 1.25rem;
-  font-size: 0.6875rem;
+  padding: 0.4rem 1rem;
+  font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #9ca3af;
   border-bottom: 1px solid #f3f4f6;
   font-weight: 600;
 }
-.sg-av-l2__steps td {
-  padding: 0.4375rem 1.25rem;
-  border-bottom: 1px solid #f9fafb;
-  color: #374151;
-}
-.sg-av-l2__step-name { font-family: ui-monospace, monospace; font-size: 0.725rem; }
-.sg-av-l2__step-time { color: #6b7280; white-space: nowrap; }
-.sg-av-l2__step-size { color: #9ca3af; white-space: nowrap; }
-.sg-av-l2__badges {
-  padding: 0.75rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  flex-shrink: 0;
-}
-.sg-av-l2__badge {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.625rem;
-  border-radius: 0.375rem;
-}
-.sg-av-l2__badge--ok  { background: #f0fdf4; color: #16a34a; }
-.sg-av-l2__badge--err { background: #fef2f2; color: #dc2626; }
-.sg-av-l2__footer {
-  padding: 0.875rem 1.25rem;
-  border-top: 1px solid #f3f4f6;
-  display: flex;
-  justify-content: flex-end;
-  margin-top: auto;
-  flex-shrink: 0;
-}
-.sg-av-l2__trace-btn {
-  background: none;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8125rem;
-  cursor: pointer;
-  color: #374151;
-  transition: background 0.15s, border-color 0.15s;
-  font-family: inherit;
-}
-.sg-av-l2__trace-btn:hover { background: #f9fafb; border-color: #d1d5db; }
+.sg-av-l2__steps td { padding: 0.3rem 1rem; border-bottom: 1px solid #f9fafb; }
+.sg-av-l2__step-name { font-family: ui-monospace, monospace; font-size: 0.7rem; color: #374151; }
+.sg-av-l2__step-time { color: #6b7280; white-space: nowrap; font-size: 0.7rem; }
+.sg-av-l2__step-size { color: #9ca3af; white-space: nowrap; font-size: 0.7rem; }
+.sg-av-l2__step-pending { color: #d1d5db; font-size: 0.7rem; font-style: italic; }
 
-/* Layer 2 mobile: bottom sheet */
+/* Objects */
+.sg-av-l2__objects-section { padding: 0.75rem 1rem; border-bottom: 1px solid #f3f4f6; }
+.sg-av-l2__obj {
+  border: 1px solid #f3f4f6;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  margin-top: 0.375rem;
+}
+.sg-av-l2__obj-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: #f9fafb;
+  flex-wrap: wrap;
+}
+.sg-av-l2__obj-role {
+  font-size: 0.65rem; font-family: ui-monospace, monospace;
+  background: #e5e7eb; color: #374151;
+  padding: 0.1rem 0.3rem; border-radius: 0.2rem; flex-shrink: 0;
+}
+.sg-av-l2__obj-id {
+  font-size: 0.7rem; font-family: ui-monospace, monospace; color: #374151;
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.sg-av-l2__obj-size { font-size: 0.65rem; color: #9ca3af; flex-shrink: 0; }
+.sg-av-l2__obj-expand {
+  background: none; border: 1px solid #e5e7eb; border-radius: 0.2rem;
+  padding: 0.1rem 0.3rem; font-size: 0.65rem; cursor: pointer; color: #6b7280;
+  white-space: nowrap; font-family: inherit; transition: all 0.15s; flex-shrink: 0;
+}
+.sg-av-l2__obj-expand:hover { background: #fff; color: #374151; border-color: #d1d5db; }
+.sg-av-l2__obj-preview {
+  margin: 0; padding: 0.5rem 0.75rem;
+  font-size: 0.7rem; font-family: ui-monospace, monospace;
+  white-space: pre-wrap; word-break: break-all;
+  color: #374151; background: #fff; border-top: 1px solid #f3f4f6;
+  max-height: 200px; overflow-y: auto; line-height: 1.5;
+}
+
+/* Badges */
+.sg-av-l2__badges { padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.375rem; }
+.sg-av-l2__badge { font-size: 0.75rem; padding: 0.25rem 0.625rem; border-radius: 0.375rem; }
+.sg-av-l2__badge--ok      { background: #f0fdf4; color: #16a34a; }
+.sg-av-l2__badge--err     { background: #fef2f2; color: #dc2626; }
+.sg-av-l2__badge--loading { background: #eff6ff; color: #3b82f6; }
+
+/* Mobile: bottom sheet */
 @media (max-width: 640px) {
   .sg-av__layer2 {
     top: auto; right: 0; left: 0; bottom: 0;
-    width: 100%; max-height: 80vh;
+    width: 100% !important; max-height: 80vh;
     border-left: none; border-top: 1px solid #e5e7eb;
     border-radius: 1rem 1rem 0 0;
     box-shadow: 0 -4px 32px rgba(0,0,0,0.1);
     animation: sg-av-slide-up 0.2s ease;
-    overflow-y: auto;
+    flex-direction: column;
   }
+  .sg-av-l2__resize-handle { display: none; }
   @keyframes sg-av-slide-up {
     from { transform: translateY(100%); opacity: 0; }
     to   { transform: translateY(0);    opacity: 1; }
   }
-}
-
-/* Layer 3 — full trace modal */
-.sg-av__layer3 {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.45);
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  animation: sg-av-fade-in 0.15s ease;
-}
-@keyframes sg-av-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-.sg-av-l3__dialog {
-  background: #fff;
-  border-radius: 0.75rem;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.18);
-  width: 100%;
-  max-width: 820px;
-  max-height: 88vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.sg-av-l3__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid #f3f4f6;
-  flex-shrink: 0;
-}
-.sg-av-l3__title { font-weight: 600; font-size: 0.9375rem; color: #111827; }
-.sg-av-l3__toolbar-actions { display: flex; gap: 0.5rem; align-items: center; }
-.sg-av-l3__newtab {
-  background: none;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.375rem;
-  padding: 0.25rem 0.625rem;
-  font-size: 0.75rem;
-  cursor: pointer;
-  color: #6b7280;
-  transition: all 0.15s;
-  font-family: inherit;
-}
-.sg-av-l3__newtab:hover { background: #f9fafb; color: #374151; }
-.sg-av-l3__close {
-  background: none; border: none; cursor: pointer;
-  color: #9ca3af; font-size: 1rem;
-  padding: 0.25rem 0.5rem; border-radius: 0.25rem;
-  transition: color 0.15s, background 0.15s; line-height: 1;
-}
-.sg-av-l3__close:hover { color: #374151; background: #f3f4f6; }
-.sg-av-l3__body {
-  overflow-y: auto;
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.75rem;
-}
-.sg-av-l3__section { display: flex; flex-direction: column; gap: 0.75rem; }
-.sg-av-l3__section-title {
-  font-size: 0.6875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #9ca3af;
-  font-weight: 600;
-}
-.sg-av-l3__tl-scale {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.6875rem;
-  color: #d1d5db;
-  padding-left: 116px;
-  font-family: ui-monospace, monospace;
-  margin-bottom: 0.125rem;
-}
-.sg-av-l3__tl-row {
-  display: grid;
-  grid-template-columns: 110px 1fr 56px;
-  align-items: center;
-  gap: 0.5rem;
-}
-.sg-av-l3__tl-label {
-  font-size: 0.6875rem;
-  font-family: ui-monospace, monospace;
-  color: #6b7280;
-  text-align: right;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.sg-av-l3__tl-track {
-  position: relative;
-  height: 18px;
-  background: #f3f4f6;
-  border-radius: 3px;
-  overflow: hidden;
-}
-.sg-av-l3__tl-bar {
-  position: absolute;
-  top: 0;
-  height: 100%;
-  background: #3b82f6;
-  border-radius: 3px;
-  min-width: 3px;
-}
-.sg-av-l3__tl-dur {
-  font-size: 0.6875rem;
-  font-family: ui-monospace, monospace;
-  color: #9ca3af;
-  white-space: nowrap;
-  text-align: right;
-}
-.sg-av-l3__obj {
-  border: 1px solid #f3f4f6;
-  border-radius: 0.5rem;
-  overflow: hidden;
-}
-.sg-av-l3__obj-header {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0.5625rem 0.875rem;
-  background: #f9fafb;
-  flex-wrap: wrap;
-}
-.sg-av-l3__obj-role {
-  font-size: 0.6875rem;
-  font-family: ui-monospace, monospace;
-  background: #e5e7eb;
-  color: #374151;
-  padding: 0.125rem 0.375rem;
-  border-radius: 0.25rem;
-  flex-shrink: 0;
-}
-.sg-av-l3__obj-id {
-  font-size: 0.725rem;
-  font-family: ui-monospace, monospace;
-  color: #374151;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  min-width: 0;
-}
-.sg-av-l3__obj-size { font-size: 0.6875rem; color: #9ca3af; flex-shrink: 0; }
-.sg-av-l3__obj-expand {
-  background: none;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.25rem;
-  padding: 0.125rem 0.375rem;
-  font-size: 0.6875rem;
-  cursor: pointer;
-  color: #6b7280;
-  white-space: nowrap;
-  font-family: inherit;
-  transition: all 0.15s;
-  flex-shrink: 0;
-}
-.sg-av-l3__obj-expand:hover { background: #fff; color: #374151; border-color: #d1d5db; }
-.sg-av-l3__obj-preview {
-  margin: 0;
-  padding: 0.75rem 0.875rem;
-  font-size: 0.725rem;
-  font-family: ui-monospace, monospace;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #374151;
-  background: #fff;
-  border-top: 1px solid #f3f4f6;
-  max-height: 280px;
-  overflow-y: auto;
-  line-height: 1.5;
-}
-.sg-av-l3__error {
-  background: #fef2f2;
-  color: #dc2626;
-  padding: 0.625rem 0.875rem;
-  border-radius: 0.5rem;
-  font-size: 0.8125rem;
-  font-family: ui-monospace, monospace;
 }
 `;
     document.head.appendChild(style);
@@ -428,6 +332,7 @@ class SgArticleViewer extends HTMLElement {
 
   _loadSeq = 0;
   _trace = null;
+  _loadT0 = 0;
   _contentEl = null;
   _reopenerEl = null;
   _layer1El = null;
@@ -456,14 +361,9 @@ class SgArticleViewer extends HTMLElement {
     const seq = ++this._loadSeq;
     this._ensureStructure();
 
-    // Close any open Layer 2
-    if (this._layer2El) { this._layer2El.remove(); this._layer2El = null; }
-
-    // Show Layer 1 progress bar
-    this._showLayer1();
-
-    // Build trace object
+    // Build trace object immediately so Layer 2 can read it live during loading
     const t0 = performance.now();
+    this._loadT0 = t0;
     const trace = {
       vault_id:    vaultId,
       object_id:   objectId,
@@ -474,6 +374,10 @@ class SgArticleViewer extends HTMLElement {
       errors:      [],
       status:      'loading',
     };
+    this._trace = trace;
+
+    // Show Layer 1 progress bar (reopener + Layer 2 persistence handled inside)
+    this._showLayer1();
 
     const stepStart = name => {
       const start_ms = Math.round(performance.now() - t0);
@@ -535,23 +439,22 @@ class SgArticleViewer extends HTMLElement {
       const { meta, body } = parseFrontmatter(text);
       endStep();
 
-      endStep = stepStart('render');
       const renderHint = this.getAttribute('render') ?? 'markdown';
       const viewer = meta.viewer ?? (renderHint === 'json' ? 'json' : 'article');
 
       if (viewer === 'article') {
-        await this._renderArticle(meta, body, vaultId, readKey);
+        await this._renderArticle(meta, body, vaultId, readKey, stepStart);
       } else if (viewer === 'json') {
+        const endRender = stepStart('render');
         this._renderJson(text);
+        endRender();
       } else {
         this._contentEl.innerHTML = `<p class="article-error">Unknown viewer: "${viewer}"</p>`;
       }
-      endStep();
 
       trace.status      = 'ok';
       trace.resolved_at = new Date().toISOString();
       trace.total_ms    = Math.round(performance.now() - t0);
-      this._trace       = trace;
       this._hideLayer1AndShowReopener();
 
     } catch (err) {
@@ -560,7 +463,6 @@ class SgArticleViewer extends HTMLElement {
       trace.status   = 'error';
       trace.total_ms = Math.round(performance.now() - t0);
       trace.errors.push(msg);
-      this._trace = trace;
 
       this._contentEl.innerHTML = `<p class="article-error">Failed to load content.</p>`;
       console.error('sg-article-viewer load failed', { objectId, vaultId, err });
@@ -585,21 +487,39 @@ class SgArticleViewer extends HTMLElement {
     this._contentEl.innerHTML = '';
     this._contentEl.appendChild(this._layer1El);
 
-    if (this._reopenerEl) {
-      this._reopenerEl.textContent = '⬡ loading…';
-      clearTimeout(this._reopenerFadeTimer);
+    // Always show reopener from the start of loading (not just after)
+    if (!this._reopenerEl) {
+      this._reopenerEl = document.createElement('button');
+      this._reopenerEl.className = 'sg-av__reopener';
+      this._reopenerEl.setAttribute('aria-label', 'Show content load details');
+      this.appendChild(this._reopenerEl);
+      this._reopenerEl.addEventListener('click', () => this._toggleLayer2());
+    }
+    this._reopenerEl.textContent = '⬡ loading…';
+    this._reopenerEl.classList.add('sg-av__reopener--visible');
+    clearTimeout(this._reopenerFadeTimer);
+
+    // Persist Layer 2 across navigations and reloads
+    if (localStorage.getItem('sg-av-layer2-open') === 'true') {
+      if (!this._layer2El) this._toggleLayer2();
+      else this._refreshLayer2();
+    } else if (this._layer2El) {
+      this._refreshLayer2();
     }
   }
 
   _updateLayer1Progress(completedStep) {
     if (!this._layer1El) return;
     const PHASES = {
-      'module-import': { pct: 18, label: 'Loading vault client…' },
-      'key-import':    { pct: 26, label: 'Preparing decryption key…' },
-      'fetch':         { pct: 55, label: 'Waiting for response…' },
-      'fetch-body':    { pct: 74, label: 'Downloading content…' },
-      'decrypt':       { pct: 84, label: 'Decrypting content…' },
-      'parse':         { pct: 92, label: 'Parsing content…' },
+      'module-import': { pct: 14, label: 'Loading vault client…' },
+      'key-import':    { pct: 20, label: 'Preparing decryption key…' },
+      'fetch':         { pct: 50, label: 'Waiting for response…' },
+      'fetch-body':    { pct: 68, label: 'Downloading content…' },
+      'decrypt':       { pct: 76, label: 'Decrypting content…' },
+      'parse':         { pct: 82, label: 'Parsing content…' },
+      'import-deps':   { pct: 88, label: 'Loading renderer…' },
+      'md-parse':      { pct: 94, label: 'Parsing markdown…' },
+      'dom-inject':    { pct: 99, label: 'Building DOM…' },
       'render':        { pct: 97, label: 'Rendering…' },
     };
     const phase = PHASES[completedStep];
@@ -608,6 +528,7 @@ class SgArticleViewer extends HTMLElement {
     const label = this._layer1El.querySelector('.sg-av-l1__label');
     if (bar)   bar.style.width = phase.pct + '%';
     if (label) label.textContent = phase.label;
+    if (this._layer2El) this._refreshLayer2();
   }
 
   _hideLayer1AndShowReopener() {
@@ -618,197 +539,228 @@ class SgArticleViewer extends HTMLElement {
       this._layer1El = null;
     }
 
-    if (!this._reopenerEl) {
-      this._reopenerEl = document.createElement('button');
-      this._reopenerEl.className = 'sg-av__reopener';
-      this._reopenerEl.setAttribute('aria-label', 'Show content load details');
-      this.appendChild(this._reopenerEl);
-      this._reopenerEl.addEventListener('click', () => this._openLayer2());
+    // Reopener already exists (created in _showLayer1), just update text
+    if (this._reopenerEl) {
+      const { total_ms, status } = this._trace ?? {};
+      this._reopenerEl.textContent = status === 'ok'
+        ? `⬡ loaded in ${(total_ms / 1000).toFixed(1)}s ↗`
+        : `⬡ load failed ↗`;
+      clearTimeout(this._reopenerFadeTimer);
+      this._reopenerEl.classList.add('sg-av__reopener--visible');
+      this._reopenerFadeTimer = setTimeout(() => {
+        if (this._reopenerEl) this._reopenerEl.classList.remove('sg-av__reopener--visible');
+      }, 5000);
     }
 
-    const { total_ms, status } = this._trace ?? {};
-    this._reopenerEl.textContent = status === 'ok'
-      ? `⬡ loaded in ${(total_ms / 1000).toFixed(1)}s ↗`
-      : `⬡ load failed ↗`;
-
-    clearTimeout(this._reopenerFadeTimer);
-    this._reopenerEl.classList.add('sg-av__reopener--visible');
-    this._reopenerFadeTimer = setTimeout(() => {
-      if (this._reopenerEl) this._reopenerEl.classList.remove('sg-av__reopener--visible');
-    }, 5000);
+    if (this._layer2El) this._refreshLayer2();
   }
 
-  // ── Layer 2 — summary panel ─────────────────────────────────────────────────
+  // ── Trace panel (merged) ────────────────────────────────────────────────────
 
-  _openLayer2() {
+  _toggleLayer2() {
     if (this._layer2El) {
       this._layer2El.remove();
       this._layer2El = null;
+      localStorage.removeItem('sg-av-layer2-open');
       return;
     }
-
-    const trace = this._trace;
-    if (!trace) return;
-
-    const stepsHtml = trace.steps.map(s => {
-      const dur     = s.end_ms - s.start_ms;
-      const sizeStr = s.size_bytes != null ? formatBytes(s.size_bytes) : '';
-      return `<tr>
-        <td class="sg-av-l2__step-name">${escHtml(s.name)}</td>
-        <td class="sg-av-l2__step-time">${dur} ms</td>
-        <td class="sg-av-l2__step-size">${escHtml(sizeStr)}</td>
-      </tr>`;
-    }).join('');
-
-    const okBadge  = `<div class="sg-av-l2__badge sg-av-l2__badge--ok">&#10003; No errors</div>`;
-    const errBadge = `<div class="sg-av-l2__badge sg-av-l2__badge--err">&#10007; ${trace.errors.length} error(s)</div>`;
-    const badges   = trace.errors.length === 0 ? okBadge : errBadge;
+    localStorage.setItem('sg-av-layer2-open', 'true');
 
     const panel = document.createElement('div');
     panel.className = 'sg-av__layer2';
+
+    const savedWidth = localStorage.getItem('sg-av-layer2-width');
+    if (savedWidth) panel.style.width = savedWidth;
+
     panel.innerHTML = `
-      <div class="sg-av-l2__header">
-        <span class="sg-av-l2__title">Content load summary</span>
-        <button class="sg-av-l2__close" aria-label="Close panel">&#10005;</button>
-      </div>
-      <div class="sg-av-l2__meta">
-        <div>
-          <span class="sg-av-l2__key">vault</span>
-          <span class="sg-av-l2__val sg-av-l2__val--mono">${escHtml(trace.vault_id)}</span>
+      <div class="sg-av-l2__resize-handle"></div>
+      <div class="sg-av__layer2-inner">
+        <div class="sg-av-l2__header">
+          <span class="sg-av-l2__title">Content load</span>
+          <div class="sg-av-l2__actions">
+            <button class="sg-av-l2__newtab">open in new tab &#8599;</button>
+            <button class="sg-av-l2__close" aria-label="Close">&#10005;</button>
+          </div>
         </div>
-        <div>
-          <span class="sg-av-l2__key">object</span>
-          <span class="sg-av-l2__val sg-av-l2__val--mono">${escHtml(trace.object_id)}</span>
-        </div>
-        <div>
-          <span class="sg-av-l2__key">loaded</span>
-          <span class="sg-av-l2__val">${trace.resolved_at ? new Date(trace.resolved_at).toUTCString() : '—'}</span>
-        </div>
-        <div>
-          <span class="sg-av-l2__key">total time</span>
-          <span class="sg-av-l2__val">${trace.total_ms != null ? trace.total_ms + ' ms' : '—'}</span>
-        </div>
-      </div>
-      <table class="sg-av-l2__steps">
-        <thead><tr><th>Step</th><th>Time</th><th>Size</th></tr></thead>
-        <tbody>${stepsHtml}</tbody>
-      </table>
-      <div class="sg-av-l2__badges">${badges}</div>
-      <div class="sg-av-l2__footer">
-        <button class="sg-av-l2__trace-btn">Full trace &#8599;</button>
+        <div class="sg-av-l2__body"></div>
       </div>`;
 
     this._layer2El = panel;
     document.body.appendChild(panel);
 
-    panel.querySelector('.sg-av-l2__close').addEventListener('click', () => {
-      panel.remove();
-      this._layer2El = null;
-    });
-    panel.querySelector('.sg-av-l2__trace-btn').addEventListener('click', () => {
-      this._openLayer3();
-    });
-  }
-
-  // ── Layer 3 — full trace modal ──────────────────────────────────────────────
-
-  _openLayer3() {
-    const existing = document.getElementById('sg-av-l3-modal');
-    if (existing) { existing.remove(); return; }
-
-    const trace   = this._trace;
-    if (!trace) return;
-    const totalMs = trace.total_ms || 1;
-
-    // Timeline
-    const timelineBars = trace.steps.map(s => {
-      const left  = Math.round((s.start_ms / totalMs) * 100);
-      const width = Math.max(1, Math.round(((s.end_ms - s.start_ms) / totalMs) * 100));
-      const dur   = s.end_ms - s.start_ms;
-      return `<div class="sg-av-l3__tl-row">
-        <span class="sg-av-l3__tl-label">${escHtml(s.name)}</span>
-        <div class="sg-av-l3__tl-track">
-          <div class="sg-av-l3__tl-bar" style="left:${left}%;width:${width}%"></div>
-        </div>
-        <span class="sg-av-l3__tl-dur">${dur}ms</span>
-      </div>`;
-    }).join('');
-
-    const scaleHtml = `<div class="sg-av-l3__tl-scale">
-      <span>0ms</span>
-      <span>${Math.round(totalMs / 2)}ms</span>
-      <span>${totalMs}ms</span>
-    </div>`;
-
-    // Objects
-    const objectsHtml = trace.objects.map((obj, i) => {
-      const previewId = `sg-av-obj-${i}`;
-      const hasPreview = !!obj.preview;
-      return `<div class="sg-av-l3__obj">
-        <div class="sg-av-l3__obj-header">
-          <span class="sg-av-l3__obj-role">${escHtml(obj.role)}</span>
-          <span class="sg-av-l3__obj-id">${escHtml(obj.id)}</span>
-          ${obj.size_bytes != null ? `<span class="sg-av-l3__obj-size">${escHtml(formatBytes(obj.size_bytes))}</span>` : ''}
-          ${hasPreview ? `<button class="sg-av-l3__obj-expand" data-target="${previewId}">view &#8599;</button>` : ''}
-        </div>
-        ${hasPreview ? `<pre class="sg-av-l3__obj-preview" id="${previewId}" hidden>${escHtml(obj.preview)}${obj.full_size > 1000 ? '\n… (' + formatBytes(obj.full_size) + ' total)' : ''}</pre>` : ''}
-      </div>`;
-    }).join('');
-
-    // Errors
-    const errorsSection = trace.errors.length
-      ? `<div class="sg-av-l3__section">
-           <div class="sg-av-l3__section-title">Errors</div>
-           ${trace.errors.map(e => `<div class="sg-av-l3__error">${escHtml(e)}</div>`).join('')}
-         </div>`
-      : '';
-
-    const modal = document.createElement('div');
-    modal.id = 'sg-av-l3-modal';
-    modal.className = 'sg-av__layer3';
-    modal.innerHTML = `
-      <div class="sg-av-l3__dialog">
-        <div class="sg-av-l3__toolbar">
-          <span class="sg-av-l3__title">Full request trace</span>
-          <div class="sg-av-l3__toolbar-actions">
-            <button class="sg-av-l3__newtab">open in new tab &#8599;</button>
-            <button class="sg-av-l3__close" aria-label="Close">&#10005;</button>
-          </div>
-        </div>
-        <div class="sg-av-l3__body">
-          <div class="sg-av-l3__section">
-            <div class="sg-av-l3__section-title">Timeline &mdash; ${totalMs}ms total</div>
-            ${scaleHtml}
-            ${timelineBars}
-          </div>
-          ${objectsHtml ? `<div class="sg-av-l3__section">
-            <div class="sg-av-l3__section-title">Objects</div>
-            ${objectsHtml}
-          </div>` : ''}
-          ${errorsSection}
-        </div>
-      </div>`;
-
-    document.body.appendChild(modal);
-
-    modal.querySelector('.sg-av-l3__close').addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-
-    modal.querySelectorAll('.sg-av-l3__obj-expand').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const pre = document.getElementById(btn.dataset.target);
-        if (!pre) return;
-        pre.hidden = !pre.hidden;
-        btn.textContent = pre.hidden ? 'view ↗' : 'close ✕';
-      });
-    });
-
-    modal.querySelector('.sg-av-l3__newtab').addEventListener('click', () => {
+    panel.querySelector('.sg-av-l2__close').addEventListener('click', () => this._toggleLayer2());
+    panel.querySelector('.sg-av-l2__newtab').addEventListener('click', () => {
+      const trace = this._trace;
+      if (!trace) return;
       const html = this._buildTracePageHtml(trace);
       const blob = new Blob([html], { type: 'text/html' });
       const url  = URL.createObjectURL(blob);
       window.open(url, '_blank');
       setTimeout(() => URL.revokeObjectURL(url), 30000);
+    });
+
+    this._initResizeHandle(panel);
+    this._refreshLayer2();
+  }
+
+  _refreshLayer2() {
+    if (!this._layer2El) return;
+    const trace = this._trace;
+    if (!trace) return;
+
+    const body = this._layer2El.querySelector('.sg-av-l2__body');
+    if (!body) return;
+
+    const isLoading = trace.status === 'loading';
+    const elapsed   = isLoading ? Math.round(performance.now() - this._loadT0) : (trace.total_ms ?? 0);
+
+    // Preserve expand states before rebuilding
+    const expanded = new Set();
+    body.querySelectorAll('.sg-av-l2__obj-preview:not([hidden])').forEach(pre => {
+      if (pre.id) expanded.add(pre.id);
+    });
+
+    // All known step names in order
+    const ALL_STEPS = ['module-import','key-import','fetch','fetch-body','decrypt','parse','import-deps','md-parse','dom-inject','render'];
+    const doneNames = new Set(trace.steps.map(s => s.name));
+    const totalMs   = isLoading ? Math.max(elapsed, 1) : Math.max(trace.total_ms ?? 1, 1);
+
+    // Timeline bars
+    const scaleHtml = `
+      <div class="sg-av-l2__tl-scale">
+        <span>0ms</span><span>${Math.round(totalMs / 2)}ms</span><span>${totalMs}ms</span>
+      </div>`;
+
+    const visibleSteps = isLoading
+      ? ALL_STEPS.filter(n => doneNames.has(n) || n === [...ALL_STEPS].find(x => !doneNames.has(x)))
+      : trace.steps.map(s => s.name);
+
+    const tlRows = visibleSteps.map(name => {
+      const step = trace.steps.find(s => s.name === name);
+      if (!step) {
+        // Currently running step
+        return `<div class="sg-av-l2__tl-row">
+          <span class="sg-av-l2__tl-label">${escHtml(name)}</span>
+          <div class="sg-av-l2__tl-track"><div class="sg-av-l2__tl-bar sg-av-l2__tl-bar--active" style="left:0%;width:40%"></div></div>
+          <span class="sg-av-l2__tl-dur sg-av-l2__tl-dur--pending">…</span>
+        </div>`;
+      }
+      const left  = Math.round((step.start_ms / totalMs) * 100);
+      const width = Math.max(1, Math.round(((step.end_ms - step.start_ms) / totalMs) * 100));
+      const dur   = step.end_ms - step.start_ms;
+      return `<div class="sg-av-l2__tl-row">
+        <span class="sg-av-l2__tl-label">${escHtml(name)}</span>
+        <div class="sg-av-l2__tl-track"><div class="sg-av-l2__tl-bar" style="left:${left}%;width:${width}%"></div></div>
+        <span class="sg-av-l2__tl-dur">${dur}ms</span>
+      </div>`;
+    }).join('');
+
+    // Steps table
+    const allStepNames = isLoading ? ALL_STEPS : ALL_STEPS.filter(n => doneNames.has(n));
+    const stepRows = allStepNames.map(name => {
+      const step = trace.steps.find(s => s.name === name);
+      if (!step) {
+        const isCurrent = name === allStepNames.find(x => !doneNames.has(x));
+        return `<tr>
+          <td class="sg-av-l2__step-name">${escHtml(name)}</td>
+          <td class="${isCurrent ? 'sg-av-l2__step-pending' : 'sg-av-l2__step-time'}">${isCurrent ? '…' : ''}</td>
+          <td></td>
+        </tr>`;
+      }
+      const dur     = step.end_ms - step.start_ms;
+      const sizeStr = step.size_bytes != null ? formatBytes(step.size_bytes) : '';
+      return `<tr>
+        <td class="sg-av-l2__step-name">${escHtml(name)}</td>
+        <td class="sg-av-l2__step-time">${dur} ms</td>
+        <td class="sg-av-l2__step-size">${escHtml(sizeStr)}</td>
+      </tr>`;
+    }).join('');
+
+    // Objects
+    const objectsHtml = trace.objects.length ? `
+      <div class="sg-av-l2__objects-section">
+        <div class="sg-av-l2__section-label">Objects</div>
+        ${trace.objects.map((obj, i) => {
+          const previewId = `sg-av-l2-obj-${i}`;
+          const hasPreview = !!obj.preview;
+          const isOpen = expanded.has(previewId);
+          return `<div class="sg-av-l2__obj">
+            <div class="sg-av-l2__obj-header">
+              <span class="sg-av-l2__obj-role">${escHtml(obj.role)}</span>
+              <span class="sg-av-l2__obj-id">${escHtml(obj.id)}</span>
+              ${obj.size_bytes != null ? `<span class="sg-av-l2__obj-size">${escHtml(formatBytes(obj.size_bytes))}</span>` : ''}
+              ${hasPreview ? `<button class="sg-av-l2__obj-expand" data-target="${previewId}">${isOpen ? 'close ✕' : 'view &#8599;'}</button>` : ''}
+            </div>
+            ${hasPreview ? `<pre class="sg-av-l2__obj-preview" id="${previewId}"${isOpen ? '' : ' hidden'}>${escHtml(obj.preview)}${obj.full_size > 1000 ? '\n… (' + formatBytes(obj.full_size) + ' total)' : ''}</pre>` : ''}
+          </div>`;
+        }).join('')}
+      </div>` : '';
+
+    // Badge
+    const badge = isLoading
+      ? `<div class="sg-av-l2__badge sg-av-l2__badge--loading">&#9679; loading…</div>`
+      : trace.errors.length === 0
+        ? `<div class="sg-av-l2__badge sg-av-l2__badge--ok">&#10003; No errors</div>`
+        : `<div class="sg-av-l2__badge sg-av-l2__badge--err">&#10007; ${trace.errors.length} error(s)</div>`;
+
+    // Error detail
+    const errHtml = trace.errors.length
+      ? trace.errors.map(e => `<div style="font-size:0.7rem;font-family:ui-monospace,monospace;background:#fef2f2;color:#dc2626;padding:0.5rem 1rem;margin-top:0.375rem;border-radius:0.375rem">${escHtml(e)}</div>`).join('')
+      : '';
+
+    body.innerHTML = `
+      <div class="sg-av-l2__meta">
+        <div><span class="sg-av-l2__key">vault</span><span class="sg-av-l2__val sg-av-l2__val--mono">${escHtml(trace.vault_id ?? '—')}</span></div>
+        <div><span class="sg-av-l2__key">object</span><span class="sg-av-l2__val sg-av-l2__val--mono">${escHtml(trace.object_id ?? '—')}</span></div>
+        <div><span class="sg-av-l2__key">total</span><span class="sg-av-l2__val">${isLoading ? elapsed + ' ms…' : (trace.total_ms ?? '—') + ' ms'}</span></div>
+        ${trace.resolved_at ? `<div><span class="sg-av-l2__key">loaded</span><span class="sg-av-l2__val">${new Date(trace.resolved_at).toUTCString()}</span></div>` : ''}
+      </div>
+      <div class="sg-av-l2__tl-section">
+        <div class="sg-av-l2__section-label">Timeline &mdash; ${isLoading ? elapsed + 'ms…' : totalMs + 'ms total'}</div>
+        ${scaleHtml}
+        ${tlRows}
+      </div>
+      <div class="sg-av-l2__steps-section">
+        <table class="sg-av-l2__steps">
+          <thead><tr><th>Step</th><th>Time</th><th>Size</th></tr></thead>
+          <tbody>${stepRows}</tbody>
+        </table>
+      </div>
+      ${objectsHtml}
+      <div class="sg-av-l2__badges">${badge}${errHtml}</div>`;
+
+    // Re-wire object expand buttons
+    body.querySelectorAll('.sg-av-l2__obj-expand').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pre = document.getElementById(btn.dataset.target);
+        if (!pre) return;
+        pre.hidden = !pre.hidden;
+        btn.innerHTML = pre.hidden ? 'view &#8599;' : 'close ✕';
+      });
+    });
+  }
+
+  _initResizeHandle(panel) {
+    const handle = panel.querySelector('.sg-av-l2__resize-handle');
+    if (!handle) return;
+    let startX, startWidth;
+    const onMove = e => {
+      const newWidth = Math.max(240, Math.min(680, startWidth + (startX - e.clientX)));
+      panel.style.width = newWidth + 'px';
+    };
+    const onUp = () => {
+      handle.classList.remove('sg-av-l2__resize-handle--dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      localStorage.setItem('sg-av-layer2-width', panel.style.width);
+    };
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      startX = e.clientX;
+      startWidth = panel.offsetWidth;
+      handle.classList.add('sg-av-l2__resize-handle--dragging');
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
     });
   }
 
@@ -877,11 +829,15 @@ class SgArticleViewer extends HTMLElement {
 
   // ── Renderers ───────────────────────────────────────────────────────────────
 
-  async _renderArticle(meta, body, vaultId, readKey) {
+  async _renderArticle(meta, body, vaultId, readKey, stepStart) {
+    const endImport = stepStart('import-deps');
     const [{ marked }, yamlLoad] = await Promise.all([
       import('https://cdn.jsdelivr.net/npm/marked@9/+esm'),
       _loadYaml(),
     ]);
+    endImport();
+
+    const endParse = stepStart('md-parse');
 
     const renderer = new marked.Renderer();
 
@@ -921,12 +877,15 @@ class SgArticleViewer extends HTMLElement {
 
     const metaHtml = renderMetaStrip(meta);
     const bodyHtml = marked.parse(applyFencedBlocks(applyTokens(body), yamlLoad));
+    endParse();
 
+    const endDom = stepStart('dom-inject');
     this._contentEl.innerHTML = `
       <div class="article-viewer">
         ${metaHtml}
         <div class="article-body">${bodyHtml}</div>
       </div>`;
+    endDom();
 
     document.dispatchEvent(new CustomEvent('viewer:rendered', {
       detail: { meta },
