@@ -119,19 +119,34 @@
     return childSlug.startsWith(parentSlug + '/') ? childSlug : `${parentSlug}/${childSlug}`;
   }
 
-  // Walk full nav tree (sections → children → children) to find an article by slug.
-  // Returns the article object augmented with sectionTitle and parentTitle, or null.
+  // Walk full nav tree recursively to find an article by slug (handles arbitrary depth).
+  // Returns the article object augmented with sectionTitle, parentTitle, and compound slug, or null.
   function findArticleBySlug(sections, slug) {
-    for (const s of sections) {
-      for (const a of (s.children ?? [])) {
-        if (a.slug === slug) return { ...a, sectionTitle: s.title, parentTitle: null };
-        for (const c of (a.children ?? [])) {
-          const cs = compoundSlug(a.slug, c.slug);
-          if (cs === slug) return { ...c, slug: cs, sectionTitle: s.title, parentTitle: a.title };
-        }
+    function walk(nodes, sectionTitle, parentSlug, parentTitle) {
+      for (const a of (nodes ?? [])) {
+        const aSlug = compoundSlug(parentSlug, a.slug);
+        if (aSlug === slug) return { ...a, slug: aSlug, sectionTitle, parentTitle };
+        const found = walk(a.children ?? [], sectionTitle, aSlug, a.title);
+        if (found) return found;
       }
+      return null;
+    }
+    for (const s of sections) {
+      const found = walk(s.children ?? [], s.title, '', null);
+      if (found) return found;
     }
     return null;
+  }
+
+  // Flatten nav tree to linear reading order — recurses to arbitrary depth.
+  function flattenNavTree(nodes, sectionTitle, parentSlug, parentTitle) {
+    const result = [];
+    for (const a of (nodes ?? [])) {
+      const aSlug = compoundSlug(parentSlug, a.slug);
+      result.push({ ...a, slug: aSlug, sectionTitle, parentTitle: parentTitle ?? null });
+      result.push(...flattenNavTree(a.children ?? [], sectionTitle, aSlug, a.title));
+    }
+    return result;
   }
 
   const shell      = document.getElementById('sub-site-shell');
@@ -166,18 +181,7 @@
     // Flatten into a linear reading order: each section's articles, and for any
     // parent article with children[], the parent followed by its child pages
     // (with compound slugs). Drives prev/next navigation on every page type.
-    allArticles = sections.flatMap(s =>
-      (s.children ?? []).flatMap(a => {
-        const self = { ...a, sectionTitle: s.title };
-        const kids = (a.children ?? []).map(c => ({
-          ...c,
-          slug: compoundSlug(a.slug, c.slug),
-          sectionTitle: s.title,
-          parentTitle: a.title,
-        }));
-        return [self, ...kids];
-      })
-    );
+    allArticles = sections.flatMap(s => flattenNavTree(s.children ?? [], s.title, '', null));
     // Emit full nav tree to debug panel
     document.dispatchEvent(new CustomEvent('debug:nav-json',
       { detail: { json: { sections }, src: 'library nav (live)' } }));
