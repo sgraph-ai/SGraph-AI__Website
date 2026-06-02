@@ -1,0 +1,39 @@
+{
+  "v": 1,
+  "id": "rendering",
+  "label": "Rendering & Components",
+  "keys": [
+    "rendering", "components", "browser", "javascript", "client"
+  ],
+  "children": [],
+  "articles": [
+    {
+      "slug": "library/components/sg-article-viewer",
+      "title": "sg-article-viewer",
+      "keys": [
+        "sg-article-viewer", "article viewer", "component", "markdown",
+        "render", "fetch", "decrypt", "pipeline", "loading", "trace",
+        "frontmatter", "vault content", "web component"
+      ],
+      "snippet": "The sg-article-viewer custom element — fetch, decrypt, parse, and render pipeline with per-step load tracing and the Layer 2 diagnostic panel."
+    },
+    {
+      "slug": "library/components/sg-vault-content",
+      "title": "sg-vault-content",
+      "keys": [
+        "sg-vault-content", "vault content", "html", "slot", "template",
+        "static content", "rich content", "component", "web component"
+      ],
+      "snippet": "The sg-vault-content web component for rendering server-provided encrypted HTML fragments — slots, theming, and usage patterns."
+    },
+    {
+      "slug": "library/architecture/edge-rendering",
+      "title": "Edge Rendering",
+      "keys": [
+        "edge", "edge rendering", "cdn", "cloudflare", "workers",
+        "ssr", "server", "html", "static", "delivery", "performance"
+      ],
+      "snippet": "How SGraph AI delivers vault content via edge rendering — CDN integration, cache headers, and the trade-offs between static and dynamic delivery."
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "sg-render/v1",
+  "type": "llm.json",
+  "content_type": "application/json; charset=utf-8",
+  "vault": {
+    "id": "pmcv9tfe",
+    "read_key": "dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw",
+    "nav_path": "library/_nav.json"
+  },
+  "site": {
+    "title": "sgraph.ai Library",
+    "base_path": "/en-gb/library"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "v": 1,
+  "id": "content-team",
+  "label": "Content Team",
+  "keys": [
+    "content team", "writing team", "editorial", "articles",
+    "publishing", "cms", "copy"
+  ],
+  "children": [],
+  "articles": [
+    {
+      "slug": "sg-teams/content-team/roles/journalist",
+      "title": "Journalist",
+      "keys": [
+        "journalist", "writing", "article", "publish", "research",
+        "draft", "vault", "content", "author", "reporter", "copy"
+      ],
+      "snippet": "The Journalist role is responsible for researching, drafting, and publishing articles to the encrypted vault — from ideation through to final publication."
+    },
+    {
+      "slug": "sg-teams/content-team/roles/editor",
+      "title": "Editor",
+      "keys": [
+        "editor", "editing", "review", "approve", "quality",
+        "proofreading", "publish", "gate", "workflow"
+      ],
+      "snippet": "The Editor role reviews and approves content before it is published to the vault, maintaining quality and consistency across the library."
+    },
+    {
+      "slug": "sg-teams/content-team",
+      "title": "Content Team Overview",
+      "keys": [
+        "content team", "overview", "team structure", "roles", "workflow",
+        "how we work", "publishing process"
+      ],
+      "snippet": "How the SGraph AI content team is structured — roles, workflow, and how agents collaborate to produce and maintain vault content."
+    }
+  ]
+}

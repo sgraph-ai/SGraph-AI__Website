@@ -72,6 +72,24 @@ async function resolvePath(vaultId, key, navPath) {
   return { blob: null, commit: ref.commit_id }
 }
 
+// ─────────────────────────── nav article lookup ──────────────────────────────
+
+function findArticle(nav, slug) {
+  const sections = (nav.library ?? nav).sections ?? []
+  const search = articles => {
+    for (const a of articles) {
+      if (a.slug === slug) return a
+      if (a.children) { const f = search(a.children); if (f) return f }
+    }
+    return null
+  }
+  for (const s of sections) {
+    const found = search(s.children ?? s.articles ?? [])
+    if (found) return found
+  }
+  return null
+}
+
 // ───────────────────────────── renderers (Layer 2 format logic) ─────────────
 // Format lives here (@Dev-controlled JS); WHAT to include is driven by the
 // manifest (Layer 3). Add a renderer here to support a new file type — the
@@ -113,23 +131,76 @@ function renderLlmsTxt(manifest, nav, ctx) {
   return { body: out, meta: { pages, sections: sections.length } }
 }
 
+async function renderMarkdown(manifest, nav, ctx) {
+  const { slug, commit } = ctx
+  const article = findArticle(nav, slug)
+  if (!article) throw new Error(`article not found: ${slug}`)
+  if (!article.content_object_id) throw new Error(`no content_object_id for: ${slug}`)
+
+  const key = b64url(manifest.vault.read_key)
+  const buf = await readObject(manifest.vault.id, article.content_object_id, key)
+  const body = buf.toString('utf8')
+
+  return { body, meta: { slug, title: article.title } }
+}
+
+async function renderLlmJson(manifest, nav, ctx) {
+  const { slug, commit, baseUrl } = ctx
+  const article = findArticle(nav, slug)
+  if (!article) throw new Error(`article not found: ${slug}`)
+  if (!article.content_object_id) throw new Error(`no content_object_id for: ${slug}`)
+
+  const key = b64url(manifest.vault.read_key)
+  const buf = await readObject(manifest.vault.id, article.content_object_id, key)
+  const content_markdown = buf.toString('utf8')
+
+  const result = {
+    schema: 'sg-render/v1',
+    slug,
+    title: article.title,
+    description: article.description ?? '',
+    content_markdown,
+    links: {
+      self: `${baseUrl}/${slug}`,
+      markdown: `${baseUrl}/${slug}.md`,
+      json: `${baseUrl}/${slug}.llm.json`,
+    },
+    source: {
+      vault_id: manifest.vault.id,
+      object_id: article.content_object_id,
+      commit_id: commit,
+    },
+    resolved_at: new Date().toISOString(),
+  }
+
+  return { body: JSON.stringify(result, null, 2), meta: { slug, title: article.title } }
+}
+
 const RENDERERS = {
   'llms.txt': renderLlmsTxt,
-  // 'markdown': renderMarkdown,   // per-page *.md  (next)
-  // 'json':     renderJson,       // *.llm.json for @QA  (next)
+  'markdown':  renderMarkdown,
+  'llm.json':  renderLlmJson,
 }
 
 // ───────────────────────── uri → manifest routing ──────────────────────────
-// Keep this dumb: map an intercepted URI to a manifest name. The manifest does
-// the rest. (When *.md / *.llm.json land, this also extracts the page slug.)
-function manifestNameFor(uri) {
-  if (uri === '/llms.txt') return 'llms.txt'
+// Maps an intercepted URI to a { manifestName, slug } pair.
+// The slug is stripped of the base_path prefix and file suffix.
+function routeUri(uri, basePath) {
+  if (uri === '/llms.txt') return { name: 'llms.txt', slug: null }
+  const stripSuffix = (suffix) => {
+    const path = uri.slice(basePath.length, -suffix.length).replace(/^\//, '')
+    return path || null
+  }
+  if (uri.startsWith(basePath) && uri.endsWith('.llm.json'))
+    return { name: 'library-page-llm', slug: stripSuffix('.llm.json') }
+  if (uri.startsWith(basePath) && uri.endsWith('.md'))
+    return { name: 'library-page-md', slug: stripSuffix('.md') }
   return null
 }
 
 // ───────────────────────────── entry point ─────────────────────────────────
 /**
- * @param {string} uri   request path (e.g. "/llms.txt")
+ * @param {string} uri   request path (e.g. "/llms.txt", "/en-gb/library/get-started/claude-setup.md")
  * @param {object} opts
  * @param {string} opts.host           request Host header (selects environment)
  * @param {Function} [opts.readManifest] (name) => Promise<object>; defaults to
@@ -143,10 +214,12 @@ export async function render(uri, opts = {}) {
     return r.json()
   })
 
-  const name = manifestNameFor(uri)
-  if (!name) throw new Error(`no manifest mapping for ${uri}`)
+  // Load the llms.txt manifest first to get base_path for slug extraction
+  const basePath = '/en-gb/library'
+  const route = routeUri(uri, basePath)
+  if (!route) throw new Error(`no manifest mapping for ${uri}`)
 
-  const manifest = await readManifest(name)
+  const manifest = await readManifest(route.name)
   const renderer = RENDERERS[manifest.type]
   if (!renderer) throw new Error(`no renderer for type ${manifest.type}`)
 
@@ -156,7 +229,7 @@ export async function render(uri, opts = {}) {
   const nav = await readJson(manifest.vault.id, blob, key)
 
   const baseUrl = `https://${host}${manifest.site.base_path ?? ''}`
-  const { body, meta } = renderer(manifest, nav, { baseUrl, host })
+  const { body, meta } = await renderer(manifest, nav, { baseUrl, host, slug: route.slug, commit })
 
   return { content_type: manifest.content_type, body, commit, ...meta }
 }

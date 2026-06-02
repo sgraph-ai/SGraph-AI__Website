@@ -2126,17 +2126,39 @@ sg-sub-nav {
 .toc-collapsed .sub-site__toc-label,
 .toc-collapsed .sub-site__toc-list { display: none; }
 
+/* ── Sidebar column wrapper (search bar + sg-side-nav) ───── */
+
+.sub-site__sidebar {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  background: var(--ss-sidebar-bg);
+  border-right: 1px solid var(--ss-border);
+  min-width: 0;
+}
+.sub-site__search-bar {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--ss-border);
+  position: sticky;
+  top: var(--site-header-height, 3.75rem);
+  background: var(--ss-sidebar-bg);
+  z-index: 10;
+  flex-shrink: 0;
+}
+.nav-collapsed .sub-site__search-bar { display: none; }
+
 /* ── Sidebar (sg-side-nav) ───────────────────────────────── */
 
 sg-side-nav {
   display: block;
   background: var(--ss-sidebar-bg);
-  border-right: 1px solid var(--ss-border);
+  border-right: none; /* border provided by .sub-site__sidebar wrapper */
   position: sticky;
   top: calc(var(--site-header-height, 3.75rem) + 0.5rem);
   max-height: calc(100vh - var(--site-header-height, 3.75rem) - 1rem);
   overflow-y: auto;
   align-self: stretch;
+  flex: 1;
 }
 
 /* Sidebar panel collapse toggle */

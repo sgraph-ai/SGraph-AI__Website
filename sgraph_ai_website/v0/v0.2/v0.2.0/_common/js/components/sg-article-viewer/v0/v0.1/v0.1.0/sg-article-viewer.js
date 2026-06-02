@@ -1,7 +1,11 @@
 /**
- * sg-article-viewer v0.1.7
+ * sg-article-viewer v0.2.0
  *
  * Full content pipeline: vault fetch → frontmatter parse → viewer render.
+ * Includes three-layer interactive loading UX:
+ *   Layer 1 — deterministic progress bar, visible during load only
+ *   Layer 2 — load summary panel, opened via reopener button after load
+ *   Layer 3 — full request trace modal with timeline, opened from Layer 2
  *
  * Attributes:
  *   vault-id   — content vault id
@@ -27,12 +31,340 @@ class SgArticleViewer extends HTMLElement {
     return ['vault-id', 'read-key', 'object-id', 'render'];
   }
 
-  connectedCallback()          { this._load(); }
-  attributeChangedCallback()   { this._load(); }
-  disconnectedCallback()       { this._revokeBlobUrls(); }
+  // ── Styles injection ────────────────────────────────────────────────────────
 
-  // Sequence counter: each _load() gets an ID; stale concurrent loads are discarded.
+  static _stylesInjected = false;
+
+  static _injectStyles() {
+    if (SgArticleViewer._stylesInjected) return;
+    SgArticleViewer._stylesInjected = true;
+    const style = document.createElement('style');
+    style.textContent = `
+/* ── sg-article-viewer loading UX (v0.2.0) ───────────────────────── */
+
+/* Layer 1 — progress bar */
+.sg-av-l1 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 4rem 2rem;
+  min-height: 200px;
+  transition: opacity 0.2s ease;
+}
+.sg-av-l1__bar-track {
+  width: 240px;
+  height: 3px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.sg-av-l1__bar {
+  height: 100%;
+  background: #3b82f6;
+  border-radius: 2px;
+  transition: width 0.45s cubic-bezier(0.4,0,0.2,1);
+}
+.sg-av-l1__label {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  letter-spacing: 0.01em;
+}
+
+/* Reopener */
+.sg-av__reopener {
+  position: fixed;
+  bottom: 14px;
+  right: calc(14px + 26px + 8px);
+  font-size: 0.75rem;
+  color: #6b7280;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid #e5e7eb;
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+  padding: 0.375rem 0.625rem;
+  border-radius: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.4s ease, background 0.15s ease, box-shadow 0.15s ease;
+  z-index: 50;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.sg-av__reopener.sg-av__reopener--visible { opacity: 0.55; }
+.sg-av__reopener:hover { opacity: 1 !important; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+
+/* ── Trace panel (merged Layer 2 + Layer 3) ─────────────────────── */
+.sg-av__layer2 {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 360px; min-width: 240px; max-width: 680px;
+  background: #fff;
+  border-left: 1px solid #e5e7eb;
+  box-shadow: -4px 0 32px rgba(0,0,0,0.08);
+  z-index: 100;
+  display: flex;
+  flex-direction: row;
+  font-size: 0.8125rem;
+  animation: sg-av-slide-in 0.2s ease;
+  overflow: hidden;
+}
+@keyframes sg-av-slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.sg-av-l2__resize-handle {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+}
+.sg-av-l2__resize-handle:hover,
+.sg-av-l2__resize-handle--dragging { background: #3b82f6; }
+.sg-av__layer2-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+.sg-av-l2__header {
+  display: flex;
+  flex-direction: column;
+  padding: 0.75rem 1rem 0.625rem;
+  border-bottom: 1px solid #f3f4f6;
+  flex-shrink: 0;
+  gap: 0.25rem;
+}
+.sg-av-l2__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sg-av-l2__title { font-weight: 600; font-size: 0.875rem; color: #111827; }
+.sg-av-l2__url {
+  font-size: 0.8rem;
+  font-family: ui-monospace, monospace;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.sg-av-l2__actions { display: flex; gap: 0.375rem; align-items: center; }
+.sg-av-l2__newtab {
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.725rem;
+  cursor: pointer;
+  color: #6b7280;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.sg-av-l2__newtab:hover { background: #f9fafb; color: #374151; }
+.sg-av-l2__close {
+  background: none; border: none; cursor: pointer;
+  color: #9ca3af; font-size: 1rem;
+  padding: 0.25rem 0.5rem; border-radius: 0.25rem;
+  transition: color 0.15s, background 0.15s; line-height: 1;
+}
+.sg-av-l2__close:hover { color: #374151; background: #f3f4f6; }
+.sg-av-l2__body { flex: 1; overflow-y: auto; }
+
+/* Meta strip */
+.sg-av-l2__meta {
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+.sg-av-l2__meta > div { display: flex; gap: 0.5rem; align-items: baseline; }
+.sg-av-l2__key { color: #9ca3af; min-width: 52px; flex-shrink: 0; font-size: 0.75rem; }
+.sg-av-l2__val { color: #374151; word-break: break-all; font-size: 0.75rem; }
+.sg-av-l2__val--mono { font-family: ui-monospace, monospace; font-size: 0.7rem; }
+
+/* Timeline bars */
+.sg-av-l2__tl-section {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+.sg-av-l2__section-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+.sg-av-l2__tl-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: #d1d5db;
+  padding-left: 80px;
+  font-family: ui-monospace, monospace;
+  margin-bottom: 0.25rem;
+}
+.sg-av-l2__tl-row {
+  display: grid;
+  grid-template-columns: 76px 1fr 42px;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.2rem;
+}
+.sg-av-l2__tl-label {
+  font-size: 0.65rem;
+  font-family: ui-monospace, monospace;
+  color: #6b7280;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sg-av-l2__tl-track {
+  position: relative;
+  height: 13px;
+  background: #f3f4f6;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.sg-av-l2__tl-bar {
+  position: absolute; top: 0; height: 100%;
+  background: #3b82f6; border-radius: 3px; min-width: 2px;
+}
+.sg-av-l2__tl-bar--active { background: #93c5fd; animation: sg-av-pulse 1s ease-in-out infinite; }
+.sg-av-l2__tl-bar--pending { background: #e5e7eb; min-width: 0; width: 100% !important; }
+@keyframes sg-av-pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+.sg-av-l2__tl-dur {
+  font-size: 0.65rem;
+  font-family: ui-monospace, monospace;
+  color: #9ca3af;
+  text-align: right;
+  white-space: nowrap;
+}
+.sg-av-l2__tl-dur--pending { color: #d1d5db; }
+
+/* Steps table */
+.sg-av-l2__steps-section { border-bottom: 1px solid #f3f4f6; }
+.sg-av-l2__steps { width: 100%; border-collapse: collapse; }
+.sg-av-l2__steps th {
+  text-align: left;
+  padding: 0.4rem 1rem;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  border-bottom: 1px solid #f3f4f6;
+  font-weight: 600;
+}
+.sg-av-l2__steps td { padding: 0.3rem 1rem; border-bottom: 1px solid #f9fafb; }
+.sg-av-l2__step-name { font-family: ui-monospace, monospace; font-size: 0.7rem; color: #374151; }
+.sg-av-l2__step-time { color: #6b7280; white-space: nowrap; font-size: 0.7rem; }
+.sg-av-l2__step-size { color: #9ca3af; white-space: nowrap; font-size: 0.7rem; }
+.sg-av-l2__step-pending { color: #d1d5db; font-size: 0.7rem; font-style: italic; }
+
+/* Objects */
+.sg-av-l2__objects-section { padding: 0.75rem 1rem; border-bottom: 1px solid #f3f4f6; }
+.sg-av-l2__obj {
+  border: 1px solid #f3f4f6;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  margin-top: 0.375rem;
+}
+.sg-av-l2__obj-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: #f9fafb;
+  flex-wrap: wrap;
+}
+.sg-av-l2__obj-role {
+  font-size: 0.65rem; font-family: ui-monospace, monospace;
+  background: #e5e7eb; color: #374151;
+  padding: 0.1rem 0.3rem; border-radius: 0.2rem; flex-shrink: 0;
+}
+.sg-av-l2__obj-id {
+  font-size: 0.7rem; font-family: ui-monospace, monospace; color: #374151;
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.sg-av-l2__obj-size { font-size: 0.65rem; color: #9ca3af; flex-shrink: 0; }
+.sg-av-l2__obj-expand {
+  background: none; border: 1px solid #e5e7eb; border-radius: 0.2rem;
+  padding: 0.1rem 0.3rem; font-size: 0.65rem; cursor: pointer; color: #6b7280;
+  white-space: nowrap; font-family: inherit; transition: all 0.15s; flex-shrink: 0;
+}
+.sg-av-l2__obj-expand:hover { background: #fff; color: #374151; border-color: #d1d5db; }
+.sg-av-l2__obj-preview {
+  margin: 0; padding: 0.5rem 0.75rem;
+  font-size: 0.7rem; font-family: ui-monospace, monospace;
+  white-space: pre-wrap; word-break: break-all;
+  color: #374151; background: #fff; border-top: 1px solid #f3f4f6;
+  max-height: 200px; overflow-y: auto; line-height: 1.5;
+}
+
+/* Badges */
+.sg-av-l2__badges { padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.375rem; }
+.sg-av-l2__badge { font-size: 0.75rem; padding: 0.25rem 0.625rem; border-radius: 0.375rem; }
+.sg-av-l2__badge--ok      { background: #f0fdf4; color: #16a34a; }
+.sg-av-l2__badge--err     { background: #fef2f2; color: #dc2626; }
+.sg-av-l2__badge--loading { background: #eff6ff; color: #3b82f6; }
+
+/* Mobile: bottom sheet */
+@media (max-width: 640px) {
+  .sg-av__layer2 {
+    top: auto; right: 0; left: 0; bottom: 0;
+    width: 100% !important; max-height: 80vh;
+    border-left: none; border-top: 1px solid #e5e7eb;
+    border-radius: 1rem 1rem 0 0;
+    box-shadow: 0 -4px 32px rgba(0,0,0,0.1);
+    animation: sg-av-slide-up 0.2s ease;
+    flex-direction: column;
+  }
+  .sg-av-l2__resize-handle { display: none; }
+  @keyframes sg-av-slide-up {
+    from { transform: translateY(100%); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+}
+`;
+    document.head.appendChild(style);
+  }
+
+  // ── Lifecycle ───────────────────────────────────────────────────────────────
+
+  connectedCallback()        { SgArticleViewer._injectStyles(); this._load(); }
+  attributeChangedCallback() { this._load(); }
+  disconnectedCallback()     { this._revokeBlobUrls(); }
+
+  // ── State ───────────────────────────────────────────────────────────────────
+
   _loadSeq = 0;
+  _trace = null;
+  _loadT0 = 0;
+  _contentEl = null;
+  _reopenerEl = null;
+  _layer1El = null;
+  _layer2El = null;
+  _reopenerFadeTimer = null;
+  _blobUrls = [];
+
+  // ── Structure ───────────────────────────────────────────────────────────────
+
+  _ensureStructure() {
+    if (!this._contentEl) {
+      this._contentEl = document.createElement('div');
+      this._contentEl.className = 'sg-av__content';
+      this.appendChild(this._contentEl);
+    }
+  }
+
+  // ── Load pipeline ───────────────────────────────────────────────────────────
 
   async _load() {
     const vaultId  = this.getAttribute('vault-id');
@@ -41,45 +373,493 @@ class SgArticleViewer extends HTMLElement {
     if (!vaultId || !readKey || !objectId) return;
 
     const seq = ++this._loadSeq;
-    this.innerHTML = '<div class="article-loading" aria-live="polite">Loading…</div>';
+    this._ensureStructure();
+
+    // Build trace object immediately so Layer 2 can read it live during loading
+    const t0 = performance.now();
+    this._loadT0 = t0;
+    const trace = {
+      vault_id:    vaultId,
+      object_id:   objectId,
+      resolved_at: null,
+      total_ms:    null,
+      steps:       [],
+      objects:     [],
+      errors:      [],
+      status:      'loading',
+    };
+    this._trace = trace;
+
+    // Show Layer 1 progress bar (reopener + Layer 2 persistence handled inside)
+    this._showLayer1();
+
+    const stepStart = name => {
+      const start_ms = Math.round(performance.now() - t0);
+      return (opts = {}) => {
+        trace.steps.push({ name, start_ms, end_ms: Math.round(performance.now() - t0), ...opts });
+        this._updateLayer1Progress(name);
+      };
+    };
 
     try {
-      const { importReadKey, readObject } =
+      let endStep;
+
+      endStep = stepStart('module-import');
+      const { importReadKey, fileIdToPath } =
         await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
+      endStep();
+
+      endStep = stepStart('key-import');
       const cryptoKey = await importReadKey(readKey);
-      const buf = await readObject('https://send.sgraph.ai', vaultId, objectId, cryptoKey);
+      endStep();
+
+      // Fetch — TTFB (connect + server + first byte)
+      const objUrl = `https://send.sgraph.ai/api/vault/read/${vaultId}/${encodeURIComponent(fileIdToPath(objectId))}`;
+      endStep = stepStart('fetch');
+      const response = await fetch(objUrl);
+      if (!response.ok) throw new Error(`Failed to fetch object ${objectId}: ${response.status} ${response.statusText}`);
+      endStep();
+
+      // Body — download encrypted bytes
+      endStep = stepStart('fetch-body');
+      const encrypted = await response.arrayBuffer();
+      const size_bytes = encrypted.byteLength;
+      endStep({ size_bytes });
+
+      // Decrypt — AES-256-GCM (IV_LENGTH = 12 bytes, same as vault client)
+      endStep = stepStart('decrypt');
+      const _data = new Uint8Array(encrypted);
+      const buf = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: _data.slice(0, 12) },
+        cryptoKey,
+        _data.slice(12)
+      );
+      endStep({ size_bytes: buf.byteLength });
 
       if (seq !== this._loadSeq) return;
 
       const text = new TextDecoder().decode(buf);
 
+      // Capture decrypted content for Layer 3
+      trace.objects.push({
+        role:       'blob',
+        id:         objectId,
+        size_bytes,
+        preview:    text.slice(0, 1000),
+        full_size:  size_bytes,
+      });
+
+      endStep = stepStart('parse');
       const { meta, body } = parseFrontmatter(text);
+      endStep();
+
       const renderHint = this.getAttribute('render') ?? 'markdown';
       const viewer = meta.viewer ?? (renderHint === 'json' ? 'json' : 'article');
 
       if (viewer === 'article') {
-        await this._renderArticle(meta, body, vaultId, readKey);
+        await this._renderArticle(meta, body, vaultId, readKey, stepStart);
       } else if (viewer === 'json') {
+        const endRender = stepStart('render');
         this._renderJson(text);
+        endRender();
       } else {
-        this.innerHTML = `<p class="article-error">Unknown viewer: "${viewer}"</p>`;
+        this._contentEl.innerHTML = `<p class="article-error">Unknown viewer: "${viewer}"</p>`;
       }
+
+      trace.status      = 'ok';
+      trace.resolved_at = new Date().toISOString();
+      trace.total_ms    = Math.round(performance.now() - t0);
+      this._hideLayer1AndShowReopener();
+
     } catch (err) {
       if (seq !== this._loadSeq) return;
       const msg = err?.message ?? String(err);
-      this.innerHTML = `<p class="article-error">Failed to load content.</p>`;
+      trace.status   = 'error';
+      trace.total_ms = Math.round(performance.now() - t0);
+      trace.errors.push(msg);
+
+      this._contentEl.innerHTML = `<p class="article-error">Failed to load content.</p>`;
       console.error('sg-article-viewer load failed', { objectId, vaultId, err });
       document.dispatchEvent(new CustomEvent('debug:log', {
         detail: { type: 'error', src: 'article-viewer', msg: `${objectId}: ${msg}` },
       }));
+      this._hideLayer1AndShowReopener();
     }
   }
 
-  async _renderArticle(meta, body, vaultId, readKey) {
+  // ── Layer 1 — progress bar ──────────────────────────────────────────────────
+
+  _showLayer1() {
+    this._layer1El = document.createElement('div');
+    this._layer1El.className = 'sg-av-l1';
+    this._layer1El.setAttribute('aria-live', 'polite');
+    this._layer1El.innerHTML = `
+      <div class="sg-av-l1__bar-track">
+        <div class="sg-av-l1__bar" style="width:5%"></div>
+      </div>
+      <div class="sg-av-l1__label">Connecting…</div>`;
+    this._contentEl.innerHTML = '';
+    this._contentEl.appendChild(this._layer1El);
+
+    // Always show reopener from the start of loading (not just after)
+    if (!this._reopenerEl) {
+      this._reopenerEl = document.createElement('button');
+      this._reopenerEl.className = 'sg-av__reopener';
+      this._reopenerEl.setAttribute('aria-label', 'Show content load details');
+      this.appendChild(this._reopenerEl);
+      this._reopenerEl.addEventListener('click', () => this._toggleLayer2());
+    }
+    this._reopenerEl.textContent = '⬡ loading…';
+    this._reopenerEl.classList.add('sg-av__reopener--visible');
+    clearTimeout(this._reopenerFadeTimer);
+
+    // Persist Layer 2 across navigations and reloads
+    if (localStorage.getItem('sg-av-layer2-open') === 'true') {
+      if (!this._layer2El) this._toggleLayer2();
+      else this._refreshLayer2();
+    } else if (this._layer2El) {
+      this._refreshLayer2();
+    }
+  }
+
+  _updateLayer1Progress(completedStep) {
+    if (!this._layer1El) return;
+    const PHASES = {
+      'module-import': { pct: 14, label: 'Loading vault client…' },
+      'key-import':    { pct: 20, label: 'Preparing decryption key…' },
+      'fetch':         { pct: 50, label: 'Waiting for response…' },
+      'fetch-body':    { pct: 68, label: 'Downloading content…' },
+      'decrypt':       { pct: 76, label: 'Decrypting content…' },
+      'parse':         { pct: 82, label: 'Parsing content…' },
+      'import-deps':   { pct: 88, label: 'Loading renderer…' },
+      'md-parse':      { pct: 94, label: 'Parsing markdown…' },
+      'dom-inject':    { pct: 99, label: 'Building DOM…' },
+      'render':        { pct: 97, label: 'Rendering…' },
+    };
+    const phase = PHASES[completedStep];
+    if (!phase) return;
+    const bar   = this._layer1El.querySelector('.sg-av-l1__bar');
+    const label = this._layer1El.querySelector('.sg-av-l1__label');
+    if (bar)   bar.style.width = phase.pct + '%';
+    if (label) label.textContent = phase.label;
+    if (this._layer2El) this._refreshLayer2();
+  }
+
+  _hideLayer1AndShowReopener() {
+    if (this._layer1El) {
+      this._layer1El.style.opacity = '0';
+      const el = this._layer1El;
+      setTimeout(() => { if (el.parentNode) el.remove(); }, 220);
+      this._layer1El = null;
+    }
+
+    // Reopener already exists (created in _showLayer1), just update text
+    if (this._reopenerEl) {
+      const { total_ms, status } = this._trace ?? {};
+      this._reopenerEl.textContent = status === 'ok'
+        ? `⬡ loaded in ${(total_ms / 1000).toFixed(1)}s ↗`
+        : `⬡ load failed ↗`;
+      clearTimeout(this._reopenerFadeTimer);
+      this._reopenerEl.classList.add('sg-av__reopener--visible');
+      this._reopenerFadeTimer = setTimeout(() => {
+        if (this._reopenerEl) this._reopenerEl.classList.remove('sg-av__reopener--visible');
+      }, 5000);
+    }
+
+    if (this._layer2El) this._refreshLayer2();
+  }
+
+  // ── Trace panel (merged) ────────────────────────────────────────────────────
+
+  _toggleLayer2() {
+    if (this._layer2El) {
+      this._layer2El.remove();
+      this._layer2El = null;
+      localStorage.removeItem('sg-av-layer2-open');
+      return;
+    }
+    localStorage.setItem('sg-av-layer2-open', 'true');
+
+    const panel = document.createElement('div');
+    panel.className = 'sg-av__layer2';
+
+    const savedWidth = localStorage.getItem('sg-av-layer2-width');
+    if (savedWidth) panel.style.width = savedWidth;
+
+    panel.innerHTML = `
+      <div class="sg-av-l2__resize-handle"></div>
+      <div class="sg-av__layer2-inner">
+        <div class="sg-av-l2__header">
+          <div class="sg-av-l2__header-row">
+            <span class="sg-av-l2__title">Content load</span>
+            <div class="sg-av-l2__actions">
+              <button class="sg-av-l2__newtab">open in new tab &#8599;</button>
+              <button class="sg-av-l2__close" aria-label="Close">&#10005;</button>
+            </div>
+          </div>
+          <span class="sg-av-l2__url">${escHtml(window.location.pathname)}</span>
+        </div>
+        <div class="sg-av-l2__body"></div>
+      </div>`;
+
+    this._layer2El = panel;
+    document.body.appendChild(panel);
+
+    panel.querySelector('.sg-av-l2__close').addEventListener('click', () => this._toggleLayer2());
+    panel.querySelector('.sg-av-l2__newtab').addEventListener('click', () => {
+      const trace = this._trace;
+      if (!trace) return;
+      const html = this._buildTracePageHtml(trace);
+      const blob = new Blob([html], { type: 'text/html' });
+      const url  = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    });
+
+    this._initResizeHandle(panel);
+    this._refreshLayer2();
+  }
+
+  _refreshLayer2() {
+    if (!this._layer2El) return;
+    const trace = this._trace;
+    if (!trace) return;
+
+    const body = this._layer2El.querySelector('.sg-av-l2__body');
+    if (!body) return;
+
+    // Keep URL current on SPA navigations
+    const urlEl = this._layer2El.querySelector('.sg-av-l2__url');
+    if (urlEl) urlEl.textContent = window.location.pathname;
+
+    const isLoading = trace.status === 'loading';
+    const elapsed   = isLoading ? Math.round(performance.now() - this._loadT0) : (trace.total_ms ?? 0);
+
+    // Preserve expand states before rebuilding
+    const expanded = new Set();
+    body.querySelectorAll('.sg-av-l2__obj-preview:not([hidden])').forEach(pre => {
+      if (pre.id) expanded.add(pre.id);
+    });
+
+    // All known step names in order
+    const ALL_STEPS = ['module-import','key-import','fetch','fetch-body','decrypt','parse','import-deps','md-parse','dom-inject','render'];
+    const doneNames = new Set(trace.steps.map(s => s.name));
+    const totalMs   = isLoading ? Math.max(elapsed, 1) : Math.max(trace.total_ms ?? 1, 1);
+
+    // Timeline bars
+    const scaleHtml = `
+      <div class="sg-av-l2__tl-scale">
+        <span>0ms</span><span>${Math.round(totalMs / 2)}ms</span><span>${totalMs}ms</span>
+      </div>`;
+
+    const visibleSteps = isLoading
+      ? ALL_STEPS.filter(n => doneNames.has(n) || n === [...ALL_STEPS].find(x => !doneNames.has(x)))
+      : trace.steps.map(s => s.name);
+
+    const tlRows = visibleSteps.map(name => {
+      const step = trace.steps.find(s => s.name === name);
+      if (!step) {
+        // Currently running step
+        return `<div class="sg-av-l2__tl-row">
+          <span class="sg-av-l2__tl-label">${escHtml(name)}</span>
+          <div class="sg-av-l2__tl-track"><div class="sg-av-l2__tl-bar sg-av-l2__tl-bar--active" style="left:0%;width:40%"></div></div>
+          <span class="sg-av-l2__tl-dur sg-av-l2__tl-dur--pending">…</span>
+        </div>`;
+      }
+      const left  = Math.round((step.start_ms / totalMs) * 100);
+      const width = Math.max(1, Math.round(((step.end_ms - step.start_ms) / totalMs) * 100));
+      const dur   = step.end_ms - step.start_ms;
+      return `<div class="sg-av-l2__tl-row">
+        <span class="sg-av-l2__tl-label">${escHtml(name)}</span>
+        <div class="sg-av-l2__tl-track"><div class="sg-av-l2__tl-bar" style="left:${left}%;width:${width}%"></div></div>
+        <span class="sg-av-l2__tl-dur">${dur}ms</span>
+      </div>`;
+    }).join('');
+
+    // Steps table
+    const allStepNames = isLoading ? ALL_STEPS : ALL_STEPS.filter(n => doneNames.has(n));
+    const stepRows = allStepNames.map(name => {
+      const step = trace.steps.find(s => s.name === name);
+      if (!step) {
+        const isCurrent = name === allStepNames.find(x => !doneNames.has(x));
+        return `<tr>
+          <td class="sg-av-l2__step-name">${escHtml(name)}</td>
+          <td class="${isCurrent ? 'sg-av-l2__step-pending' : 'sg-av-l2__step-time'}">${isCurrent ? '…' : ''}</td>
+          <td></td>
+        </tr>`;
+      }
+      const dur     = step.end_ms - step.start_ms;
+      const sizeStr = step.size_bytes != null ? formatBytes(step.size_bytes) : '';
+      return `<tr>
+        <td class="sg-av-l2__step-name">${escHtml(name)}</td>
+        <td class="sg-av-l2__step-time">${dur} ms</td>
+        <td class="sg-av-l2__step-size">${escHtml(sizeStr)}</td>
+      </tr>`;
+    }).join('');
+
+    // Objects
+    const objectsHtml = trace.objects.length ? `
+      <div class="sg-av-l2__objects-section">
+        <div class="sg-av-l2__section-label">Objects</div>
+        ${trace.objects.map((obj, i) => {
+          const previewId = `sg-av-l2-obj-${i}`;
+          const hasPreview = !!obj.preview;
+          const isOpen = expanded.has(previewId);
+          return `<div class="sg-av-l2__obj">
+            <div class="sg-av-l2__obj-header">
+              <span class="sg-av-l2__obj-role">${escHtml(obj.role)}</span>
+              <span class="sg-av-l2__obj-id">${escHtml(obj.id)}</span>
+              ${obj.size_bytes != null ? `<span class="sg-av-l2__obj-size">${escHtml(formatBytes(obj.size_bytes))}</span>` : ''}
+              ${hasPreview ? `<button class="sg-av-l2__obj-expand" data-target="${previewId}">${isOpen ? 'close ✕' : 'view &#8599;'}</button>` : ''}
+            </div>
+            ${hasPreview ? `<pre class="sg-av-l2__obj-preview" id="${previewId}"${isOpen ? '' : ' hidden'}>${escHtml(obj.preview)}${obj.full_size > 1000 ? '\n… (' + formatBytes(obj.full_size) + ' total)' : ''}</pre>` : ''}
+          </div>`;
+        }).join('')}
+      </div>` : '';
+
+    // Badge
+    const badge = isLoading
+      ? `<div class="sg-av-l2__badge sg-av-l2__badge--loading">&#9679; loading…</div>`
+      : trace.errors.length === 0
+        ? `<div class="sg-av-l2__badge sg-av-l2__badge--ok">&#10003; No errors</div>`
+        : `<div class="sg-av-l2__badge sg-av-l2__badge--err">&#10007; ${trace.errors.length} error(s)</div>`;
+
+    // Error detail
+    const errHtml = trace.errors.length
+      ? trace.errors.map(e => `<div style="font-size:0.7rem;font-family:ui-monospace,monospace;background:#fef2f2;color:#dc2626;padding:0.5rem 1rem;margin-top:0.375rem;border-radius:0.375rem">${escHtml(e)}</div>`).join('')
+      : '';
+
+    body.innerHTML = `
+      <div class="sg-av-l2__meta">
+        <div><span class="sg-av-l2__key">vault</span><span class="sg-av-l2__val sg-av-l2__val--mono">${escHtml(trace.vault_id ?? '—')}</span></div>
+        <div><span class="sg-av-l2__key">object</span><span class="sg-av-l2__val sg-av-l2__val--mono">${escHtml(trace.object_id ?? '—')}</span></div>
+        <div><span class="sg-av-l2__key">total</span><span class="sg-av-l2__val">${isLoading ? elapsed + ' ms…' : (trace.total_ms ?? '—') + ' ms'}</span></div>
+        ${trace.resolved_at ? `<div><span class="sg-av-l2__key">loaded</span><span class="sg-av-l2__val">${new Date(trace.resolved_at).toUTCString()}</span></div>` : ''}
+      </div>
+      <div class="sg-av-l2__tl-section">
+        <div class="sg-av-l2__section-label">Timeline &mdash; ${isLoading ? elapsed + 'ms…' : totalMs + 'ms total'}</div>
+        ${scaleHtml}
+        ${tlRows}
+      </div>
+      <div class="sg-av-l2__steps-section">
+        <table class="sg-av-l2__steps">
+          <thead><tr><th>Step</th><th>Time</th><th>Size</th></tr></thead>
+          <tbody>${stepRows}</tbody>
+        </table>
+      </div>
+      ${objectsHtml}
+      <div class="sg-av-l2__badges">${badge}${errHtml}</div>`;
+
+    // Re-wire object expand buttons
+    body.querySelectorAll('.sg-av-l2__obj-expand').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pre = body.querySelector(`#${btn.dataset.target}`);
+        if (!pre) return;
+        pre.hidden = !pre.hidden;
+        btn.innerHTML = pre.hidden ? 'view &#8599;' : 'close ✕';
+        if (!pre.hidden) pre.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    });
+  }
+
+  _initResizeHandle(panel) {
+    const handle = panel.querySelector('.sg-av-l2__resize-handle');
+    if (!handle) return;
+    let startX, startWidth;
+    const onMove = e => {
+      const newWidth = Math.max(240, Math.min(680, startWidth + (startX - e.clientX)));
+      panel.style.width = newWidth + 'px';
+    };
+    const onUp = () => {
+      handle.classList.remove('sg-av-l2__resize-handle--dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      localStorage.setItem('sg-av-layer2-width', panel.style.width);
+    };
+    handle.addEventListener('mousedown', e => {
+      e.preventDefault();
+      startX = e.clientX;
+      startWidth = panel.offsetWidth;
+      handle.classList.add('sg-av-l2__resize-handle--dragging');
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  _buildTracePageHtml(trace) {
+    const stepsRows = trace.steps.map(s => `
+      <tr>
+        <td>${escHtml(s.name)}</td>
+        <td>${s.start_ms}ms</td>
+        <td>${s.end_ms}ms</td>
+        <td>${s.end_ms - s.start_ms}ms</td>
+        <td>${s.size_bytes != null ? formatBytes(s.size_bytes) : ''}</td>
+        <td>${s.error ? escHtml(s.error) : ''}</td>
+      </tr>`).join('');
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>sg-article-viewer trace &mdash; ${escHtml(trace.object_id)}</title>
+  <style>
+    body{font-family:system-ui,sans-serif;max-width:960px;margin:2rem auto;padding:0 1.25rem;color:#111;line-height:1.5}
+    h1{font-size:1rem;color:#374151;margin:0 0 1.5rem}
+    h2{font-size:0.6875rem;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;font-weight:600;margin:2rem 0 .5rem}
+    .meta{display:grid;grid-template-columns:110px 1fr;gap:.25rem .5rem;font-size:.875rem;margin-bottom:.5rem}
+    .key{color:#9ca3af}
+    .mono{font-family:ui-monospace,monospace;font-size:.8125rem}
+    table{width:100%;border-collapse:collapse;font-size:.8125rem}
+    th{text-align:left;padding:.375rem .5rem;background:#f9fafb;font-weight:600;border-bottom:1px solid #e5e7eb}
+    td{padding:.375rem .5rem;border-bottom:1px solid #f3f4f6;font-family:ui-monospace,monospace}
+    pre{background:#f9fafb;padding:1rem;border-radius:.5rem;overflow-x:auto;font-size:.8rem;line-height:1.5;white-space:pre-wrap;word-break:break-all}
+    .badge-ok{display:inline-block;background:#f0fdf4;color:#16a34a;padding:.125rem .5rem;border-radius:.25rem;font-size:.8rem}
+    .badge-err{display:inline-block;background:#fef2f2;color:#dc2626;padding:.125rem .5rem;border-radius:.25rem;font-size:.8rem}
+  </style>
+</head>
+<body>
+  <h1>Request trace &mdash; ${escHtml(trace.object_id)}</h1>
+  <div class="meta">
+    <span class="key">vault</span>    <span class="mono">${escHtml(trace.vault_id)}</span>
+    <span class="key">object</span>   <span class="mono">${escHtml(trace.object_id)}</span>
+    <span class="key">status</span>   <span>${escHtml(trace.status)}</span>
+    <span class="key">total</span>    <span>${trace.total_ms ?? '—'}ms</span>
+    <span class="key">resolved</span> <span>${trace.resolved_at ?? '—'}</span>
+  </div>
+  <span class="${trace.errors.length === 0 ? 'badge-ok' : 'badge-err'}">
+    ${trace.errors.length === 0 ? '&#10003; No errors' : `&#10007; ${trace.errors.length} error(s)`}
+  </span>
+  <h2>Steps</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Start</th><th>End</th><th>Duration</th><th>Size</th><th>Error</th></tr></thead>
+    <tbody>${stepsRows}</tbody>
+  </table>
+  ${trace.objects.length ? `
+  <h2>Objects</h2>
+  ${trace.objects.map(o => `
+    <h3 style="font-size:.8125rem;font-weight:600;color:#374151;margin:1rem 0 .25rem">
+      ${escHtml(o.role)} &mdash; ${escHtml(o.id)}
+      ${o.size_bytes != null ? `<span style="color:#9ca3af;font-weight:400"> (${escHtml(formatBytes(o.size_bytes))})</span>` : ''}
+    </h3>
+    <pre>${escHtml(o.preview ?? '')}${o.full_size > 1000 ? '\n…' : ''}</pre>`).join('')}` : ''}
+  ${trace.errors.length ? `
+  <h2>Errors</h2>
+  <pre style="background:#fef2f2;color:#dc2626">${trace.errors.map(e => escHtml(e)).join('\n')}</pre>` : ''}
+</body>
+</html>`;
+  }
+
+  // ── Renderers ───────────────────────────────────────────────────────────────
+
+  async _renderArticle(meta, body, vaultId, readKey, stepStart) {
+    const endImport = stepStart('import-deps');
     const [{ marked }, yamlLoad] = await Promise.all([
       import('https://cdn.jsdelivr.net/npm/marked@9/+esm'),
       _loadYaml(),
     ]);
+    endImport();
+
+    const endParse = stepStart('md-parse');
 
     const renderer = new marked.Renderer();
 
@@ -117,14 +897,17 @@ class SgArticleViewer extends HTMLElement {
 
     marked.use({ renderer });
 
-    const metaHtml  = renderMetaStrip(meta);
-    const bodyHtml  = marked.parse(applyFencedBlocks(applyTokens(body), yamlLoad));
+    const metaHtml = renderMetaStrip(meta);
+    const bodyHtml = marked.parse(applyFencedBlocks(applyTokens(body), yamlLoad));
+    endParse();
 
-    this.innerHTML = `
+    const endDom = stepStart('dom-inject');
+    this._contentEl.innerHTML = `
       <div class="article-viewer">
         ${metaHtml}
         <div class="article-body">${bodyHtml}</div>
       </div>`;
+    endDom();
 
     document.dispatchEvent(new CustomEvent('viewer:rendered', {
       detail: { meta },
@@ -137,7 +920,7 @@ class SgArticleViewer extends HTMLElement {
     let data;
     try { data = JSON.parse(text); }
     catch {
-      this.innerHTML = `<div class="article-viewer"><div class="article-body"><pre class="article-json-raw">${escHtml(text)}</pre></div></div>`;
+      this._contentEl.innerHTML = `<div class="article-viewer"><div class="article-body"><pre class="article-json-raw">${escHtml(text)}</pre></div></div>`;
       return;
     }
 
@@ -160,7 +943,7 @@ class SgArticleViewer extends HTMLElement {
 
     const rawHtml = escHtml(JSON.stringify(data, null, 2));
 
-    this.innerHTML = `
+    this._contentEl.innerHTML = `
       <div class="article-viewer">
         <div class="article-body">
           <div class="json-view-toggle">
@@ -242,7 +1025,7 @@ class SgArticleViewer extends HTMLElement {
 
   _workstreamsHtml(data) {
     const workstreams = data.workstreams ?? [];
-    const statusIcon = s => ({ done: '✅', 'in-progress': '🔄', next: '🔄', queued: '⏳', pending: '⏳' }[s?.toLowerCase()] ?? '·');
+    const statusIcon = s => ({ done: '&#10003;', 'in-progress': '&#8635;', next: '&#8635;', queued: '&#8987;', pending: '&#8987;' }[s?.toLowerCase()] ?? '&middot;');
     return `
       <h1>Workstreams</h1>
       <div class="workstreams-list">
@@ -278,13 +1061,12 @@ class SgArticleViewer extends HTMLElement {
   _kanbanHtml(data) {
     const workstreams = data.workstreams ?? [];
     const columns = [
-      { key: 'queued',      label: 'Queued',      icon: '⏳' },
-      { key: 'next',        label: 'Up Next',     icon: '🔜' },
-      { key: 'in-progress', label: 'In Progress', icon: '🔄' },
-      { key: 'done',        label: 'Done',         icon: '✅' },
+      { key: 'queued',      label: 'Queued',      icon: '&#8987;' },
+      { key: 'next',        label: 'Up Next',     icon: '&#8594;' },
+      { key: 'in-progress', label: 'In Progress', icon: '&#8635;' },
+      { key: 'done',        label: 'Done',         icon: '&#10003;' },
     ];
 
-    // Collect all tasks across workstreams, tagged with workstream metadata
     const allTasks = workstreams.flatMap(ws =>
       (ws.tasks ?? []).map(t => ({
         ...t,
@@ -298,7 +1080,7 @@ class SgArticleViewer extends HTMLElement {
       const tasks = allTasks.filter(t =>
         (t.status ?? '').toLowerCase().replace(/\s+/g, '-') === col.key
       );
-      if (!tasks.length && col.key === 'next') return ''; // hide if empty
+      if (!tasks.length && col.key === 'next') return '';
       const cards = tasks.map(t => `
         <div class="kanban-card" style="--ws-color:${escHtml(t._wsColor)}">
           <div class="kanban-card__ws">${escHtml(t._wsTitle)}</div>
@@ -313,7 +1095,7 @@ class SgArticleViewer extends HTMLElement {
             <span class="kanban-col__label">${col.label}</span>
             <span class="kanban-col__count">${tasks.length}</span>
           </div>
-          <div class="kanban-col__cards">${cards || '<div class="kanban-col__empty">—</div>'}</div>
+          <div class="kanban-col__cards">${cards || '<div class="kanban-col__empty">&mdash;</div>'}</div>
         </div>`;
     }).filter(Boolean).join('');
 
@@ -341,7 +1123,7 @@ class SgArticleViewer extends HTMLElement {
       const cls = (p ?? '').toLowerCase();
       return `<span class="issue-priority issue-priority--${escHtml(cls)}">${escHtml(p ?? '')}</span>`;
     };
-    const statusIcon = s => ({ open: '🔴', 'in-progress': '🟡', closed: '🟢', blocked: '⛔' }[s?.toLowerCase()] ?? '·');
+    const statusIcon = s => ({ open: '&#128308;', 'in-progress': '&#128993;', closed: '&#128994;', blocked: '&#9940;' }[s?.toLowerCase()] ?? '&middot;');
 
     const rows = sorted.map(issue => `
       <div class="issue-row issue-row--${escHtml((issue.status ?? '').toLowerCase())}">
@@ -362,13 +1144,13 @@ class SgArticleViewer extends HTMLElement {
       <h1>Issues</h1>
       <div class="issues-summary">
         <span class="issues-summary__stat">${open} open</span>
-        <span class="issues-summary__sep">·</span>
+        <span class="issues-summary__sep">&middot;</span>
         <span class="issues-summary__stat issues-summary__stat--muted">${closed} closed</span>
       </div>
       <div class="issues-list">${rows || '<p>No issues.</p>'}</div>`;
   }
 
-  _blobUrls = [];
+  // ── Image resolution ────────────────────────────────────────────────────────
 
   async _resolveVaultImages(vaultId, readKey) {
     const imgs = Array.from(this.querySelectorAll('img[data-vault-obj]'));
@@ -452,7 +1234,7 @@ function renderMetaStrip(meta) {
   }
 
   if (!parts.length) return '';
-  return `<div class="article-meta">${parts.join('<span class="article-meta__sep">·</span>')}</div>`;
+  return `<div class="article-meta">${parts.join('<span class="article-meta__sep">&middot;</span>')}</div>`;
 }
 
 function sniffMime(bytes) {
@@ -471,29 +1253,10 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-// Token replacement — pre-processing pass on raw markdown body.
-// Supported tokens (must be on a single line):
-//   {{screenshot: id | title | description | dimensions}}
-function applyTokens(body) {
-  return body.replace(
-    /\{\{screenshot:\s*([^|\n}]+?)(?:\s*\|\s*([^|\n}]*?))?(?:\s*\|\s*([^|\n}]*?))?(?:\s*\|\s*([^|\n}]*?))?\s*\}\}/g,
-    (_, id, title, desc, dims) => {
-      id    = (id    ?? '').trim();
-      title = (title ?? '').trim();
-      desc  = (desc  ?? '').trim();
-      dims  = (dims  ?? '').trim();
-      const dimsLabel = dims ? dims.replace(/x/i, '×') : '';
-      const badge = dimsLabel ? `[ SCREENSHOT NEEDED ]  ~ ${dimsLabel}` : '[ SCREENSHOT NEEDED ]';
-      return `<div class="screenshot-placeholder" data-screenshot-id="${escHtml(id)}">` +
-             `<div class="screenshot-placeholder__header">` +
-             `<span class="screenshot-placeholder__icon">📷</span>` +
-             `<span class="screenshot-placeholder__title">${escHtml(title)}</span>` +
-             `</div>` +
-             (desc ? `<div class="screenshot-placeholder__desc">${escHtml(desc)}</div>` : '') +
-             `<div class="screenshot-placeholder__badge">${escHtml(badge)}</div>` +
-             `</div>`;
-    }
-  );
+function formatBytes(bytes) {
+  if (bytes < 1024)       return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 // ── YAML loader (cached) ──────────────────────────────────────────────────────
@@ -534,6 +1297,31 @@ function applyFencedBlocks(body, yamlLoad) {
     }
   );
 }
+
+// ── Token replacement ─────────────────────────────────────────────────────────
+function applyTokens(body) {
+  return body.replace(
+    /\{\{screenshot:\s*([^|\n}]+?)(?:\s*\|\s*([^|\n}]*?))?(?:\s*\|\s*([^|\n}]*?))?(?:\s*\|\s*([^|\n}]*?))?\s*\}\}/g,
+    (_, id, title, desc, dims) => {
+      id    = (id    ?? '').trim();
+      title = (title ?? '').trim();
+      desc  = (desc  ?? '').trim();
+      dims  = (dims  ?? '').trim();
+      const dimsLabel = dims ? dims.replace(/x/i, '\xd7') : '';
+      const badge = dimsLabel ? `[ SCREENSHOT NEEDED ]  ~ ${dimsLabel}` : '[ SCREENSHOT NEEDED ]';
+      return `<div class="screenshot-placeholder" data-screenshot-id="${escHtml(id)}">` +
+             `<div class="screenshot-placeholder__header">` +
+             `<span class="screenshot-placeholder__icon">&#128247;</span>` +
+             `<span class="screenshot-placeholder__title">${escHtml(title)}</span>` +
+             `</div>` +
+             (desc ? `<div class="screenshot-placeholder__desc">${escHtml(desc)}</div>` : '') +
+             `<div class="screenshot-placeholder__badge">${escHtml(badge)}</div>` +
+             `</div>`;
+    }
+  );
+}
+
+// ── Fenced-block renderers ────────────────────────────────────────────────────
 
 function renderComparison(data) {
   const col = side => {
@@ -596,7 +1384,7 @@ function renderChecklist(data) {
   const items = (data.items ?? []).map(item => {
     const done = item.done === true;
     return `<li class="check-item ${done ? 'check-item--done' : 'check-item--todo'}">
-      <span class="check-item__icon">${done ? '✅' : '⬜'}</span>
+      <span class="check-item__icon">${done ? '&#10003;' : '&#9633;'}</span>
       <div class="check-item__body">
         <div class="check-item__label">${escHtml(item.label ?? '')}</div>
         ${item.detail ? `<div class="check-item__detail">${escHtml(item.detail)}</div>` : ''}
