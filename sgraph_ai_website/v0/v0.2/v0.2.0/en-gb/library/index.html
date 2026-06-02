@@ -82,6 +82,15 @@
     </sg-side-nav>
   </div>
 
+  <!-- Loading state — shown while nav/vault cold-starts, hidden after nav:loaded -->
+  <div class="sub-site__loading" id="loading-state">
+    <div class="sg-loading">
+      <div class="sg-loading__spinner" aria-hidden="true"></div>
+      <p class="sg-loading__title">Loading library…</p>
+      <p class="sg-loading__sub" id="loading-sub">Connecting to vault</p>
+    </div>
+  </div>
+
   <!-- Landing page — shown at /en-gb/library/ (no article selected) -->
   <div class="sub-site__landing" id="landing" hidden>
     <p class="sub-site__landing-eyebrow">sgraph.ai / Library</p>
@@ -185,10 +194,41 @@
   let allSections = [];
   let headingObserver = null;
 
+  const loadingEl  = document.getElementById('loading-state');
+  const loadingSub = document.getElementById('loading-sub');
+
+  // Progress messages for the cold-start wait — keeps the user informed
+  const _loadMsgs = ['Connecting to vault', 'Fetching nav tree', 'Decrypting content', 'Almost there…'];
+  let _loadMsgIdx = 0;
+  const _loadMsgTimer = setInterval(() => {
+    _loadMsgIdx = Math.min(_loadMsgIdx + 1, _loadMsgs.length - 1);
+    if (loadingSub) loadingSub.textContent = _loadMsgs[_loadMsgIdx];
+  }, 3000);
+
+  // If nav hasn't loaded after 20 s show an error (lambda timeout / network issue)
+  const _loadTimeout = setTimeout(() => {
+    clearInterval(_loadMsgTimer);
+    if (!loadingEl.hidden) {
+      if (loadingSub) loadingSub.textContent = '';
+      loadingEl.querySelector('.sg-loading__title').textContent = 'Could not load library';
+      loadingEl.innerHTML += `
+        <p class="sg-loading__error">The library vault is taking too long to respond.
+          This can happen after a period of inactivity.</p>
+        <button class="sg-loading__retry" onclick="location.reload()">Try again</button>`;
+    }
+  }, 20000);
+
+  function hideLoading() {
+    clearInterval(_loadMsgTimer);
+    clearTimeout(_loadTimeout);
+    loadingEl.hidden = true;
+  }
+
   const initialSlug = slugFromPath();
   if (initialSlug) sideNav.setAttribute('active-slug', initialSlug);
 
   document.addEventListener('nav:loaded', e => {
+    hideLoading();
     const { sections } = e.detail;
     allSections = sections;
     // Flatten into a linear reading order: each section's articles, and for any
