@@ -5,7 +5,7 @@
  *   { v, id, label, keys[], children[{ keys[], label, ref }], articles[{ slug, title, keys[], snippet }] }
  *
  * The client loads only the nodes whose keys match the query (lazy, parallel).
- * Fuse.js is lazy-loaded from vendor/fuse.mjs on first keypress.
+ * Fuse.js is lazy-loaded from vendor/fuse.js on first keypress.
  *
  * Attributes:
  *   root-url   — URL (absolute path) to the root node JSON, e.g. /en-gb/library/search/root.json
@@ -18,7 +18,7 @@
  */
 
 const FUSE_URL = new URL(
-  '../../../../../vendor/fuse.mjs',
+  '../../../../../vendor/fuse.js',
   import.meta.url
 ).href;
 
@@ -215,13 +215,20 @@ class SgSearch extends HTMLElement {
 
     this._resultsList.innerHTML = '<li class="sg-search__loading">Searching…</li>';
 
-    const root = await this._loadRootNode();
-    if (!root) {
-      this._resultsList.innerHTML = '<li class="sg-search__empty">Could not load search index.</li>';
+    let root, results;
+    try {
+      root = await this._loadRootNode();
+      if (!root) throw new Error('search index unavailable');
+      results = await this._searchNode(query, root, 0, new Set());
+    } catch (err) {
+      console.error('[sg-search]', err);
+      if (this._resultsList) {
+        this._resultsList.innerHTML = `<li class="sg-search__empty">Search unavailable — ${escHtml(err.message)}</li>`;
+      }
       return;
     }
 
-    const results = await this._searchNode(query, root, 0, new Set());
+    if (this._currentQuery !== query) return; // stale (new query arrived while searching)
 
     // Deduplicate by slug, preserve best (lowest) score
     const seen = new Map();
@@ -230,8 +237,6 @@ class SgSearch extends HTMLElement {
       if (!prev || r._score < prev._score) seen.set(r.slug, r);
     }
     const deduped = [...seen.values()].sort((a, b) => (a._score ?? 1) - (b._score ?? 1));
-
-    if (this._currentQuery !== query) return; // stale
 
     if (!deduped.length) {
       this._resultsList.innerHTML = `<li class="sg-search__empty">No results for <strong>${escHtml(query)}</strong></li>`;
