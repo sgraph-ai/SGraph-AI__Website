@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Library — sgraph.ai</title>
-  <base href="/en-gb/library/">
+  <title>Invest in SGraph — sgraph.ai</title>
+  <base href="/en-gb/invest/">
   <link rel="icon"       href="../../_common/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,7 +22,6 @@
   </script>
 
   <script type="module" src="../../_common/js/components/sg-article-viewer/v0/v0.1/v0.1.0/sg-article-viewer.js"></script>
-  <script type="module" src="../../_common/js/components/sg-search/v0/v0.1/v0.1.0/sg-search.js"></script>
 </head>
 <body class="sub-site-page">
 
@@ -31,71 +30,51 @@
   <div slot="locale" id="locale-picker"></div>
 </sg-site-header>
 
-<!-- Gap between dark site header and light sub-site shell -->
 <div class="sub-site-gap"></div>
 
-<!-- ═══ LIBRARY SUB-SITE BAND ════════════════════════════════ -->
+<!-- ═══ INVEST SUB-SITE BAND ══════════════════════════════════ -->
 <!--
-  Vault: pmcv9tfe  |  nav resolved at runtime via tree walk: library/_nav.json
-  (Approach A — no hardcoded nav-object-id; vault-client v1.2.2 resolves HEAD → tree → blob_id)
+  Vault: ub9jj0gq  |  nav: _nav.json (vault root)
+  Not linked from main site nav — direct URL only.
 -->
 <sg-sub-nav
-  site-title="Library"
-  site-description="A growing public knowledge base. How sgraph.ai delivers content from encrypted vaults — the cryptography, the components, and the trust boundaries."
-  vault-id="pmcv9tfe"
-  read-key="dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw"
-  nav-path="library/_nav.json">
+  site-title="Invest in SGraph"
+  site-description="Investment opportunity — zero-knowledge encrypted file transfer, built and operated by one person and an agentic team."
+  vault-id="ub9jj0gq"
+  read-key="fJaOQDUcy2QCXSJzfmspg6tCFP94d253qD2NXyxQBeM"
+  nav-path="_nav.json">
 </sg-sub-nav>
 
 <!-- ═══ THREE-COLUMN SHELL ════════════════════════════════════ -->
-<!--
-  Col 1: sg-side-nav (sticky file-tree)
-  Col 2: landing page OR article content
-  Col 3: article TOC (hidden on landing, shown with .with-toc class when article has headings)
--->
 <div class="sub-site" id="sub-site-shell">
 
-  <!-- Left column: search bar + nav tree -->
+  <!-- Left column: nav tree (no search — small section) -->
   <div class="sub-site__sidebar">
-    <div class="sub-site__search-bar">
-      <sg-search
-        id="sg-search"
-        root-url="/en-gb/library/search/root.json"
-        vault-id="pmcv9tfe"
-        read-key="dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw"
-        placeholder="Search library…">
-      </sg-search>
-    </div>
     <sg-side-nav
-      vault-id="pmcv9tfe"
-      read-key="dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw"
-      nav-path="library/_nav.json"
-      tree-label="Library"
+      vault-id="ub9jj0gq"
+      read-key="fJaOQDUcy2QCXSJzfmspg6tCFP94d253qD2NXyxQBeM"
+      nav-path="_nav.json"
+      tree-label="Invest"
       version="v0.2.0"
-      home-href="/en-gb/library/"
-      auto-select
-      extra-links="[
-        {&quot;section&quot;:&quot;Blog&quot;,&quot;title&quot;:&quot;Introducing @Journalist&quot;,&quot;slug&quot;:&quot;blog/introducing-journalist&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-684e59d65e77a25d6846245eee2291e9a1767860ef80dcb6351e4e78607ad123&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;},
-        {&quot;section&quot;:&quot;Blog&quot;,&quot;title&quot;:&quot;Agentics London Session&quot;,&quot;slug&quot;:&quot;blog/agentics-london-session&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-77c47abb9be86ebfcd7f826f275856f8849914377aa9dab015145c1a9af1cf8e&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;},
-        {&quot;section&quot;:&quot;What&#39;s New&quot;,&quot;title&quot;:&quot;Team Expansion — Seven Agents&quot;,&quot;slug&quot;:&quot;whats-new/team-expansion-seven-agents&quot;,&quot;object_id&quot;:&quot;obj-cas-imm-f678dd3857795479a88c8064c138330732c9ff2ee9ed8d4782904af861847355&quot;,&quot;vault_id&quot;:&quot;d3o9s0ff&quot;,&quot;read_key&quot;:&quot;nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI&quot;,&quot;render&quot;:&quot;markdown&quot;}
-      ]">
+      home-href="/en-gb/invest/"
+      auto-select>
     </sg-side-nav>
   </div>
 
-  <!-- Loading state — shown while nav/vault cold-starts, hidden after nav:loaded -->
+  <!-- Loading state — shown while vault cold-starts -->
   <div class="sub-site__loading" id="loading-state">
     <div class="sg-loading">
       <div class="sg-loading__spinner" aria-hidden="true"></div>
-      <p class="sg-loading__title">Loading library…</p>
+      <p class="sg-loading__title">Loading…</p>
       <p class="sg-loading__sub" id="loading-sub">Connecting to vault</p>
     </div>
   </div>
 
-  <!-- Landing page — shown at /en-gb/library/ (no article selected) -->
+  <!-- Landing page — shown at /en-gb/invest/ (no article selected) -->
   <div class="sub-site__landing" id="landing" hidden>
-    <p class="sub-site__landing-eyebrow">sgraph.ai / Library</p>
-    <h1 class="sub-site__landing-title">Library</h1>
-    <p class="sub-site__landing-desc">Technical knowledge base — how sgraph.ai works, the underlying concepts, security model, and integration guides.</p>
+    <p class="sub-site__landing-eyebrow">sgraph.ai / Invest</p>
+    <h1 class="sub-site__landing-title">Invest in SGraph</h1>
+    <p class="sub-site__landing-desc">Zero-knowledge encrypted file transfer — built and operated by one person and an agentic team. Read the opportunity, the numbers, and the ask.</p>
     <div class="sub-site__section-cards" id="landing-sections"></div>
     <p class="sub-site__landing-stats" id="landing-stats" hidden></p>
   </div>
@@ -107,7 +86,7 @@
     <div class="sub-site__next-prev" id="next-prev"></div>
   </div>
 
-  <!-- Right TOC — built from rendered article headings, hidden until populated -->
+  <!-- Right TOC -->
   <div class="sub-site__toc" id="article-toc" hidden>
     <button class="sub-site__toc-toggle" id="toc-toggle" title="Toggle table of contents"></button>
     <div class="sub-site__toc-label">On this page</div>
@@ -118,18 +97,20 @@
 
 <footer class="sub-site-footer">
   <span class="sub-site-footer__copy">© 2026 SGraph AI Ltd.</span>
-  <span class="sub-site-footer__meta">sgraph.ai/library · site v0.2.0 · nav: dynamic (library/_nav.json)</span>
+  <span class="sub-site-footer__meta">sgraph.ai/invest · site v0.2.0 · vault: ub9jj0gq</span>
 </footer>
 
 <sg-debug-panel></sg-debug-panel>
 <script type="module" src="../../_common/js/components/sg-debug-panel/v0/v0.1/v0.1.0/sg-debug-panel.js"></script>
 
 <script type="module">
-  const VAULT_ID = 'pmcv9tfe';
-  const READ_KEY = 'dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw';
+  const VAULT_ID = 'ub9jj0gq';
+  const READ_KEY = 'fJaOQDUcy2QCXSJzfmspg6tCFP94d253qD2NXyxQBeM';
+  const BASE     = '/en-gb/invest/';
 
   function slugFromPath() {
     const segments = location.pathname.split('/').filter(Boolean);
+    // /en-gb/invest/<slug...>  →  segments[0]=en-gb, [1]=invest, [2+]=slug
     return segments.length > 2 ? segments.slice(2).join('/') : '';
   }
 
@@ -142,8 +123,6 @@
     return childSlug.startsWith(parentSlug + '/') ? childSlug : `${parentSlug}/${childSlug}`;
   }
 
-  // Walk full nav tree recursively to find an article by slug (handles arbitrary depth).
-  // Returns the article object augmented with sectionTitle, parentTitle, and compound slug, or null.
   function findArticleBySlug(sections, slug) {
     function walk(nodes, sectionTitle, parentSlug, parentTitle) {
       for (const a of (nodes ?? [])) {
@@ -161,7 +140,6 @@
     return null;
   }
 
-  // Flatten nav tree to linear reading order — recurses to arbitrary depth.
   function flattenNavTree(nodes, sectionTitle, parentSlug, parentTitle) {
     const result = [];
     for (const a of (nodes ?? [])) {
@@ -178,8 +156,6 @@
   const articleEl  = document.getElementById('article-content');
   const articleToc = document.getElementById('article-toc');
 
-  // Restore panel collapse states immediately (before nav loads)
-  // On mobile (≤900px) default to collapsed unless user has explicitly expanded
   const _savedNav = localStorage.getItem('sg-nav-collapsed');
   if (_savedNav === 'true' || (_savedNav === null && window.innerWidth <= 900)) {
     shell.classList.add('nav-collapsed');
@@ -196,11 +172,9 @@
   let headingObserver = null;
 
   const _navStartMs = performance.now();
+  const loadingEl   = document.getElementById('loading-state');
+  const loadingSub  = document.getElementById('loading-sub');
 
-  const loadingEl  = document.getElementById('loading-state');
-  const loadingSub = document.getElementById('loading-sub');
-
-  // Progress messages for the cold-start wait — keeps the user informed
   const _loadMsgs = ['Connecting to vault', 'Fetching nav tree', 'Decrypting content', 'Almost there…'];
   let _loadMsgIdx = 0;
   const _loadMsgTimer = setInterval(() => {
@@ -208,14 +182,13 @@
     if (loadingSub) loadingSub.textContent = _loadMsgs[_loadMsgIdx];
   }, 3000);
 
-  // If nav hasn't loaded after 20 s show an error (lambda timeout / network issue)
   const _loadTimeout = setTimeout(() => {
     clearInterval(_loadMsgTimer);
     if (!loadingEl.hidden) {
       if (loadingSub) loadingSub.textContent = '';
-      loadingEl.querySelector('.sg-loading__title').textContent = 'Could not load library';
+      loadingEl.querySelector('.sg-loading__title').textContent = 'Could not load content';
       loadingEl.innerHTML += `
-        <p class="sg-loading__error">The library vault is taking too long to respond.
+        <p class="sg-loading__error">The vault is taking too long to respond.
           This can happen after a period of inactivity.</p>
         <button class="sg-loading__retry" onclick="location.reload()">Try again</button>`;
     }
@@ -232,124 +205,74 @@
 
   document.addEventListener('nav:loaded', e => {
     const navElapsedMs = performance.now() - _navStartMs;
-    const sections = e.detail?.sections;
-    if (!Array.isArray(sections) || sections.length === 0) return; // ignore partial/empty nav events
     hideLoading();
+    const { sections } = e.detail;
     allSections = sections;
-    // Flatten into a linear reading order: each section's articles, and for any
-    // parent article with children[], the parent followed by its child pages
-    // (with compound slugs). Drives prev/next navigation on every page type.
     allArticles = sections.flatMap(s => flattenNavTree(s.children ?? [], s.title, '', null));
-    // Emit full nav tree + timing to debug panel
     const navElapsedSec = (navElapsedMs / 1000).toFixed(2);
     document.dispatchEvent(new CustomEvent('debug:nav-json',
-      { detail: { json: { sections }, src: `library nav · ${allArticles.length} articles · loaded in ${navElapsedSec}s` } }));
-    document.dispatchEvent(new CustomEvent('debug:vault-content', {
-      detail: {
-        objectId: 'nav-timing',
-        kind: 'nav timing',
-        text: `nav:loaded in ${navElapsedSec}s\n${allArticles.length} articles across ${allSections.length} sections`,
-      }
-    }));
-    buildLandingCards(sections, navElapsedMs);
+      { detail: { json: { sections }, src: `invest nav · ${allArticles.length} articles · ${navElapsedSec}s` } }));
 
     const slug = slugFromPath();
     if (!slug) {
-      showLanding();
+      // Single-section area: show the section index directly
+      showSectionIndex(sections[0]);
     } else {
-      const matchedSection = sections.find(s => toSlug(s.title) === slug);
-      if (matchedSection) {
-        showSectionIndex(matchedSection);
-      } else {
-        // Explicit slug routing: walk full nav tree to find article or group node.
-        // This fires before auto-select (which also calls showArticle via nav:select).
-        // The article-viewer sequence counter ensures only the final load renders.
-        const found = findArticleBySlug(sections, slug);
-        if (found) {
-          setBreadcrumbs('Library', found.sectionTitle, found.parentTitle || null, found.title);
-          if (found.content_object_id) {
-            showArticle(found.content_object_id, found.render ?? 'markdown', found.vault_id ?? null, found.read_key ?? null);
-            buildNextPrev(slug);
-          } else if ((found.children ?? []).length) {
-            showGroupIndex(found);
-          } else {
-            showNotFound(slug);
-          }
+      const found = findArticleBySlug(sections, slug);
+      if (found) {
+        setBreadcrumbs(found.sectionTitle, found.parentTitle || null, found.title);
+        if (found.content_object_id) {
+          showArticle(found.content_object_id, found.render ?? 'markdown', found.vault_id ?? null, found.read_key ?? null);
+          buildNextPrev(slug);
+        } else if ((found.children ?? []).length) {
+          showGroupIndex(found);
         } else {
           showNotFound(slug);
         }
+      } else {
+        showNotFound(slug);
       }
     }
   });
 
-  // Article selected via sidebar
   document.addEventListener('nav:select', e => {
     const { title, slug, sectionTitle, parentTitle, content_object_id, render, vault_id, read_key } = e.detail;
-    const targetPath = `/en-gb/library/${slug}/`;
-    if (location.pathname !== targetPath) {
-      history.pushState({ slug }, '', targetPath);
-    }
-    setBreadcrumbs('Library', sectionTitle, parentTitle || null, title);
+    const targetPath = `${BASE}${slug}/`;
+    if (location.pathname !== targetPath) history.pushState({ slug }, '', targetPath);
+    setBreadcrumbs(sectionTitle, parentTitle || null, title);
     showArticle(content_object_id, render ?? 'markdown', vault_id, read_key);
     buildNextPrev(slug);
-    // Auto-collapse nav on mobile so content is immediately visible
     if (window.innerWidth <= 900) {
       shell.classList.add('nav-collapsed');
       localStorage.setItem('sg-nav-collapsed', 'true');
     }
   });
 
-  // Section folder label clicked — show section index page
   document.addEventListener('nav:section', e => {
     const { title, sectionSlug } = e.detail;
-    const targetPath = `/en-gb/library/${sectionSlug}/`;
-    if (location.pathname !== targetPath) {
-      history.pushState({ sectionSlug }, '', targetPath);
-    }
+    const targetPath = `${BASE}${sectionSlug}/`;
+    if (location.pathname !== targetPath) history.pushState({ sectionSlug }, '', targetPath);
     const section = allSections.find(s => s.title === title);
     if (section) showSectionIndex(section);
   });
 
-  // Browser back/forward
   window.addEventListener('popstate', () => {
     const slug = slugFromPath();
-    if (!slug) { showLanding(); return; }
-
+    if (!slug) { showSectionIndex(allSections[0]); return; }
     const matchedSection = allSections.find(s => toSlug(s.title) === slug);
     if (matchedSection) { showSectionIndex(matchedSection); return; }
-
     const btn = sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`);
     if (btn) btn.click();
     else sideNav.setAttribute('active-slug', slug);
   });
 
-  function showLanding() {
-    articleEl.hidden = true;
-    articleToc.hidden = true;
-    shell.classList.remove('with-toc');
-    landing.hidden = false;
-  }
-
   function showSectionIndex(section) {
-    // If the section declares an index article, load it as the landing page
-    if (section.index) {
-      const indexArticle = (section.children ?? []).find(a => a.slug === section.index);
-      if (indexArticle?.content_object_id) {
-        setBreadcrumbs('Library', section.title, null);
-        showArticle(indexArticle.content_object_id, indexArticle.render ?? 'markdown',
-                    indexArticle.vault_id, indexArticle.read_key);
-        buildNextPrev(indexArticle.slug);
-        return;
-      }
-    }
-
+    if (!section) { showLanding(); return; }
     landing.hidden = true;
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     articleEl.hidden = false;
-
-    setBreadcrumbs('Library', section.title, null);
-
+    setBreadcrumbs(section.title, null, null);
     const articles = section.children ?? [];
     document.getElementById('article-render').innerHTML = `
       <div class="article-viewer">
@@ -357,33 +280,17 @@
           <h1>${section.title}</h1>
           ${section.description ? `<p class="section-index-desc">${section.description}</p>` : ''}
           <ul class="section-index-list">
-            ${articles.map(a => {
-              const kids = (a.children ?? []);
-              const childList = kids.length ? `
-                <ul class="section-index-list section-index-list--nested">
-                  ${kids.map(c => `
-                    <li class="section-index-list__item">
-                      <button class="section-index-list__link" data-slug="${compoundSlug(a.slug, c.slug)}">
-                        <span class="section-index-list__title">${c.title}</span>
-                        ${c.description ? `<span class="section-index-list__desc">${c.description}</span>` : ''}
-                      </button>
-                    </li>`).join('')}
-                </ul>` : '';
-              return `
+            ${articles.map(a => `
               <li class="section-index-list__item">
                 <button class="section-index-list__link" data-slug="${a.slug ?? ''}">
                   <span class="section-index-list__title">${a.title}</span>
                   ${a.description ? `<span class="section-index-list__desc">${a.description}</span>` : ''}
                 </button>
-                ${childList}
-              </li>`;
-            }).join('')}
+              </li>`).join('')}
           </ul>
         </div>
       </div>`;
-
     document.getElementById('next-prev').innerHTML = '';
-
     document.querySelectorAll('.section-index-list__link').forEach(btn => {
       btn.addEventListener('click', () => {
         const slug = btn.dataset.slug;
@@ -393,26 +300,26 @@
     });
   }
 
-  // Show an index page for a nav group node that has children but no content_object_id
-  // (e.g. /en-gb/library/sg-teams/content-team/roles/).
+  function showLanding() {
+    articleEl.hidden = true;
+    articleToc.hidden = true;
+    shell.classList.remove('with-toc');
+    landing.hidden = false;
+  }
+
   function showGroupIndex(groupNode) {
     landing.hidden = true;
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     articleEl.hidden = false;
-
-    setBreadcrumbs('Library', groupNode.sectionTitle, groupNode.parentTitle || null, groupNode.title);
-
+    setBreadcrumbs(groupNode.sectionTitle, groupNode.parentTitle || null, groupNode.title);
     const children = (groupNode.children ?? []).map(c => ({
-      ...c,
-      slug: compoundSlug(groupNode.slug, c.slug),
+      ...c, slug: compoundSlug(groupNode.slug, c.slug),
     }));
-
     document.getElementById('article-render').innerHTML = `
       <div class="article-viewer">
         <div class="article-body">
           <h1>${groupNode.title}</h1>
-          ${groupNode.description ? `<p class="section-index-desc">${groupNode.description}</p>` : ''}
           <ul class="section-index-list">
             ${children.map(c => `
               <li class="section-index-list__item">
@@ -424,9 +331,7 @@
           </ul>
         </div>
       </div>`;
-
     document.getElementById('next-prev').innerHTML = '';
-
     document.querySelectorAll('.section-index-list__link').forEach(btn => {
       btn.addEventListener('click', () => {
         const slug = btn.dataset.slug;
@@ -441,49 +346,38 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     articleEl.hidden = false;
-
-    setBreadcrumbs('Library', 'Not found', null, slug);
+    setBreadcrumbs('Not found', null, slug);
     document.getElementById('article-render').innerHTML = `
       <div class="article-viewer">
         <div class="article-body sg-not-found">
           <p class="sg-not-found__code">404</p>
           <h1 class="sg-not-found__title">Page not found</h1>
           <p class="sg-not-found__desc">
-            <code class="sg-not-found__slug">${slug}</code> doesn't exist in the library yet.
-            It may be coming soon, or the link may be outdated.
+            <code class="sg-not-found__slug">${slug}</code> doesn't exist here.
           </p>
           <div class="sg-not-found__actions">
-            <a class="sg-not-found__btn sg-not-found__btn--primary" href="/en-gb/library/">← Library home</a>
-            <button class="sg-not-found__btn sg-not-found__btn--secondary" id="not-found-search-btn">Search the library</button>
+            <a class="sg-not-found__btn sg-not-found__btn--primary" href="/en-gb/invest/">← Invest home</a>
           </div>
         </div>
       </div>`;
     document.getElementById('next-prev').innerHTML = '';
-    document.getElementById('not-found-search-btn')?.addEventListener('click', () => {
-      document.querySelector('sg-search')?.dispatchEvent(new CustomEvent('sg-search:open', { bubbles: true }));
-    });
   }
 
   function showArticle(objectId, render, vaultId, readKey) {
     landing.hidden = true;
     articleEl.hidden = false;
-
     const renderEl = document.getElementById('article-render');
     renderEl.innerHTML = '';
-
     const el = document.createElement('sg-article-viewer');
     el.setAttribute('vault-id',  vaultId  || VAULT_ID);
     el.setAttribute('read-key',  readKey  || READ_KEY);
     el.setAttribute('object-id', objectId);
     el.setAttribute('render',    render   || 'markdown');
     renderEl.appendChild(el);
-
-    // Build TOC once content renders
     if (headingObserver) headingObserver.disconnect();
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     document.getElementById('toc-list').innerHTML = '';
-
     headingObserver = new MutationObserver(() => {
       clearTimeout(headingObserver._t);
       headingObserver._t = setTimeout(() => buildToc(renderEl), 150);
@@ -491,14 +385,11 @@
     headingObserver.observe(renderEl, { childList: true, subtree: true });
   }
 
-  function setBreadcrumbs(site, section, parent, article) {
-    const siteHref    = '/en-gb/library/';
-    const sectionHref = section ? `/en-gb/library/${toSlug(section)}/` : null;
+  function setBreadcrumbs(section, parent, article) {
     const el = document.getElementById('article-crumbs');
-    const parts = [site, section, parent, article].filter(Boolean);
+    const parts = ['Invest', section, parent, article].filter(Boolean);
     el.innerHTML = parts.map((p, i) => {
-      if (i === 0) return `<a class="sub-site__crumbs-link" href="${siteHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
-      if (i === 1 && parts.length > 2) return `<a class="sub-site__crumbs-link" href="${sectionHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
+      if (i === 0) return `<a class="sub-site__crumbs-link" href="${BASE}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
       if (i < parts.length - 1) return `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`;
       return `<span class="sub-site__crumbs-here">${p}</span>`;
     }).join('');
@@ -506,79 +397,25 @@
 
   function buildToc(container) {
     const headings = Array.from(container.querySelectorAll('h2, h3'));
-    if (headings.length < 2) return; // not worth showing TOC for < 2 headings
-
+    if (headings.length < 2) return;
     headings.forEach((h, i) => { if (!h.id) h.id = `h-${i}`; });
-
     const tocList = document.getElementById('toc-list');
     tocList.innerHTML = headings.map(h => `
       <li class="${h.tagName === 'H3' ? 'h3' : ''}">
         <a class="sub-site__toc-link" href="#${h.id}">${h.textContent}</a>
       </li>`).join('');
-
     shell.classList.add('with-toc');
     articleToc.hidden = false;
-
-    // Highlight active section on scroll
     const links = Array.from(tocList.querySelectorAll('.sub-site__toc-link'));
     const io = new IntersectionObserver(entries => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           links.forEach(l => l.classList.remove('active'));
-          tocList.querySelector(`a[href="#${entry.target.id}"]`)
-                 ?.classList.add('active');
+          tocList.querySelector(`a[href="#${entry.target.id}"]`)?.classList.add('active');
         }
       });
     }, { rootMargin: '-15% 0px -70% 0px' });
     headings.forEach(h => io.observe(h));
-  }
-
-  function buildLandingCards(sections, navElapsedMs) {
-    const statsEl = document.getElementById('landing-stats');
-    if (statsEl && navElapsedMs != null) {
-      const total = sections.reduce((n, s) => n + (s.children ?? []).length, 0);
-      statsEl.textContent = `${total} articles · ${sections.length} sections · nav loaded in ${(navElapsedMs / 1000).toFixed(2)} s`;
-      statsEl.hidden = false;
-    }
-    const container = document.getElementById('landing-sections');
-    container.innerHTML = sections.map(section => {
-      const articles = section.children ?? [];
-      const shown    = articles.slice(0, 4);
-      const overflow = articles.length - shown.length;
-      return `
-        <div class="section-card">
-          <div class="section-card__header">
-            <button class="section-card__title" data-section="${section.title}">${section.title}</button>
-            <span class="section-card__count">${articles.length}</span>
-          </div>
-          ${section.description ? `<p class="section-card__desc">${section.description}</p>` : ''}
-          <ul class="section-card__articles">
-            ${shown.map(a => `
-              <li><button class="section-card__article"
-                          data-slug="${a.slug ?? ''}">${a.title}</button></li>
-            `).join('')}
-            ${overflow > 0 ? `<li><span class="section-card__more">+${overflow} more</span></li>` : ''}
-          </ul>
-        </div>`;
-    }).join('');
-
-    container.querySelectorAll('.section-card__title[data-section]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const sectionTitle = btn.dataset.section;
-        const sectionSlug  = toSlug(sectionTitle);
-        history.pushState({ sectionSlug }, '', `/en-gb/library/${sectionSlug}/`);
-        const section = allSections.find(s => s.title === sectionTitle);
-        if (section) showSectionIndex(section);
-      });
-    });
-
-    container.querySelectorAll('.section-card__article[data-slug]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const slug = btn.dataset.slug;
-        if (!slug) return;
-        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`)?.click();
-      });
-    });
   }
 
   function buildNextPrev(currentSlug) {
@@ -586,9 +423,7 @@
     const idx  = allArticles.findIndex(a => a.slug === currentSlug);
     const prev = idx > 0 ? allArticles[idx - 1] : null;
     const next = idx >= 0 && idx < allArticles.length - 1 ? allArticles[idx + 1] : null;
-
     if (!prev && !next) { container.innerHTML = ''; return; }
-
     container.innerHTML = `
       <div class="sub-site__nav-card sub-site__nav-card--prev${prev ? '' : ' sub-site__nav-card--empty'}"
            ${prev ? '' : 'aria-hidden="true"'}>
@@ -600,26 +435,15 @@
         ${next ? `<div class="sub-site__nav-label">Next →</div>
                   <div class="sub-site__nav-title">${next.title}</div>` : ''}
       </div>`;
-
-    if (prev) {
-      container.querySelector('.sub-site__nav-card--prev')
-               .addEventListener('click', () => {
-        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(prev.slug)}"]`)?.click();
-      });
-    }
-    if (next) {
-      container.querySelector('.sub-site__nav-card--next')
-               .addEventListener('click', () => {
-        sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(next.slug)}"]`)?.click();
-      });
-    }
+    if (prev) container.querySelector('.sub-site__nav-card--prev')
+      .addEventListener('click', () => sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(prev.slug)}"]`)?.click());
+    if (next) container.querySelector('.sub-site__nav-card--next')
+      .addEventListener('click', () => sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(next.slug)}"]`)?.click());
   }
 </script>
 
 <script src="../../_common/js/nav.js"></script>
 <script>
-  // Reload if browser restores page from bfcache (back/forward cache).
-  // Prevents stale HTML shell being shown after navigation on mobile.
   window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); });
 </script>
 <script type="module" src="../../_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>
