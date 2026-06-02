@@ -91,6 +91,9 @@
   padding: 0;
 }
 
+/* Ensure [hidden] always wins over display properties set on the same element */
+[hidden] { display: none !important; }
+
 html {
   font-size: 16px;
   scroll-behavior: smooth;

@@ -6,6 +6,7 @@
 // What it does:
 //   /                              → /index.html
 //   /en-gb/library/SLUG/           → /en-gb/library/index.html   (SPA rewrite)
+//   /en-gb/invest/SLUG/            → /en-gb/invest/index.html    (SPA rewrite)
 //   /en-gb/dev/SLUG/               → /en-gb/dev/index.html       (SPA rewrite, except real sub-pages)
 //   /en-gb/dev/vault-peek/         → /en-gb/dev/vault-peek/index.html  (real sub-page, not rewritten)
 //   /en-gb/library/                → /en-gb/library/index.html
@@ -47,6 +48,12 @@ function handler(event) {
     // Library: all sub-paths are SPA slug routes → serve library index
     if (uri.endsWith('/') && uri.startsWith('/en-gb/library/') && uri !== '/en-gb/library/') {
         request.uri = '/en-gb/library/index.html';
+        return request;
+    }
+
+    // Invest: all sub-paths are SPA slug routes → serve invest index
+    if (uri.endsWith('/') && uri.startsWith('/en-gb/invest/') && uri !== '/en-gb/invest/') {
+        request.uri = '/en-gb/invest/index.html';
         return request;
     }
 
