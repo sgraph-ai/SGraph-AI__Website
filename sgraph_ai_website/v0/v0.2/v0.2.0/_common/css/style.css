@@ -3671,3 +3671,69 @@ sg-article-viewer { display: block; }
   color: var(--ss-fg-faint, #aaa);
   letter-spacing: 0.04em;
 }
+
+/* ── Article body: markdown table styles ─────────────────────── */
+
+.article-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border: 1px solid var(--ss-border, #e5e5e3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.article-body thead {
+  background: var(--ss-bg-alt, #f5f5f4);
+}
+
+.article-body th {
+  text-align: left;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-fg-soft, #555);
+  border-bottom: 2px solid var(--ss-border, #e5e5e3);
+  white-space: nowrap;
+}
+
+.article-body td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--ss-border, #e5e5e3);
+  color: var(--ss-fg, #222);
+  vertical-align: top;
+}
+
+.article-body tbody tr:last-child td { border-bottom: none; }
+
+.article-body tbody tr:nth-child(even) { background: rgba(0, 0, 0, 0.022); }
+
+.article-body tbody tr:hover { background: rgba(0, 0, 0, 0.04); transition: background 0.1s; }
+
+/* Status badge pills (injected by sg-article-viewer) */
+.article-status {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.article-status--live       { background: #dcfce7; color: #16a34a; }
+.article-status--shipped    { background: #dbeafe; color: #1d4ed8; }
+.article-status--planned    { background: #f3f4f6; color: #6b7280; }
+.article-status--beta       { background: #fef3c7; color: #d97706; }
+.article-status--alpha      { background: #fee2e2; color: #dc2626; }
+.article-status--wip        { background: #fef3c7; color: #b45309; }
+.article-status--deprecated { background: #fee2e2; color: #9f1239; }
+
+@media (max-width: 700px) {
+  .article-body table { font-size: 0.8125rem; }
+  .article-body th,
+  .article-body td    { padding: 7px 10px; }
+}

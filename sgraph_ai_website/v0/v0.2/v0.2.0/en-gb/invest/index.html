@@ -205,8 +205,9 @@
 
   document.addEventListener('nav:loaded', e => {
     const navElapsedMs = performance.now() - _navStartMs;
+    const sections = e.detail?.sections;
+    if (!Array.isArray(sections) || sections.length === 0) return;
     hideLoading();
-    const { sections } = e.detail;
     allSections = sections;
     allArticles = sections.flatMap(s => flattenNavTree(s.children ?? [], s.title, '', null));
     const navElapsedSec = (navElapsedMs / 1000).toFixed(2);

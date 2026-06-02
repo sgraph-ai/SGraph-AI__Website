@@ -898,7 +898,26 @@ class SgArticleViewer extends HTMLElement {
     marked.use({ renderer });
 
     const metaHtml = renderMetaStrip(meta);
-    const bodyHtml = marked.parse(applyFencedBlocks(applyTokens(body), yamlLoad));
+    let bodyHtml = marked.parse(applyFencedBlocks(applyTokens(body), yamlLoad));
+
+    // Wrap known status words in table cells with badge spans.
+    const _STATUS_MAP = [
+      ['Live',       'live'],
+      ['Shipped',    'shipped'],
+      ['Planned',    'planned'],
+      ['Beta',       'beta'],
+      ['Alpha',      'alpha'],
+      ['WIP',        'wip'],
+      ['In Progress','wip'],
+      ['Deprecated', 'deprecated'],
+    ];
+    for (const [word, cls] of _STATUS_MAP) {
+      bodyHtml = bodyHtml.replace(
+        new RegExp(`(<td[^>]*>)\\s*${word}\\s*(</td>)`, 'g'),
+        `$1<span class="article-status article-status--${cls}">${word}</span>$2`
+      );
+    }
+
     endParse();
 
     const endDom = stepStart('dom-inject');
