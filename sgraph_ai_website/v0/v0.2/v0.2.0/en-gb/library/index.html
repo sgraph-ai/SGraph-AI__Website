@@ -97,6 +97,7 @@
     <h1 class="sub-site__landing-title">Library</h1>
     <p class="sub-site__landing-desc">Technical knowledge base — how sgraph.ai works, the underlying concepts, security model, and integration guides.</p>
     <div class="sub-site__section-cards" id="landing-sections"></div>
+    <p class="sub-site__landing-stats" id="landing-stats" hidden></p>
   </div>
 
   <!-- Article content — shown when an article is selected -->
@@ -194,6 +195,8 @@
   let allSections = [];
   let headingObserver = null;
 
+  const _navStartMs = performance.now();
+
   const loadingEl  = document.getElementById('loading-state');
   const loadingSub = document.getElementById('loading-sub');
 
@@ -218,27 +221,40 @@
     }
   }, 20000);
 
-  function hideLoading() {
+  function hideLoading(navElapsedMs) {
     clearInterval(_loadMsgTimer);
     clearTimeout(_loadTimeout);
-    loadingEl.hidden = true;
+    if (navElapsedMs != null && loadingSub) {
+      loadingSub.textContent = `Ready in ${(navElapsedMs / 1000).toFixed(2)} s`;
+    }
+    // Give the user a brief glimpse of the "ready" state (100 ms feels snappy)
+    setTimeout(() => { loadingEl.hidden = true; }, navElapsedMs > 400 ? 600 : 0);
   }
 
   const initialSlug = slugFromPath();
   if (initialSlug) sideNav.setAttribute('active-slug', initialSlug);
 
   document.addEventListener('nav:loaded', e => {
-    hideLoading();
+    const navElapsedMs = performance.now() - _navStartMs;
+    hideLoading(navElapsedMs);
     const { sections } = e.detail;
     allSections = sections;
     // Flatten into a linear reading order: each section's articles, and for any
     // parent article with children[], the parent followed by its child pages
     // (with compound slugs). Drives prev/next navigation on every page type.
     allArticles = sections.flatMap(s => flattenNavTree(s.children ?? [], s.title, '', null));
-    // Emit full nav tree to debug panel
+    // Emit full nav tree + timing to debug panel
+    const navElapsedSec = (navElapsedMs / 1000).toFixed(2);
     document.dispatchEvent(new CustomEvent('debug:nav-json',
-      { detail: { json: { sections }, src: 'library nav (live)' } }));
-    buildLandingCards(sections);
+      { detail: { json: { sections }, src: `library nav · ${allArticles.length} articles · loaded in ${navElapsedSec}s` } }));
+    document.dispatchEvent(new CustomEvent('debug:vault-content', {
+      detail: {
+        objectId: 'nav-timing',
+        kind: 'nav timing',
+        text: `nav:loaded in ${navElapsedSec}s\n${allArticles.length} articles across ${allSections.length} sections`,
+      }
+    }));
+    buildLandingCards(sections, navElapsedMs);
 
     const slug = slugFromPath();
     if (!slug) {
@@ -520,7 +536,13 @@
     headings.forEach(h => io.observe(h));
   }
 
-  function buildLandingCards(sections) {
+  function buildLandingCards(sections, navElapsedMs) {
+    const statsEl = document.getElementById('landing-stats');
+    if (statsEl && navElapsedMs != null) {
+      const total = sections.reduce((n, s) => n + (s.children ?? []).length, 0);
+      statsEl.textContent = `${total} articles · ${sections.length} sections · nav loaded in ${(navElapsedMs / 1000).toFixed(2)} s`;
+      statsEl.hidden = false;
+    }
     const container = document.getElementById('landing-sections');
     container.innerHTML = sections.map(section => {
       const articles = section.children ?? [];

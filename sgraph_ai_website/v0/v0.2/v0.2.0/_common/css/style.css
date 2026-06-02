@@ -2544,6 +2544,13 @@ sg-side-nav {
   max-width: 60ch; margin: 0 0 2.5rem;
 }
 
+.sub-site__landing-stats {
+  margin: 1.5rem 0 0;
+  font-size: 0.75rem; font-family: ui-monospace, monospace;
+  color: var(--ss-fg-faint, #9ca3af);
+  letter-spacing: 0.03em;
+}
+
 .sub-site__section-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
