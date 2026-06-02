@@ -18,7 +18,7 @@
  */
 
 const FUSE_URL = new URL(
-  '../../../../../../../vendor/fuse.mjs',
+  '../../../../../vendor/fuse.mjs',
   import.meta.url
 ).href;
 
