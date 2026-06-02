@@ -81,6 +81,9 @@ class SgSearch extends HTMLElement {
     };
     document.addEventListener('sub-nav:search', this._subNavSearchHandler);
 
+    this._openHandler = () => this._open();
+    this.addEventListener('sg-search:open', this._openHandler);
+
     // Eagerly warm the root node (it's tiny)
     this._loadRootNode();
   }
@@ -88,6 +91,7 @@ class SgSearch extends HTMLElement {
   disconnectedCallback() {
     document.removeEventListener('keydown', this._keyHandler);
     document.removeEventListener('sub-nav:search', this._subNavSearchHandler);
+    this.removeEventListener('sg-search:open', this._openHandler);
     this._overlay?.remove();
   }
 
