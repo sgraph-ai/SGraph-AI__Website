@@ -224,11 +224,7 @@
   function hideLoading(navElapsedMs) {
     clearInterval(_loadMsgTimer);
     clearTimeout(_loadTimeout);
-    if (navElapsedMs != null && loadingSub) {
-      loadingSub.textContent = `Ready in ${(navElapsedMs / 1000).toFixed(2)} s`;
-    }
-    // Give the user a brief glimpse of the "ready" state (100 ms feels snappy)
-    setTimeout(() => { loadingEl.hidden = true; }, navElapsedMs > 400 ? 600 : 0);
+    loadingEl.hidden = true;
   }
 
   const initialSlug = slugFromPath();
