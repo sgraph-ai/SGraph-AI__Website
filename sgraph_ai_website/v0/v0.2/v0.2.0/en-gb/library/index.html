@@ -130,8 +130,12 @@
 
   function slugFromPath() {
     const segments = location.pathname.split('/').filter(Boolean);
-    return segments.length > 2 ? segments.slice(2).join('/') : '';
+    let slug = segments.length > 2 ? segments.slice(2).join('/') : '';
+    if (slug.endsWith('.md')) slug = slug.slice(0, -3);
+    return slug;
   }
+
+  function isMdMode() { return location.pathname.endsWith('.md'); }
 
   function toSlug(title) {
     return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
@@ -268,8 +272,12 @@
         if (found) {
           setBreadcrumbs('Library', found.sectionTitle, found.parentTitle || null, found.title);
           if (found.content_object_id) {
-            showArticle(found.content_object_id, found.render ?? 'markdown', found.vault_id ?? null, found.read_key ?? null);
-            buildNextPrev(slug);
+            if (isMdMode()) {
+              showRawMarkdown(found.content_object_id, found.vault_id ?? null, found.read_key ?? null, slug);
+            } else {
+              showArticle(found.content_object_id, found.render ?? 'markdown', found.vault_id ?? null, found.read_key ?? null);
+              buildNextPrev(slug);
+            }
           } else if ((found.children ?? []).length) {
             showGroupIndex(found);
           } else {
@@ -462,6 +470,37 @@
     document.getElementById('not-found-search-btn')?.addEventListener('click', () => {
       document.querySelector('sg-search')?.dispatchEvent(new CustomEvent('sg-search:open', { bubbles: true }));
     });
+  }
+
+  async function showRawMarkdown(objectId, vaultId, readKey, slug) {
+    landing.hidden = true;
+    articleToc.hidden = true;
+    shell.classList.remove('with-toc');
+    articleEl.hidden = false;
+    const renderEl = document.getElementById('article-render');
+    const renderedHref = `/en-gb/library/${slug}/`;
+    renderEl.innerHTML = `
+      <div class="article-viewer">
+        <div class="article-body">
+          <div class="article-md-raw-wrap">
+            <div class="article-md-raw-header">
+              <span>${slug}.md</span>
+              <a class="article-md-raw-switch" href="${renderedHref}">View rendered →</a>
+            </div>
+            <pre class="article-md-raw" id="md-raw-pre">Loading…</pre>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('next-prev').innerHTML = '';
+    try {
+      const { importReadKey, readObject } =
+        await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
+      const cryptoKey = await importReadKey(readKey || READ_KEY);
+      const buf  = await readObject('https://send.sgraph.ai', vaultId || VAULT_ID, objectId, cryptoKey);
+      document.getElementById('md-raw-pre').textContent = new TextDecoder().decode(buf);
+    } catch (err) {
+      document.getElementById('md-raw-pre').textContent = `Error: ${err.message}`;
+    }
   }
 
   function showArticle(objectId, render, vaultId, readKey) {

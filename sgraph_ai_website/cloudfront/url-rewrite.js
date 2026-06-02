@@ -31,7 +31,7 @@
 //
 //   Then associate with distribution as Viewer Request.
 
-var CF_VERSION = 'v0.1.1';
+var CF_VERSION = 'v0.1.2';
 
 function handler(event) {
     var request = event.request;
@@ -44,15 +44,27 @@ function handler(event) {
 
     // SPA sub-site rewrites — must run before the generic index.html append.
     // Only apply to trailing-slash URIs (bare paths are handled below with a redirect).
+    // .md extension rewrites must also come here — .md has a dot so the pass-through
+    // rule at the bottom would send them to S3 (→ 404) without these guards.
 
     // Library: all sub-paths are SPA slug routes → serve library index
     if (uri.endsWith('/') && uri.startsWith('/en-gb/library/') && uri !== '/en-gb/library/') {
         request.uri = '/en-gb/library/index.html';
         return request;
     }
+    // Library: .md raw-view URLs → serve SPA (SPA strips .md to find the article)
+    if (uri.endsWith('.md') && uri.startsWith('/en-gb/library/')) {
+        request.uri = '/en-gb/library/index.html';
+        return request;
+    }
 
     // Invest: all sub-paths are SPA slug routes → serve invest index
     if (uri.endsWith('/') && uri.startsWith('/en-gb/invest/') && uri !== '/en-gb/invest/') {
+        request.uri = '/en-gb/invest/index.html';
+        return request;
+    }
+    // Invest: .md raw-view URLs → serve SPA
+    if (uri.endsWith('.md') && uri.startsWith('/en-gb/invest/')) {
         request.uri = '/en-gb/invest/index.html';
         return request;
     }

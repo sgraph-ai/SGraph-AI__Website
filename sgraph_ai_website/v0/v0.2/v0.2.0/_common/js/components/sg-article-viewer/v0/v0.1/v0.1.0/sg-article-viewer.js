@@ -875,6 +875,25 @@ class SgArticleViewer extends HTMLElement {
       return `<a href="${escHtml(href)}"${titleAttr}${target}>${text}</a>`;
     };
 
+    const origLink = renderer.link.bind(renderer);
+    renderer.link = function (href, title, text) {
+      if (typeof href === 'object' && href !== null) {
+        title = href.title;
+        text  = href.text;
+        href  = href.href;
+      }
+      if (href && href.startsWith('vault-pdf:')) {
+        const objId     = href.slice(10).trim();
+        const caption   = title || text || '';
+        const captionEl = caption ? `<p class="article-pdf__caption">${escHtml(caption)}</p>` : '';
+        return `<figure class="article-pdf" data-vault-pdf-obj="${escHtml(objId)}">` +
+               `<div class="article-pdf__loading">Loading PDF…</div>` +
+               captionEl +
+               `</figure>`;
+      }
+      return origLink(href, title, text);
+    };
+
     const origImage = renderer.image.bind(renderer);
     renderer.image = function (href, title, text) {
       if (typeof href === 'object' && href !== null) {
@@ -933,6 +952,7 @@ class SgArticleViewer extends HTMLElement {
     }));
 
     this._resolveVaultImages(vaultId, readKey);
+    this._resolveVaultPdfs(vaultId, readKey);
   }
 
   _renderJson(text) {
@@ -1194,6 +1214,41 @@ class SgArticleViewer extends HTMLElement {
         img.classList.remove('article-img--loading');
         img.classList.add('article-img--error');
         img.alt = `[Image unavailable: ${objId}]`;
+      }
+    }));
+  }
+
+  async _resolveVaultPdfs(vaultId, readKey) {
+    const figures = Array.from(this.querySelectorAll('figure[data-vault-pdf-obj]'));
+    if (!figures.length) return;
+
+    const { importReadKey, readObject } =
+      await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
+    const cryptoKey = await importReadKey(readKey);
+
+    await Promise.allSettled(figures.map(async fig => {
+      const objId = fig.dataset.vaultPdfObj;
+      const loadingEl = fig.querySelector('.article-pdf__loading');
+      try {
+        const buf  = await readObject('https://send.sgraph.ai', vaultId, objId, cryptoKey);
+        const blob = new Blob([buf], { type: 'application/pdf' });
+        const url  = URL.createObjectURL(blob);
+        this._blobUrls.push(url);
+        if (loadingEl) loadingEl.remove();
+        const iframe = document.createElement('iframe');
+        iframe.className = 'article-pdf__frame';
+        iframe.src = url;
+        iframe.title = fig.querySelector('.article-pdf__caption')?.textContent || 'PDF document';
+        fig.insertBefore(iframe, fig.querySelector('.article-pdf__caption') ?? null);
+        // Fallback download link for browsers that don't inline PDFs (e.g. Safari)
+        const dl = document.createElement('a');
+        dl.className = 'article-pdf__download';
+        dl.href = url;
+        dl.download = `${objId}.pdf`;
+        dl.textContent = '↓ Download PDF';
+        fig.appendChild(dl);
+      } catch (_) {
+        if (loadingEl) loadingEl.textContent = `[PDF unavailable: ${objId}]`;
       }
     }));
   }
