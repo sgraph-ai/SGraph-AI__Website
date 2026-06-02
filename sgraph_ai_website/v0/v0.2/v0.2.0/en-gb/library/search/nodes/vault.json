@@ -8,7 +8,7 @@
   "children": [],
   "articles": [
     {
-      "slug": "library/architecture/vault-overview",
+      "slug": "architecture/vault-overview",
       "title": "Vault Architecture Overview",
       "keys": [
         "vault", "architecture", "overview", "content addressable", "cas",
@@ -17,7 +17,7 @@
       "snippet": "How the SGraph AI vault stores content — content-addressable immutable objects, key derivation, and why data is safe in transit and at rest."
     },
     {
-      "slug": "library/architecture/encryption",
+      "slug": "architecture/encryption",
       "title": "Encryption Model",
       "keys": [
         "encryption", "aes-gcm", "aes", "gcm", "key", "read key",
@@ -27,7 +27,7 @@
       "snippet": "The AES-GCM encryption model used across the vault — key types, IV generation, client-side decryption via Web Crypto API, and trust boundaries."
     },
     {
-      "slug": "library/architecture/trust-boundaries",
+      "slug": "architecture/trust-boundaries",
       "title": "Trust Boundaries",
       "keys": [
         "trust", "security", "boundaries", "public", "private",

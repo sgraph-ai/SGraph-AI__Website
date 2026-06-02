@@ -8,7 +8,7 @@
   "children": [],
   "articles": [
     {
-      "slug": "library/components/sg-article-viewer",
+      "slug": "components/sg-article-viewer",
       "title": "sg-article-viewer",
       "keys": [
         "sg-article-viewer", "article viewer", "component", "markdown",
@@ -18,7 +18,7 @@
       "snippet": "The sg-article-viewer custom element — fetch, decrypt, parse, and render pipeline with per-step load tracing and the Layer 2 diagnostic panel."
     },
     {
-      "slug": "library/components/sg-vault-content",
+      "slug": "components/sg-vault-content",
       "title": "sg-vault-content",
       "keys": [
         "sg-vault-content", "vault content", "html", "slot", "template",
@@ -27,7 +27,7 @@
       "snippet": "The sg-vault-content web component for rendering server-provided encrypted HTML fragments — slots, theming, and usage patterns."
     },
     {
-      "slug": "library/architecture/edge-rendering",
+      "slug": "architecture/edge-rendering",
       "title": "Edge Rendering",
       "keys": [
         "edge", "edge rendering", "cdn", "cloudflare", "workers",
