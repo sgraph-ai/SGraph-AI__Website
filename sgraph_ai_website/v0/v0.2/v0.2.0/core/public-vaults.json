@@ -1,0 +1,40 @@
+{
+  "schema": "sg-public-vaults/v1",
+  "description": "Vaults that sgraph.ai exposes with a PUBLIC read key. The read keys below are published by design — they grant read-only access to already-public content. Write keys are never listed here. Each vault may also carry an in-vault `_vault-meta.json` (owner-maintained) that this registry is enriched with at view time.",
+  "server": "https://send.sgraph.ai",
+  "meta_path": "_vault-meta.json",
+  "vaults": [
+    {
+      "id": "pmcv9tfe",
+      "read_key": "dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw",
+      "label": "Library Content",
+      "owner": "@Content",
+      "purpose": "Library articles, use-case pages, and the library nav tree (_nav.json). Served at /en-gb/library/ and as .md/.llm.json via edge-render.",
+      "site_url": "https://sgraph.ai/en-gb/library/"
+    },
+    {
+      "id": "1lfehfjh",
+      "read_key": "gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs",
+      "label": "Project Status",
+      "owner": "@Content",
+      "purpose": "Live project status — workstreams, issues, and the agent roster. Rendered as structured JSON views in the Dev sub-site.",
+      "site_url": "https://sgraph.ai/en-gb/dev/workstreams/"
+    },
+    {
+      "id": "bf31a13c78c9",
+      "read_key": "s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA",
+      "label": "Dev Docs",
+      "owner": "@Dev",
+      "purpose": "Developer documentation sub-site — the agent operating model, Email-FS protocol, vault architecture, and onboarding guides.",
+      "site_url": "https://sgraph.ai/en-gb/dev/"
+    },
+    {
+      "id": "ub9jj0gq",
+      "read_key": "fJaOQDUcy2QCXSJzfmspg6tCFP94d253qD2NXyxQBeM",
+      "label": "Invest",
+      "owner": "@Invest",
+      "purpose": "Investor-facing content for the (unlisted) /en-gb/invest sub-site. Read key is public; the page is simply not linked from the main nav.",
+      "site_url": "https://sgraph.ai/en-gb/invest/"
+    }
+  ]
+}
