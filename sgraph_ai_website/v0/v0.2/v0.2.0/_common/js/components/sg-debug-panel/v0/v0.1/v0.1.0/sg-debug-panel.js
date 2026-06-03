@@ -1,12 +1,15 @@
 /**
- * sg-debug-panel v0.1.7
+ * sg-debug-panel v0.1.8
  *
  * Floating debug overlay for sgraph.ai sub-sites. Three tabs:
  *   Log     — intercepted fetch calls (vault / GitHub API) + custom nav:* events
  *   Fetches — every vault request as a sequenced list OR a Jaeger/X-Ray-style
  *             waterfall trace: bars positioned by start offset, sized by duration,
  *             colour-coded by source component (detected via call stack).
- *             Duplicate blob fetches are flagged ("dup ×N").
+ *             If sg-vault-cache is present, cache hits (IDB ✓) and in-flight
+ *             dedup waits (→ inflight) are shown as distinct bar styles with
+ *             their own colour coding. An IDB stats bar shows live cache size.
+ *             Duplicate network blob fetches are flagged ("dup ×N").
  *   Sources — raw nav JSON tree + last decrypted vault content
  *
  * Only active on qa / dev / localhost — no-op on prod.
@@ -41,7 +44,7 @@ class SgDebugPanel extends HTMLElement {
     this._patchFetch();
     this._listenEvents();
     this._listenKeyboard();
-    this._pushLog({ kind: 'system', msg: `sg-debug-panel v0.1.7 · ${env} · ${location.pathname}` });
+    this._pushLog({ kind: 'system', msg: `sg-debug-panel v0.1.8 · ${env} · ${location.pathname}` });
   }
 
   disconnectedCallback() {
@@ -259,10 +262,23 @@ class SgDebugPanel extends HTMLElement {
         border-radius: 3px; padding: 0 4px; white-space: nowrap;
       }
       .sgdbg-fetches-empty { padding: 2rem; text-align: center; color: #334155; font-size: 11px; }
-      .sgdbg-f-src {
-        font-weight: 700; font-size: 9px; text-transform: lowercase;
-        margin-right: 4px;
+      .sgdbg-f-src { font-weight: 700; font-size: 9px; text-transform: lowercase; margin-right: 4px; }
+
+      /* IDB stats bar */
+      .sgdbg-idb-bar {
+        display: flex; align-items: center; gap: 8px;
+        padding: 5px 14px; border-bottom: 1px solid #1e293b;
+        background: #16a34a0d; flex-shrink: 0;
       }
+      .sgdbg-idb-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #4ade80; letter-spacing: .06em; }
+      .sgdbg-idb-stats { font-size: 10px; color: #94a3b8; }
+      .sgdbg-idb-inflight { font-size: 10px; color: #fbbf24; margin-left: auto; }
+
+      /* Cache-type row variants */
+      .sgdbg-frow.idb-hit  { border-left-color: #16a34a; background: #16a34a07; }
+      .sgdbg-frow.inflight { border-left-color: #a78bfa; background: #7c3aed07; }
+      .sgdbg-frow.idb-hit  .sgdbg-f-type { color: #4ade80; }
+      .sgdbg-frow.inflight .sgdbg-f-type { color: #c4b5fd; }
 
       /* Fetches — trace / waterfall (Jaeger / X-Ray style) */
       .sgdbg-trace-legend {
@@ -304,12 +320,13 @@ class SgDebugPanel extends HTMLElement {
         position: absolute; top: 2px; height: 10px; border-radius: 2px;
         min-width: 2px; opacity: .85;
       }
-      .sgdbg-trace-bar.inflight { opacity: .4; background-image: repeating-linear-gradient(45deg, #ffffff22 0 4px, transparent 4px 8px); }
+      .sgdbg-trace-bar.inflight  { opacity: .5; background-image: repeating-linear-gradient(45deg, #ffffff22 0 4px, transparent 4px 8px); }
+      .sgdbg-trace-bar.idb-cached { opacity: 1; height: 8px; top: 3px; min-width: 4px; border-radius: 1px; }
+      .sgdbg-trace-row.err .sgdbg-trace-bar { background: #dc2626 !important; }
       .sgdbg-trace-bar-label {
         position: absolute; top: 0; font-size: 9px; color: #94a3b8;
         white-space: nowrap; padding: 0 5px; line-height: 14px; pointer-events: none;
       }
-      .sgdbg-trace-row.err .sgdbg-trace-bar { background: #dc2626 !important; }
 
       /* Footer */
       .sgdbg-foot {
@@ -375,6 +392,12 @@ class SgDebugPanel extends HTMLElement {
             <button class="sgdbg-tbtn${this._fetchView!=='list'?' on':''}" id="sgdbg-fetches-trace">Trace</button>
             <button class="sgdbg-tbtn${this._fetchView==='list'?' on':''}" id="sgdbg-fetches-list">List</button>
             <button class="sgdbg-tbtn" id="sgdbg-fetches-clear">Clear</button>
+            <button class="sgdbg-tbtn" id="sgdbg-idb-clear" title="Clear IndexedDB cache">IDB ✕</button>
+          </div>
+          <div class="sgdbg-idb-bar" id="sgdbg-idb-bar" hidden>
+            <span class="sgdbg-idb-label">IDB cache</span>
+            <span id="sgdbg-idb-stats" class="sgdbg-idb-stats">—</span>
+            <span id="sgdbg-idb-inflight" class="sgdbg-idb-inflight"></span>
           </div>
           <div class="sgdbg-fetches-log" id="sgdbg-fetches-log">
             <div class="sgdbg-fetches-empty">No vault requests captured yet.<br>Load a page or article to populate.</div>
@@ -456,6 +479,16 @@ class SgDebugPanel extends HTMLElement {
     };
     panel.querySelector('#sgdbg-fetches-trace')?.addEventListener('click', () => setFetchView('trace'));
     panel.querySelector('#sgdbg-fetches-list')?.addEventListener('click',  () => setFetchView('list'));
+
+    panel.querySelector('#sgdbg-idb-clear')?.addEventListener('click', () => {
+      window.sgVaultCache?.clearIdb().then(() => this._refreshIdbStats());
+    });
+
+    // Show IDB stats bar only if vault cache is present; refresh periodically
+    if (window.sgVaultCache) {
+      panel.querySelector('#sgdbg-idb-bar').hidden = false;
+      this._refreshIdbStats();
+    }
 
     this._logEl   = panel.querySelector('#sgdbg-log');
     this._srcEl   = panel.querySelector('#sgdbg-sources');
@@ -713,21 +746,28 @@ class SgDebugPanel extends HTMLElement {
 
   _renderFetchesList(el) {
     el.innerHTML = this._vaultFetches.map(f => {
-      const isDupBlob = f.objType === 'blob' && f.dupNum > 0;
-      const rowCls = ['sgdbg-frow', f.objType ?? 'other',
+      const ct        = f.cacheType ?? 'network';
+      const isDupBlob = f.objType === 'blob' && f.dupNum > 0 && ct === 'network';
+      const rowCls    = ['sgdbg-frow',
+        ct === 'idb-hit'  ? 'idb-hit'  :
+        ct === 'inflight' ? 'inflight'  :
+        f.objType ?? 'other',
         isDupBlob ? 'dup-blob' : '',
         f.ok === false ? 'fetch-err' : ''].filter(Boolean).join(' ');
-      const durCls = f.durationMs == null ? '' : f.durationMs > 500 ? ' vslow' : f.durationMs > 200 ? ' slow' : '';
+      const durCls    = f.durationMs == null ? '' : f.durationMs > 500 ? ' vslow' : f.durationMs > 200 ? ' slow' : '';
       const displayId = f.objId.startsWith('obj-') ? f.objId
                       : f.objId.length > 16 ? f.objId.slice(0, 16) + '…'
                       : f.objId;
-      const durText  = f.durationMs != null ? `${f.durationMs}ms` : '…';
-      const sizeText = f.sizekb ? ` · ${f.sizekb}KB` : '';
-      const srcColor = this._sourceColor(f.source);
+      const durText   = f.durationMs != null ? `${f.durationMs}ms` : '…';
+      const sizeText  = f.sizekb ? ` · ${f.sizekb}KB` : '';
+      const srcColor  = this._sourceColor(f.source);
+      const typeLabel = ct === 'idb-hit' ? 'IDB ✓'
+                      : ct === 'inflight' ? '→ dedup'
+                      : (f.objType ?? '?');
       return `<div class="${rowCls}">
         <span class="sgdbg-f-seq">#${f.seq}</span>
         <span class="sgdbg-f-ts">${f.ts}</span>
-        <span class="sgdbg-f-type">${f.objType ?? '?'}</span>
+        <span class="sgdbg-f-type">${typeLabel}</span>
         <span class="sgdbg-f-id">
           <span class="sgdbg-f-src" style="color:${srcColor}">${esc(f.source ?? '?')}</span>
           ${esc(displayId)} <span class="sgdbg-f-vid">[${esc(f.vaultId)}]</span>
@@ -766,34 +806,53 @@ class SgDebugPanel extends HTMLElement {
     // Source legend (distinct sources in first-seen order)
     const seenSrc = [];
     for (const f of fetches) if (!seenSrc.includes(f.source)) seenSrc.push(f.source);
-    const legend = seenSrc.map(s =>
-      `<span class="sgdbg-trace-legend-item">
-         <span class="sgdbg-trace-swatch" style="background:${this._sourceColor(s)}"></span>${esc(s ?? '?')}
-       </span>`).join('');
+    const legend = [
+      ...seenSrc.map(s =>
+        `<span class="sgdbg-trace-legend-item">
+           <span class="sgdbg-trace-swatch" style="background:${this._sourceColor(s)}"></span>${esc(s ?? '?')}
+         </span>`),
+      ...(fetches.some(f => f.cacheType === 'idb-hit')
+        ? [`<span class="sgdbg-trace-legend-item"><span class="sgdbg-trace-swatch" style="background:#16a34a"></span>IDB ✓</span>`] : []),
+      ...(fetches.some(f => f.cacheType === 'inflight')
+        ? [`<span class="sgdbg-trace-legend-item"><span class="sgdbg-trace-swatch" style="background:#7c3aed"></span>→ dedup</span>`] : []),
+    ].join('');
 
     const rows = fetches.map(f => {
+      const ct          = f.cacheType ?? 'network';
       const startOffset = f.startPerf - base;
       const dur         = f.durationMs != null ? f.durationMs : (now - f.startPerf);
       const leftPct     = (startOffset / total) * 100;
-      const widthPct    = Math.max((dur / total) * 100, 0.6);
-      const labelLeft   = leftPct < 55;   // put label after the bar near left, before near right
-      const color       = this._sourceColor(f.source);
-      const isDupBlob   = f.objType === 'blob' && f.dupNum > 0;
+      // IDB hits and inflight waits show as a narrow marker at their start position
+      const widthPct    = ct === 'idb-hit' ? Math.max((dur / total) * 100, 0.3)
+                        : Math.max((dur / total) * 100, 0.6);
+      const labelLeft   = leftPct < 55;
+      const srcColor    = this._sourceColor(f.source);
+      const barColor    = ct === 'idb-hit'  ? '#16a34a'
+                        : ct === 'inflight' ? '#7c3aed'
+                        : srcColor;
+      const isDupBlob   = f.objType === 'blob' && f.dupNum > 0 && ct === 'network';
       const displayId   = f.objId.length > 22 ? f.objId.slice(0, 22) + '…' : f.objId;
-      const inFlight    = f.durationMs == null;
-      const durText     = inFlight ? '…' : `${f.durationMs}ms`;
-      const barLabel    = `${f.objType} ${displayId} · ${durText}${isDupBlob ? ` · dup ×${f.dupNum + 1}` : ''}`;
-      return `<div class="sgdbg-trace-row${isDupBlob ? ' dup' : ''}${f.ok === false ? ' err' : ''}">
+      const pending     = f.durationMs == null;
+      const durText     = pending ? '…' : `${f.durationMs}ms`;
+      const typeLabel   = ct === 'idb-hit' ? 'IDB' : ct === 'inflight' ? 'dedup' : (f.objType ?? '?');
+      const barExtra    = isDupBlob ? ';outline:1px solid #f59e0b' : '';
+      const barCls      = ct === 'inflight' ? ' inflight'
+                        : ct === 'idb-hit'  ? ' idb-cached'
+                        : pending            ? ' inflight'
+                        : '';
+      const labelText   = ct === 'idb-hit' ? `IDB ✓ ${displayId}` : ct === 'inflight' ? `→ dedup ${durText}` : `${displayId} · ${durText}`;
+      const rowCls      = `sgdbg-trace-row${isDupBlob ? ' dup' : ''}${f.ok === false ? ' err' : ''}`;
+      return `<div class="${rowCls}">
         <div class="sgdbg-trace-gutter">
           <span class="sgdbg-trace-seq">#${f.seq}</span>
-          <span class="sgdbg-trace-src" style="color:${color}">${esc(f.source ?? '?')}</span>
-          <span class="sgdbg-trace-type">${f.objType}</span>
+          <span class="sgdbg-trace-src" style="color:${srcColor}">${esc(f.source ?? '?')}</span>
+          <span class="sgdbg-trace-type">${typeLabel}</span>
         </div>
         <div class="sgdbg-trace-track">
-          <div class="sgdbg-trace-bar${inFlight ? ' inflight' : ''}"
-               style="left:${leftPct}%;width:${widthPct}%;background:${color}${isDupBlob ? ';outline:1px solid #f59e0b' : ''}"
-               title="${esc(barLabel)}"></div>
-          <span class="sgdbg-trace-bar-label" style="${labelLeft ? `left:calc(${leftPct}% + ${widthPct}%)` : `right:calc(${100 - leftPct}%)`}">${esc(displayId)} · ${durText}${isDupBlob ? ` <span class="sgdbg-f-dup">dup ×${f.dupNum + 1}</span>` : ''}</span>
+          <div class="sgdbg-trace-bar${barCls}"
+               style="left:${leftPct}%;width:${widthPct}%;background:${barColor}${barExtra}"
+               title="${esc(`${typeLabel} ${displayId} · ${durText}`)}"></div>
+          <span class="sgdbg-trace-bar-label" style="${labelLeft ? `left:calc(${leftPct}% + ${widthPct}% + 3px)` : `right:calc(${100 - leftPct}% + 3px)`}">${esc(labelText)}${isDupBlob ? ` <span class="sgdbg-f-dup">dup ×${f.dupNum + 1}</span>` : ''}</span>
         </div>
       </div>`;
     }).join('');
@@ -807,22 +866,43 @@ class SgDebugPanel extends HTMLElement {
   _updateFetchSummary() {
     const sumEl = this._panel?.querySelector('#sgdbg-fetches-summary');
     if (!sumEl) return;
-    const total  = this._vaultFetches.length;
-    const blobs  = this._vaultFetches.filter(f => f.objType === 'blob');
-    const uniq   = new Set(blobs.map(f => f.objId)).size;
-    const dups   = blobs.filter(f => f.dupNum > 0).length;
-    const byType = {};
-    for (const f of this._vaultFetches) byType[f.objType] = (byType[f.objType] ?? 0) + 1;
+    const total     = this._vaultFetches.length;
+    const networks  = this._vaultFetches.filter(f => f.cacheType === 'network' || f.cacheType == null);
+    const idbHits   = this._vaultFetches.filter(f => f.cacheType === 'idb-hit').length;
+    const inflights = this._vaultFetches.filter(f => f.cacheType === 'inflight').length;
+    const blobs     = networks.filter(f => f.objType === 'blob');
+    const uniq      = new Set(blobs.map(f => f.objId)).size;
+    const dups      = blobs.filter(f => f.dupNum > 0).length;
+    const byType    = {};
+    for (const f of networks) byType[f.objType] = (byType[f.objType] ?? 0) + 1;
     const parts = [`${total} req`];
+    if (networks.length < total) parts.push(`${networks.length} net`);
+    if (idbHits)    parts.push(`${idbHits} IDB✓`);
+    if (inflights)  parts.push(`${inflights} dedup`);
     if (byType.blob)   parts.push(`${byType.blob} blob${byType.blob > 1 ? 's' : ''} (${uniq} uniq)`);
     if (byType.ref)    parts.push(`${byType.ref} ref`);
     if (byType.commit) parts.push(`${byType.commit} commit`);
     if (byType.tree)   parts.push(`${byType.tree} tree`);
     if (dups > 0)      parts.push(`⚠ ${dups} dup${dups > 1 ? 's' : ''}`);
     sumEl.textContent = parts.join(' · ');
-    // Badge on the tab button
     const tabBtn = this._panel?.querySelector('.sgdbg-tab[data-tab="fetches"]');
     if (tabBtn) tabBtn.textContent = dups > 0 ? `Fetches ⚠${dups}` : `Fetches${total ? ` ${total}` : ''}`;
+  }
+
+  _refreshIdbStats() {
+    const bar  = this._panel?.querySelector('#sgdbg-idb-bar');
+    const stat = this._panel?.querySelector('#sgdbg-idb-stats');
+    const inf  = this._panel?.querySelector('#sgdbg-idb-inflight');
+    if (!bar || !stat) return;
+    if (!window.sgVaultCache) { bar.hidden = true; return; }
+    bar.hidden = false;
+    window.sgVaultCache.idbStats().then(s => {
+      if (stat) stat.textContent = `${s.count} objects · ${(s.bytes / 1024).toFixed(0)} KB`;
+    }).catch(() => {});
+    if (inf) {
+      const n = window.sgVaultCache.inFlightCount;
+      inf.textContent = n > 0 ? `${n} in-flight` : '';
+    }
   }
 
   // ── fetch patch ───────────────────────────────────────────────────────────
@@ -865,6 +945,7 @@ class SgDebugPanel extends HTMLElement {
             source:    self._detectSource(),   // calling component (from stack)
             dupNum:    prevCnt,                 // >0 means this is a duplicate
             startPerf: t0,                      // performance.now() at request start
+            cacheType: null,                    // filled in post-response: 'idb-hit'|'inflight'|'network'
             ok:        null, durationMs: null, sizekb: null,
           };
           if (self._traceT0 == null) self._traceT0 = t0;
@@ -900,14 +981,21 @@ class SgDebugPanel extends HTMLElement {
             });
           }
 
-          // Post-request: fill in duration + size for vault fetch entry
+          // Post-request: fill in duration + size + cache type for vault fetch entry
           if (vfe) {
             vfe.ok = res.ok;
             vfe.durationMs = ms;
+            const sgCache = res.headers.get('x-sg-cache');
+            vfe.cacheType = sgCache ?? 'network';  // 'idb-hit' | 'inflight' | 'network'
+            if (sgCache === 'inflight') {
+              const wms = parseInt(res.headers.get('x-sg-wait-ms') ?? '0', 10);
+              vfe.durationMs = wms;  // show actual wait time, not full network time
+            }
             const cl = res.headers.get('content-length');
             if (cl) vfe.sizekb = (parseInt(cl, 10) / 1024).toFixed(1);
             self._updateFetchSummary();
             if (self._open && self._activeTab === 'fetches') self._renderFetches();
+            if (sgCache && sgCache !== 'network') self._refreshIdbStats();
           }
 
           return res;
