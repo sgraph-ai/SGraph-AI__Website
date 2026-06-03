@@ -183,18 +183,25 @@ const RENDERERS = {
 }
 
 // ───────────────────────── uri → manifest routing ──────────────────────────
-// Maps an intercepted URI to a { manifestName, slug } pair.
-// The slug is stripped of the base_path prefix and file suffix.
-function routeUri(uri, basePath) {
+// Content areas served by edge-render. Each maps a URL base path to its per-type
+// manifests. Add an entry here to expose a new sub-site as machine-readable text —
+// no Lambda change and no orchestrator-logic change required.
+const AREAS = [
+  { base: '/en-gb/library', md: 'library-page-md', json: 'library-page-llm' },
+  { base: '/en-gb/invest',  md: 'invest-page-md',  json: 'invest-page-llm'  },
+]
+
+// Maps an intercepted URI to a { name, slug } pair (manifest name + article slug).
+// The slug is stripped of the area base_path prefix and the file suffix.
+function routeUri(uri) {
   if (uri === '/llms.txt') return { name: 'llms.txt', slug: null }
-  const stripSuffix = (suffix) => {
-    const path = uri.slice(basePath.length, -suffix.length).replace(/^\//, '')
-    return path || null
+  for (const area of AREAS) {
+    if (!uri.startsWith(area.base)) continue
+    const stripSuffix = (suffix) =>
+      uri.slice(area.base.length, -suffix.length).replace(/^\//, '') || null
+    if (uri.endsWith('.llm.json')) return { name: area.json, slug: stripSuffix('.llm.json') }
+    if (uri.endsWith('.md'))       return { name: area.md,   slug: stripSuffix('.md') }
   }
-  if (uri.startsWith(basePath) && uri.endsWith('.llm.json'))
-    return { name: 'library-page-llm', slug: stripSuffix('.llm.json') }
-  if (uri.startsWith(basePath) && uri.endsWith('.md'))
-    return { name: 'library-page-md', slug: stripSuffix('.md') }
   return null
 }
 
@@ -214,9 +221,7 @@ export async function render(uri, opts = {}) {
     return r.json()
   })
 
-  // Load the llms.txt manifest first to get base_path for slug extraction
-  const basePath = '/en-gb/library'
-  const route = routeUri(uri, basePath)
+  const route = routeUri(uri)
   if (!route) throw new Error(`no manifest mapping for ${uri}`)
 
   const manifest = await readManifest(route.name)

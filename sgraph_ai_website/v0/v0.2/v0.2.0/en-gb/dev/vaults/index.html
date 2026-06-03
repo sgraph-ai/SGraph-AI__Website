@@ -27,9 +27,6 @@
 
 <div class="sub-site-gap"></div>
 
-<!--
-  Vault: bf31a13c78c9  |  nav object: obj-cas-imm-23a4cac1cd36 (dev nav v2.1)
--->
 <sg-sub-nav
   site-title="Dev"
   site-description="Developer documentation — the two-agent operating model, Email-FS protocol, vault architecture, and agent onboarding guides."
@@ -60,68 +57,23 @@
     <div class="article-viewer">
       <div class="article-body">
         <h1>Open Vaults</h1>
-        <p>Vaults currently exposed with a public read key. These can be opened
-        by any client that supports the SGit vault protocol.</p>
+        <p>These vaults are exposed with a <strong>public read key</strong> — published
+        by design so anyone can read the (already-public) content directly from the
+        encrypted store. Each card below is generated live from
+        <code>/core/public-vaults.json</code>, then verified against the vault by
+        resolving its HEAD commit and decrypting in your browser. The server only ever
+        sees ciphertext.</p>
 
-        <h2>Content Vault</h2>
-        <table class="vaults-table">
-          <tbody>
-            <tr>
-              <th>Vault ID</th>
-              <td><code>pmcv9tfe</code></td>
-            </tr>
-            <tr>
-              <th>Read key (base64url)</th>
-              <td><code class="vaults-table__key">dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw</code></td>
-            </tr>
-            <tr>
-              <th>Purpose</th>
-              <td>Library articles, use-case pages, nav JSON</td>
-            </tr>
-            <tr>
-              <th>Owner</th>
-              <td>@Content</td>
-            </tr>
-            <tr>
-              <th>Current nav object</th>
-              <td><code>obj-cas-imm-825c5a468d59</code> <span class="vaults-table__note">(_nav.json v2.4)</span></td>
-            </tr>
-          </tbody>
-        </table>
+        <div id="vaults-list" class="vault-cards">
+          <p class="vault-cards__loading">Loading vault registry…</p>
+        </div>
 
-        <h2>Status Vault</h2>
-        <table class="vaults-table">
-          <tbody>
-            <tr>
-              <th>Vault ID</th>
-              <td><code>1lfehfjh</code></td>
-            </tr>
-            <tr>
-              <th>Read key (base64url)</th>
-              <td><code class="vaults-table__key">gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs</code></td>
-            </tr>
-            <tr>
-              <th>Purpose</th>
-              <td>Live project status — workstreams, issues, agents</td>
-            </tr>
-            <tr>
-              <th>Owner</th>
-              <td>@Content</td>
-            </tr>
-            <tr>
-              <th>Objects</th>
-              <td>
-                <code>obj-cas-imm-32aa32595ec4</code> <span class="vaults-table__note">workstreams.json (project-workstreams-v2)</span><br>
-                <code>obj-cas-imm-da66557cad10</code> <span class="vaults-table__note">issues.json (project-issues-v1)</span><br>
-                <code>obj-cas-imm-652a31e21300</code> <span class="vaults-table__note">agents.json (project-agents-v2)</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <p class="vaults-note">The collaboration vault (<code>r8m13rgj</code>) has no public read key
-        and is not listed here.</p>
-
+        <p class="vaults-note" style="margin-top:2rem;">
+          Write keys are never published here. The collaboration vault has no public
+          read key and is not listed. To expose a new vault, add it to
+          <code>core/public-vaults.json</code> and (optionally) commit a
+          <code>_vault-meta.json</code> to the vault root for the richer details.
+        </p>
       </div>
     </div>
   </div>
@@ -131,6 +83,166 @@
 </div>
 
 <sg-site-footer></sg-site-footer>
+
+<script type="module">
+  const SERVER = 'https://send.sgraph.ai';
+  const listEl = document.getElementById('vaults-list');
+
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ── self-contained vault path resolver (mirrors sg-side-nav) ────────────────
+  // Returns { commitId, entries[] } for the verify step, and can resolve a file
+  // path to its blob id for reading _vault-meta.json.
+  async function openVault(client, vaultId, readKey) {
+    const b64  = readKey.replace(/-/g, '+').replace(/_/g, '/');
+    const pad  = b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=');
+    const bstr = atob(pad);
+    const readKeyBytes = Uint8Array.from({ length: bstr.length }, (_, i) => bstr.charCodeAt(i));
+    const cryptoKey = await client.importReadKey(readKey);
+    const refHex    = await client.deriveFileIdHex(readKeyBytes, `sg-vault-v1:file-id:ref:${vaultId}`);
+    const refFileId = client.formatFileId('ref', 'pid', 'muw', refHex);
+    const vault = {
+      keys: { readKey: cryptoKey, readKeyBytes, refFileId, vaultId },
+      apiBaseUrl: SERVER, vaultId,
+    };
+    const ref      = await client.readFileAsJson(vault, refFileId);
+    const commitId = ref.commit_id ?? ref.commitId ?? ref.target;
+    const commit   = await client.readFileAsJson(vault, commitId);
+    const treeId   = commit.tree_id ?? commit.treeId ?? commit.tree;
+    const rootTree = await client.walkTree(vault, treeId);
+    return { client, vault, cryptoKey, commitId, treeId,
+             entries: rootTree.entries ?? [] };
+  }
+
+  // Resolve a top-level file in the root tree and return its decrypted JSON, or null.
+  async function readRootJson(handle, name) {
+    const entry = handle.entries.find(e => e.name === name);
+    if (!entry || !entry.blob_id) return null;
+    const { importReadKey, readObject } =
+      await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
+    const buf = await readObject(SERVER, handle.vault.vaultId, entry.blob_id, handle.cryptoKey);
+    try { return JSON.parse(new TextDecoder().decode(buf)); }
+    catch { return null; }
+  }
+
+  function keyField(label, value, mono) {
+    const id = 'k' + Math.random().toString(36).slice(2, 8);
+    return `
+      <div class="vault-card__row">
+        <span class="vault-card__label">${esc(label)}</span>
+        <span class="vault-card__val ${mono ? 'vault-card__val--mono' : ''}">
+          <code id="${id}">${esc(value)}</code>
+          <button class="vault-card__copy" data-copy="${id}" title="Copy">copy</button>
+        </span>
+      </div>`;
+  }
+
+  function renderCard(v) {
+    const cloneHint =
+      `# browser (no install) — read + decrypt one object:\n` +
+      `import { importReadKey, readObject } from '.../sg-vault-client.js'\n` +
+      `const key = await importReadKey('${v.read_key}')\n` +
+      `const buf = await readObject('${SERVER}', '${v.id}', '<object-id>', key)`;
+    return `
+      <div class="vault-card" data-vault="${esc(v.id)}">
+        <div class="vault-card__head">
+          <h3 class="vault-card__title">${esc(v.label)}</h3>
+          ${v.owner ? `<span class="vault-card__owner">${esc(v.owner)}</span>` : ''}
+          <span class="vault-card__verify" data-verify>checking…</span>
+        </div>
+        ${v.purpose ? `<p class="vault-card__purpose">${esc(v.purpose)}</p>` : ''}
+
+        <div class="vault-card__section-label">What's happening</div>
+        ${keyField('Server', SERVER)}
+        ${keyField('Vault ID', v.id, true)}
+        ${keyField('Read key (base64url)', v.read_key, true)}
+        ${v.site_url ? `<div class="vault-card__row"><span class="vault-card__label">Live at</span>
+          <span class="vault-card__val"><a href="${esc(v.site_url)}">${esc(v.site_url)}</a></span></div>` : ''}
+        <div class="vault-card__meta" data-meta hidden></div>
+
+        <div class="vault-card__section-label">Clone &amp; read this vault</div>
+        <div class="vault-card__clone" data-clone>
+          <pre class="vault-card__snippet"><code>${esc(cloneHint)}</code></pre>
+          <p class="vault-card__clone-note" data-clone-note>
+            CLI clone token is supplied by the owning agent in the vault's
+            <code>_vault-meta.json</code> (only the owner knows the read token).
+          </p>
+        </div>
+      </div>`;
+  }
+
+  async function verifyCard(cardEl, v) {
+    const badge   = cardEl.querySelector('[data-verify]');
+    const metaEl  = cardEl.querySelector('[data-meta]');
+    const noteEl  = cardEl.querySelector('[data-clone-note]');
+    try {
+      const client = await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
+      const handle = await openVault(client, v.id, v.read_key);
+      badge.textContent = '✓ decrypted';
+      badge.classList.add('vault-card__verify--ok');
+
+      const names = handle.entries.map(e => e.name).filter(Boolean);
+      let metaHtml =
+        `<div class="vault-card__row"><span class="vault-card__label">HEAD commit</span>
+          <span class="vault-card__val vault-card__val--mono"><code>${esc(handle.commitId)}</code></span></div>
+         <div class="vault-card__row"><span class="vault-card__label">Root entries</span>
+          <span class="vault-card__val">${names.length} — <code>${esc(names.slice(0, 12).join(', '))}</code></span></div>`;
+
+      // Enrich from in-vault _vault-meta.json if present (the (c) self-describing layer)
+      const meta = await readRootJson(handle, '_vault-meta.json');
+      if (meta) {
+        const rows = [
+          ['Owner agent',  meta.owner_agent],
+          ['CI pipeline',  meta.ci_pipeline],
+          ['Nav path',     meta.nav_path],
+          ['Updated',      meta.updated],
+        ].filter(([, val]) => val);
+        metaHtml += rows.map(([k, val]) =>
+          `<div class="vault-card__row"><span class="vault-card__label">${esc(k)}</span>
+            <span class="vault-card__val">${esc(val)}</span></div>`).join('');
+        if (meta.clone_cmd && noteEl) {
+          noteEl.innerHTML =
+            `<span class="vault-card__label">CLI clone</span>
+             <code>${esc(meta.clone_cmd)}</code>`;
+        }
+      }
+      metaEl.innerHTML = metaHtml;
+      metaEl.hidden = false;
+    } catch (err) {
+      badge.textContent = '✗ ' + (err.message || 'failed');
+      badge.classList.add('vault-card__verify--err');
+    }
+  }
+
+  (async () => {
+    let registry;
+    try {
+      const r = await fetch('/core/public-vaults.json', { cache: 'no-cache' });
+      registry = await r.json();
+    } catch (err) {
+      listEl.innerHTML = `<p class="vault-cards__loading">Could not load registry: ${esc(err.message)}</p>`;
+      return;
+    }
+    listEl.innerHTML = registry.vaults.map(renderCard).join('');
+
+    // Copy buttons
+    listEl.addEventListener('click', e => {
+      const btn = e.target.closest('[data-copy]');
+      if (!btn) return;
+      const txt = document.getElementById(btn.dataset.copy)?.textContent ?? '';
+      navigator.clipboard?.writeText(txt);
+      btn.textContent = 'copied';
+      setTimeout(() => (btn.textContent = 'copy'), 1200);
+    });
+
+    // Verify each card (sequential to be gentle on cold-start)
+    for (const v of registry.vaults) {
+      const cardEl = listEl.querySelector(`.vault-card[data-vault="${CSS.escape(v.id)}"]`);
+      if (cardEl) await verifyCard(cardEl, v);
+    }
+  })();
+</script>
 
 <script src="../../_common/js/nav.js"></script>
 <script type="module" src="../../_common/js/components/sg-site-header/v1/v1.0/v1.0.6/sg-site-header.js"></script>

@@ -1,0 +1,30 @@
+{
+  "v": 1,
+  "id": "technology",
+  "label": "Technology & Architecture",
+  "keys": [
+    "technology", "architecture", "how it works", "system",
+    "design", "infrastructure", "stack"
+  ],
+  "children": [
+    {
+      "label": "Vault & Encryption",
+      "keys": [
+        "vault", "encryption", "decrypt", "encrypt", "aes-gcm", "aes",
+        "crypto", "cryptography", "security", "keys", "read key", "write key",
+        "object", "blob", "cas", "content addressable", "immutable", "iv"
+      ],
+      "ref": "/en-gb/library/search/nodes/vault.json"
+    },
+    {
+      "label": "Rendering & Components",
+      "keys": [
+        "rendering", "web components", "custom elements", "sg-article-viewer",
+        "sg-vault-content", "markdown", "html", "dom", "browser", "client",
+        "javascript", "esm", "module", "component", "marked", "frontmatter"
+      ],
+      "ref": "/en-gb/library/search/nodes/rendering.json"
+    }
+  ],
+  "articles": []
+}

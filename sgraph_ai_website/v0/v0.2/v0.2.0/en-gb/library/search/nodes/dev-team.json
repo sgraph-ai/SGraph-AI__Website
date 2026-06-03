@@ -1,0 +1,21 @@
+{
+  "v": 1,
+  "id": "dev-team",
+  "label": "Dev Team",
+  "keys": [
+    "dev team", "engineering", "technical", "developers",
+    "frontend", "backend", "build", "code"
+  ],
+  "children": [],
+  "articles": [
+    {
+      "slug": "sg-teams/dev-team",
+      "title": "Dev Team Overview",
+      "keys": [
+        "dev team", "engineering team", "developers", "technical team",
+        "software", "build", "architecture", "code"
+      ],
+      "snippet": "The Dev Team builds and maintains the SGraph AI platform — components, vault client, rendering pipeline, and deployment infrastructure."
+    }
+  ]
+}

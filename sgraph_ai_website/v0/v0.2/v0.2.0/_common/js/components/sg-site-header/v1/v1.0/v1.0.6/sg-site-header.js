@@ -84,6 +84,7 @@ const SITE_CONFIGS = {
                 { label: 'How it Works', href: '/en-gb/how-it-works/' },
                 { label: 'Vaults',       href: '/en-gb/vaults/' },
                 { label: 'Security',     href: '/en-gb/security/' },
+                { label: 'Library',      href: '/en-gb/library/' },
                 { label: 'Tools',        href: xsite('tools', ENV) },
                 { label: 'Pricing',      href: '/en-gb/pricing/' },
             ]
