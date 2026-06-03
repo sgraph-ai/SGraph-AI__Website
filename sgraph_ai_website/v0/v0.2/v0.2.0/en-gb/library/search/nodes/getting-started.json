@@ -1,0 +1,30 @@
+{
+  "v": 1,
+  "id": "getting-started",
+  "label": "Getting Started",
+  "keys": [
+    "overview", "introduction", "what is", "start", "setup",
+    "claude", "configure", "install", "access", "first", "basics"
+  ],
+  "children": [],
+  "articles": [
+    {
+      "slug": "get-started/overview",
+      "title": "Overview",
+      "keys": [
+        "overview", "introduction", "what is sgraph", "sgraph ai",
+        "how it works", "platform", "summary"
+      ],
+      "snippet": "Introduction to SGraph AI — what it is, how the platform works, and the core concepts behind encrypted vault content delivery."
+    },
+    {
+      "slug": "get-started/claude-setup",
+      "title": "Claude Setup",
+      "keys": [
+        "claude", "setup", "configure", "api key", "anthropic",
+        "model", "ai", "assistant", "install", "integration"
+      ],
+      "snippet": "How to configure Claude as the AI layer for SGraph AI — API keys, model selection, and connecting Claude to your vault."
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "v": 1,
+  "id": "updates",
+  "label": "What's New & Blog",
+  "keys": [
+    "news", "updates", "announcements", "blog", "posts", "latest"
+  ],
+  "children": [],
+  "articles": [
+    {
+      "slug": "whats-new/team-expansion-seven-agents",
+      "title": "Team Expansion — Seven Agents",
+      "keys": [
+        "team expansion", "seven agents", "new agents", "team", "growth",
+        "announcement", "agents", "expansion", "hiring", "roles"
+      ],
+      "snippet": "SGraph AI expands its agent team to seven — what each new agent does, how they collaborate, and what this means for content velocity.",
+      "vault_id": "d3o9s0ff",
+      "object_id": "obj-cas-imm-f678dd3857795479a88c8064c138330732c9ff2ee9ed8d4782904af861847355",
+      "read_key": "nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI",
+      "render": "markdown"
+    },
+    {
+      "slug": "blog/introducing-journalist",
+      "title": "Introducing @Journalist",
+      "keys": [
+        "journalist", "introducing", "new agent", "blog", "content",
+        "ai journalist", "writing agent", "announcement"
+      ],
+      "snippet": "Meet @Journalist — SGraph AI's content agent, designed to research, draft, and publish articles to the vault autonomously.",
+      "vault_id": "d3o9s0ff",
+      "object_id": "obj-cas-imm-684e59d65e77a25d6846245eee2291e9a1767860ef80dcb6351e4e78607ad123",
+      "read_key": "nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI",
+      "render": "markdown"
+    },
+    {
+      "slug": "blog/agentics-london-session",
+      "title": "Agentics London Session",
+      "keys": [
+        "agentics", "london", "session", "event", "meetup", "talk",
+        "presentation", "community", "ai", "agents"
+      ],
+      "snippet": "Notes and reflections from the Agentics London session — what we presented, the conversations that followed, and upcoming events.",
+      "vault_id": "d3o9s0ff",
+      "object_id": "obj-cas-imm-77c47abb9be86ebfcd7f826f275856f8849914377aa9dab015145c1a9af1cf8e",
+      "read_key": "nvm8rNKlduEPcu_7NecGTqCeDLiVoTCSSNapIJ-uOMI",
+      "render": "markdown"
+    }
+  ]
+}

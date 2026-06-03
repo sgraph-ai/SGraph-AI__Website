@@ -1,0 +1,28 @@
+{
+  "v": 1,
+  "id": "teams",
+  "label": "Teams & Roles",
+  "keys": [
+    "teams", "organization", "structure", "members", "people",
+    "who", "team", "agents", "staff"
+  ],
+  "children": [
+    {
+      "label": "Content Team",
+      "keys": [
+        "content", "content team", "journalist", "editor", "writer",
+        "writing", "articles", "publishing", "cms", "copy", "author"
+      ],
+      "ref": "/en-gb/library/search/nodes/content-team.json"
+    },
+    {
+      "label": "Dev Team",
+      "keys": [
+        "dev", "developer", "engineer", "code", "programming",
+        "technical", "software", "build", "frontend", "backend"
+      ],
+      "ref": "/en-gb/library/search/nodes/dev-team.json"
+    }
+  ],
+  "articles": []
+}

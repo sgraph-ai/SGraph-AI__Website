@@ -1,0 +1,46 @@
+{
+  "v": 1,
+  "id": "root",
+  "label": "SGraph AI Library",
+  "keys": [],
+  "children": [
+    {
+      "label": "Getting Started",
+      "keys": [
+        "getting started", "start", "setup", "install", "overview", "begin",
+        "quick start", "onboarding", "first steps", "how to", "introduction",
+        "hello", "new", "beginner", "guide"
+      ],
+      "ref": "/en-gb/library/search/nodes/getting-started.json"
+    },
+    {
+      "label": "Teams & Roles",
+      "keys": [
+        "teams", "roles", "people", "members", "who", "organization",
+        "journalist", "editor", "writer", "developer", "engineer", "manager",
+        "content team", "agents", "staff", "crew", "contributors"
+      ],
+      "ref": "/en-gb/library/search/nodes/teams.json"
+    },
+    {
+      "label": "Technology & Architecture",
+      "keys": [
+        "technology", "architecture", "vault", "encryption", "security",
+        "dependencies", "library", "tech stack", "infrastructure", "how it works",
+        "cryptography", "aes", "keys", "objects", "cdn", "edge", "rendering",
+        "components", "web components", "javascript", "client"
+      ],
+      "ref": "/en-gb/library/search/nodes/technology.json"
+    },
+    {
+      "label": "What's New & Blog",
+      "keys": [
+        "news", "updates", "new", "latest", "release", "changelog",
+        "blog", "announcement", "team expansion", "seven agents", "agentics",
+        "london", "session", "events", "recent"
+      ],
+      "ref": "/en-gb/library/search/nodes/updates.json"
+    }
+  ],
+  "articles": []
+}
