@@ -1,8 +1,12 @@
 /**
- * sg-debug-panel v0.1.6
+ * sg-debug-panel v0.1.7
  *
- * Floating debug overlay for sgraph.ai sub-sites. Two tabs:
+ * Floating debug overlay for sgraph.ai sub-sites. Three tabs:
  *   Log     — intercepted fetch calls (vault / GitHub API) + custom nav:* events
+ *   Fetches — every vault request as a sequenced list OR a Jaeger/X-Ray-style
+ *             waterfall trace: bars positioned by start offset, sized by duration,
+ *             colour-coded by source component (detected via call stack).
+ *             Duplicate blob fetches are flagged ("dup ×N").
  *   Sources — raw nav JSON tree + last decrypted vault content
  *
  * Only active on qa / dev / localhost — no-op on prod.
@@ -28,14 +32,16 @@ class SgDebugPanel extends HTMLElement {
     this._vaultFetches  = [];   // ordered vault fetch entries
     this._objFetchCount = new Map();   // objectId → number of times fetched
     this._vaultFetchSeq = 0;
+    this._traceT0       = null; // performance.now() of first vault fetch (trace origin)
     this._open          = localStorage.getItem('sg-debug-open') === 'true';
     this._activeTab     = localStorage.getItem('sg-debug-tab') ?? 'log';
+    this._fetchView     = localStorage.getItem('sg-debug-fetchview') ?? 'trace';
 
     this._buildUI();
     this._patchFetch();
     this._listenEvents();
     this._listenKeyboard();
-    this._pushLog({ kind: 'system', msg: `sg-debug-panel v0.1.6 · ${env} · ${location.pathname}` });
+    this._pushLog({ kind: 'system', msg: `sg-debug-panel v0.1.7 · ${env} · ${location.pathname}` });
   }
 
   disconnectedCallback() {
@@ -253,6 +259,57 @@ class SgDebugPanel extends HTMLElement {
         border-radius: 3px; padding: 0 4px; white-space: nowrap;
       }
       .sgdbg-fetches-empty { padding: 2rem; text-align: center; color: #334155; font-size: 11px; }
+      .sgdbg-f-src {
+        font-weight: 700; font-size: 9px; text-transform: lowercase;
+        margin-right: 4px;
+      }
+
+      /* Fetches — trace / waterfall (Jaeger / X-Ray style) */
+      .sgdbg-trace-legend {
+        display: flex; flex-wrap: wrap; gap: 4px 12px;
+        padding: 6px 14px; border-bottom: 1px solid #1e293b;
+        font-size: 10px; color: #94a3b8; flex-shrink: 0;
+      }
+      .sgdbg-trace-legend-item { display: inline-flex; align-items: center; gap: 4px; }
+      .sgdbg-trace-swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+      .sgdbg-trace-axis {
+        position: relative; height: 16px; margin-left: 132px;
+        border-bottom: 1px solid #1e293b; flex-shrink: 0;
+      }
+      .sgdbg-trace-tick {
+        position: absolute; top: 2px; transform: translateX(-50%);
+        font-size: 9px; color: #475569; white-space: nowrap;
+      }
+      .sgdbg-trace-tick:first-child { transform: none; }
+      .sgdbg-trace-tick:last-child  { transform: translateX(-100%); }
+      .sgdbg-trace-rows { padding: 2px 0; }
+      .sgdbg-trace-row {
+        display: grid; grid-template-columns: 132px 1fr;
+        align-items: center; gap: 0; min-height: 18px;
+        border-bottom: 1px solid #1e293b0a;
+      }
+      .sgdbg-trace-row:hover { background: #1e293b66; }
+      .sgdbg-trace-row.dup { background: #f59e0b08; }
+      .sgdbg-trace-gutter {
+        display: flex; align-items: center; gap: 5px;
+        padding: 0 6px 0 14px; overflow: hidden; white-space: nowrap;
+      }
+      .sgdbg-trace-seq  { color: #334155; font-size: 9px; }
+      .sgdbg-trace-src  { font-size: 9px; font-weight: 700; text-overflow: ellipsis; overflow: hidden; }
+      .sgdbg-trace-type { font-size: 8px; font-weight: 700; text-transform: uppercase; opacity: .8; }
+      .sgdbg-trace-track {
+        position: relative; height: 14px; margin-right: 8px;
+      }
+      .sgdbg-trace-bar {
+        position: absolute; top: 2px; height: 10px; border-radius: 2px;
+        min-width: 2px; opacity: .85;
+      }
+      .sgdbg-trace-bar.inflight { opacity: .4; background-image: repeating-linear-gradient(45deg, #ffffff22 0 4px, transparent 4px 8px); }
+      .sgdbg-trace-bar-label {
+        position: absolute; top: 0; font-size: 9px; color: #94a3b8;
+        white-space: nowrap; padding: 0 5px; line-height: 14px; pointer-events: none;
+      }
+      .sgdbg-trace-row.err .sgdbg-trace-bar { background: #dc2626 !important; }
 
       /* Footer */
       .sgdbg-foot {
@@ -315,6 +372,8 @@ class SgDebugPanel extends HTMLElement {
         <div id="sgdbg-tab-fetches" style="${this._activeTab==='fetches'?'display:flex;flex-direction:column;flex:1;min-height:0':'display:none'}">
           <div class="sgdbg-toolbar">
             <span id="sgdbg-fetches-summary" style="font-size:10px;color:#475569;flex:1">0 requests</span>
+            <button class="sgdbg-tbtn${this._fetchView!=='list'?' on':''}" id="sgdbg-fetches-trace">Trace</button>
+            <button class="sgdbg-tbtn${this._fetchView==='list'?' on':''}" id="sgdbg-fetches-list">List</button>
             <button class="sgdbg-tbtn" id="sgdbg-fetches-clear">Clear</button>
           </div>
           <div class="sgdbg-fetches-log" id="sgdbg-fetches-log">
@@ -384,9 +443,19 @@ class SgDebugPanel extends HTMLElement {
       this._sources = []; this._renderSources();
     });
     panel.querySelector('#sgdbg-fetches-clear')?.addEventListener('click', () => {
-      this._vaultFetches = []; this._objFetchCount = new Map(); this._vaultFetchSeq = 0;
+      this._vaultFetches = []; this._objFetchCount = new Map();
+      this._vaultFetchSeq = 0; this._traceT0 = null;
       this._renderFetches(); this._updateFetchSummary();
     });
+    const setFetchView = (view) => {
+      this._fetchView = view;
+      localStorage.setItem('sg-debug-fetchview', view);
+      panel.querySelector('#sgdbg-fetches-trace').classList.toggle('on', view !== 'list');
+      panel.querySelector('#sgdbg-fetches-list').classList.toggle('on', view === 'list');
+      this._renderFetches();
+    };
+    panel.querySelector('#sgdbg-fetches-trace')?.addEventListener('click', () => setFetchView('trace'));
+    panel.querySelector('#sgdbg-fetches-list')?.addEventListener('click',  () => setFetchView('list'));
 
     this._logEl   = panel.querySelector('#sgdbg-log');
     this._srcEl   = panel.querySelector('#sgdbg-sources');
@@ -592,6 +661,45 @@ class SgDebugPanel extends HTMLElement {
 
   // ── Fetches ───────────────────────────────────────────────────────────────
 
+  // Identify the component that initiated a fetch, by inspecting the call stack.
+  // The patched fetch wrapper and the vault-client library frames are skipped so
+  // the first *application* frame (a custom element module or page script) wins.
+  _detectSource() {
+    const stack = (new Error()).stack || '';
+    const lines = stack.split('\n');
+    for (const line of lines) {
+      if (line.includes('sg-debug-panel')) continue;   // the patch itself
+      if (line.includes('sg-vault-client')) continue;  // the crypto/IO library
+      const m = line.match(/([\w.\-]+)\.(?:js|mjs|html)(?::\d+:\d+)?/);
+      if (!m) continue;
+      const file = m[1];
+      if (file.includes('sg-side-nav'))       return 'side-nav';
+      if (file.includes('sg-sub-nav'))        return 'sub-nav';
+      if (file.includes('sg-search'))         return 'search';
+      if (file.includes('sg-article-viewer')) return 'article-viewer';
+      if (file.includes('sg-debug-panel'))    continue;
+      if (file === 'index' || file.endsWith('index')) return 'page';
+      // Any other named module/page becomes its short name
+      return file.split('/').pop();
+    }
+    return 'page';
+  }
+
+  _sourceColor(source) {
+    const PALETTE = {
+      'side-nav':       '#38bdf8',
+      'sub-nav':        '#a78bfa',
+      'search':         '#4ade80',
+      'article-viewer': '#fbbf24',
+      'page':           '#f472b6',
+    };
+    if (PALETTE[source]) return PALETTE[source];
+    // Stable hash → hue for any other source
+    let h = 0;
+    for (let i = 0; i < (source ?? '').length; i++) h = (h * 31 + source.charCodeAt(i)) % 360;
+    return `hsl(${h}, 65%, 62%)`;
+  }
+
   _renderFetches() {
     const el = this._fetchEl;
     if (!el) return;
@@ -599,6 +707,11 @@ class SgDebugPanel extends HTMLElement {
       el.innerHTML = '<div class="sgdbg-fetches-empty">No vault requests captured yet.<br>Load a page or article to populate.</div>';
       return;
     }
+    if (this._fetchView === 'list') this._renderFetchesList(el);
+    else                            this._renderFetchesTrace(el);
+  }
+
+  _renderFetchesList(el) {
     el.innerHTML = this._vaultFetches.map(f => {
       const isDupBlob = f.objType === 'blob' && f.dupNum > 0;
       const rowCls = ['sgdbg-frow', f.objType ?? 'other',
@@ -608,19 +721,87 @@ class SgDebugPanel extends HTMLElement {
       const displayId = f.objId.startsWith('obj-') ? f.objId
                       : f.objId.length > 16 ? f.objId.slice(0, 16) + '…'
                       : f.objId;
-      const durText = f.durationMs != null ? `${f.durationMs}ms` : '…';
+      const durText  = f.durationMs != null ? `${f.durationMs}ms` : '…';
       const sizeText = f.sizekb ? ` · ${f.sizekb}KB` : '';
+      const srcColor = this._sourceColor(f.source);
       return `<div class="${rowCls}">
         <span class="sgdbg-f-seq">#${f.seq}</span>
         <span class="sgdbg-f-ts">${f.ts}</span>
         <span class="sgdbg-f-type">${f.objType ?? '?'}</span>
-        <span class="sgdbg-f-id">${esc(displayId)} <span class="sgdbg-f-vid">[${esc(f.vaultId)}]</span></span>
+        <span class="sgdbg-f-id">
+          <span class="sgdbg-f-src" style="color:${srcColor}">${esc(f.source ?? '?')}</span>
+          ${esc(displayId)} <span class="sgdbg-f-vid">[${esc(f.vaultId)}]</span>
+        </span>
         <span class="sgdbg-f-right">
           <span class="sgdbg-f-dur${durCls}">${durText}${sizeText}</span>
           ${isDupBlob ? `<span class="sgdbg-f-dup">dup ×${f.dupNum + 1}</span>` : ''}
         </span>
       </div>`;
     }).join('');
+  }
+
+  // Jaeger / X-Ray style waterfall: each request is a span positioned by its
+  // start offset and sized by duration. Bars are colour-coded by source
+  // component so parallel duplicate dependency chains are visually obvious.
+  _renderFetchesTrace(el) {
+    const fetches = this._vaultFetches;
+    const base = this._traceT0 ?? fetches[0].startPerf;
+    // Total span = from first start to the latest end (use elapsed-so-far for in-flight)
+    const now  = performance.now();
+    let maxEnd = 0;
+    for (const f of fetches) {
+      const end = f.startPerf + (f.durationMs != null ? f.durationMs : (now - f.startPerf));
+      if (end - base > maxEnd) maxEnd = end - base;
+    }
+    const total = Math.max(maxEnd, 1);
+
+    // Time axis ticks (~5 divisions)
+    const tickCount = 5;
+    const ticks = Array.from({ length: tickCount + 1 }, (_, i) => {
+      const ms = Math.round((total / tickCount) * i);
+      const pct = (i / tickCount) * 100;
+      return `<span class="sgdbg-trace-tick" style="left:${pct}%">${ms}ms</span>`;
+    }).join('');
+
+    // Source legend (distinct sources in first-seen order)
+    const seenSrc = [];
+    for (const f of fetches) if (!seenSrc.includes(f.source)) seenSrc.push(f.source);
+    const legend = seenSrc.map(s =>
+      `<span class="sgdbg-trace-legend-item">
+         <span class="sgdbg-trace-swatch" style="background:${this._sourceColor(s)}"></span>${esc(s ?? '?')}
+       </span>`).join('');
+
+    const rows = fetches.map(f => {
+      const startOffset = f.startPerf - base;
+      const dur         = f.durationMs != null ? f.durationMs : (now - f.startPerf);
+      const leftPct     = (startOffset / total) * 100;
+      const widthPct    = Math.max((dur / total) * 100, 0.6);
+      const labelLeft   = leftPct < 55;   // put label after the bar near left, before near right
+      const color       = this._sourceColor(f.source);
+      const isDupBlob   = f.objType === 'blob' && f.dupNum > 0;
+      const displayId   = f.objId.length > 22 ? f.objId.slice(0, 22) + '…' : f.objId;
+      const inFlight    = f.durationMs == null;
+      const durText     = inFlight ? '…' : `${f.durationMs}ms`;
+      const barLabel    = `${f.objType} ${displayId} · ${durText}${isDupBlob ? ` · dup ×${f.dupNum + 1}` : ''}`;
+      return `<div class="sgdbg-trace-row${isDupBlob ? ' dup' : ''}${f.ok === false ? ' err' : ''}">
+        <div class="sgdbg-trace-gutter">
+          <span class="sgdbg-trace-seq">#${f.seq}</span>
+          <span class="sgdbg-trace-src" style="color:${color}">${esc(f.source ?? '?')}</span>
+          <span class="sgdbg-trace-type">${f.objType}</span>
+        </div>
+        <div class="sgdbg-trace-track">
+          <div class="sgdbg-trace-bar${inFlight ? ' inflight' : ''}"
+               style="left:${leftPct}%;width:${widthPct}%;background:${color}${isDupBlob ? ';outline:1px solid #f59e0b' : ''}"
+               title="${esc(barLabel)}"></div>
+          <span class="sgdbg-trace-bar-label" style="${labelLeft ? `left:calc(${leftPct}% + ${widthPct}%)` : `right:calc(${100 - leftPct}%)`}">${esc(displayId)} · ${durText}${isDupBlob ? ` <span class="sgdbg-f-dup">dup ×${f.dupNum + 1}</span>` : ''}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="sgdbg-trace-legend">${legend}</div>
+      <div class="sgdbg-trace-axis">${ticks}</div>
+      <div class="sgdbg-trace-rows">${rows}</div>`;
   }
 
   _updateFetchSummary() {
@@ -678,12 +859,15 @@ class SgDebugPanel extends HTMLElement {
           const prevCnt = self._objFetchCount.get(objId) ?? 0;
           self._objFetchCount.set(objId, prevCnt + 1);
           vfe = {
-            seq:      ++self._vaultFetchSeq,
-            ts:       new Date().toLocaleTimeString('en-GB', { hour12:false, second:'2-digit', fractionalSecondDigits:2 }),
+            seq:       ++self._vaultFetchSeq,
+            ts:        new Date().toLocaleTimeString('en-GB', { hour12:false, second:'2-digit', fractionalSecondDigits:2 }),
             objType, objId, vaultId,
-            dupNum:   prevCnt,   // >0 means this is a duplicate
-            ok:       null, durationMs: null, sizekb: null,
+            source:    self._detectSource(),   // calling component (from stack)
+            dupNum:    prevCnt,                 // >0 means this is a duplicate
+            startPerf: t0,                      // performance.now() at request start
+            ok:        null, durationMs: null, sizekb: null,
           };
+          if (self._traceT0 == null) self._traceT0 = t0;
           self._vaultFetches.push(vfe);
           self._updateFetchSummary();
           if (self._open && self._activeTab === 'fetches') self._renderFetches();
