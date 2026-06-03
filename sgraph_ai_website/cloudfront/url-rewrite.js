@@ -31,7 +31,7 @@
 //
 //   Then associate with distribution as Viewer Request.
 
-var CF_VERSION = 'v0.1.1';
+var CF_VERSION = 'v0.1.3';
 
 function handler(event) {
     var request = event.request;
