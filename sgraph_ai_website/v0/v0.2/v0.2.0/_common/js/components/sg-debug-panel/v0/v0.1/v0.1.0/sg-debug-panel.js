@@ -1,5 +1,5 @@
 /**
- * sg-debug-panel v0.1.5
+ * sg-debug-panel v0.1.6
  *
  * Floating debug overlay for sgraph.ai sub-sites. Two tabs:
  *   Log     — intercepted fetch calls (vault / GitHub API) + custom nav:* events
@@ -22,17 +22,20 @@ class SgDebugPanel extends HTMLElement {
               : 'prod';
     if (env === 'prod') return;
 
-    this._log          = [];
-    this._sources      = [];   // { kind, label, content }
-    this._vaultContent = new Map();   // objectId → decrypted text
-    this._open         = localStorage.getItem('sg-debug-open') === 'true';
-    this._activeTab    = localStorage.getItem('sg-debug-tab') ?? 'log';
+    this._log           = [];
+    this._sources       = [];   // { kind, label, content }
+    this._vaultContent  = new Map();   // objectId → decrypted text
+    this._vaultFetches  = [];   // ordered vault fetch entries
+    this._objFetchCount = new Map();   // objectId → number of times fetched
+    this._vaultFetchSeq = 0;
+    this._open          = localStorage.getItem('sg-debug-open') === 'true';
+    this._activeTab     = localStorage.getItem('sg-debug-tab') ?? 'log';
 
     this._buildUI();
     this._patchFetch();
     this._listenEvents();
     this._listenKeyboard();
-    this._pushLog({ kind: 'system', msg: `sg-debug-panel v0.1.5 · ${env} · ${location.pathname}` });
+    this._pushLog({ kind: 'system', msg: `sg-debug-panel v0.1.6 · ${env} · ${location.pathname}` });
   }
 
   disconnectedCallback() {
@@ -209,6 +212,48 @@ class SgDebugPanel extends HTMLElement {
       .sgdbg-source-item.open .sgdbg-source-body { display: block; }
       .sgdbg-src-empty { padding: 2rem; text-align: center; color: #334155; font-size: 11px; }
 
+      /* Fetches tab */
+      .sgdbg-fetches-log { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0; overscroll-behavior: contain; }
+      .sgdbg-frow {
+        display: grid;
+        grid-template-columns: 28px 64px 44px 1fr auto;
+        gap: 0 6px; padding: 3px 14px;
+        border-bottom: 1px solid #1e293b0a;
+        border-left: 2px solid #334155;
+        align-items: baseline;
+      }
+      .sgdbg-frow.blob   { border-left-color: #7c3aed88; }
+      .sgdbg-frow.ref    { border-left-color: #0369a1; }
+      .sgdbg-frow.tree   { border-left-color: #16a34a; }
+      .sgdbg-frow.commit { border-left-color: #475569; }
+      .sgdbg-frow.other  { border-left-color: #334155; }
+      .sgdbg-frow.dup-blob { border-left-color: #f59e0b; background: #f59e0b07; }
+      .sgdbg-frow.fetch-err { border-left-color: #dc2626; }
+      .sgdbg-f-seq  { color: #334155; font-size: 9px; text-align: right; white-space: nowrap; }
+      .sgdbg-f-ts   { color: #475569; font-size: 10px; white-space: nowrap; }
+      .sgdbg-f-type {
+        font-size: 9px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .05em; white-space: nowrap;
+      }
+      .sgdbg-frow.blob   .sgdbg-f-type { color: #a78bfa; }
+      .sgdbg-frow.ref    .sgdbg-f-type { color: #38bdf8; }
+      .sgdbg-frow.tree   .sgdbg-f-type { color: #4ade80; }
+      .sgdbg-frow.commit .sgdbg-f-type { color: #94a3b8; }
+      .sgdbg-frow.other  .sgdbg-f-type { color: #475569; }
+      .sgdbg-frow.dup-blob .sgdbg-f-type { color: #fbbf24; }
+      .sgdbg-f-id  { color: #cbd5e1; font-size: 11px; word-break: break-all; min-width: 0; }
+      .sgdbg-f-id .sgdbg-f-vid { color: #334155; font-size: 9px; }
+      .sgdbg-f-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+      .sgdbg-f-dur  { color: #475569; font-size: 10px; white-space: nowrap; }
+      .sgdbg-f-dur.slow  { color: #fbbf24; }
+      .sgdbg-f-dur.vslow { color: #f87171; }
+      .sgdbg-f-dup {
+        font-size: 9px; font-weight: 700; color: #f59e0b;
+        background: #f59e0b11; border: 1px solid #f59e0b44;
+        border-radius: 3px; padding: 0 4px; white-space: nowrap;
+      }
+      .sgdbg-fetches-empty { padding: 2rem; text-align: center; color: #334155; font-size: 11px; }
+
       /* Footer */
       .sgdbg-foot {
         padding: 8px 14px; border-top: 1px solid #1e293b;
@@ -243,6 +288,7 @@ class SgDebugPanel extends HTMLElement {
           <span class="sgdbg-title">◉ Debug</span>
           <div class="sgdbg-tabs">
             <button class="sgdbg-tab${this._activeTab==='log'?' active':''}" data-tab="log">Log</button>
+            <button class="sgdbg-tab${this._activeTab==='fetches'?' active':''}" data-tab="fetches">Fetches</button>
             <button class="sgdbg-tab${this._activeTab==='sources'?' active':''}" data-tab="sources">Sources</button>
           </div>
           <div class="sgdbg-counts">
@@ -263,6 +309,17 @@ class SgDebugPanel extends HTMLElement {
             <button class="sgdbg-tbtn" id="sgdbg-clear">Clear</button>
           </div>
           <div class="sgdbg-log" id="sgdbg-log"></div>
+        </div>
+
+        <!-- FETCHES tab -->
+        <div id="sgdbg-tab-fetches" style="${this._activeTab==='fetches'?'display:flex;flex-direction:column;flex:1;min-height:0':'display:none'}">
+          <div class="sgdbg-toolbar">
+            <span id="sgdbg-fetches-summary" style="font-size:10px;color:#475569;flex:1">0 requests</span>
+            <button class="sgdbg-tbtn" id="sgdbg-fetches-clear">Clear</button>
+          </div>
+          <div class="sgdbg-fetches-log" id="sgdbg-fetches-log">
+            <div class="sgdbg-fetches-empty">No vault requests captured yet.<br>Load a page or article to populate.</div>
+          </div>
         </div>
 
         <!-- SOURCES tab -->
@@ -296,9 +353,12 @@ class SgDebugPanel extends HTMLElement {
         localStorage.setItem('sg-debug-tab', this._activeTab);
         panel.querySelectorAll('.sgdbg-tab').forEach(t => t.classList.toggle('active', t === tab));
         panel.querySelector('#sgdbg-tab-log').style.display     = this._activeTab==='log'     ? 'flex' : 'none';
+        panel.querySelector('#sgdbg-tab-fetches').style.display = this._activeTab==='fetches' ? 'flex' : 'none';
         panel.querySelector('#sgdbg-tab-sources').style.display = this._activeTab==='sources' ? 'flex' : 'none';
         if (this._activeTab === 'log')     { const el = panel.querySelector('#sgdbg-tab-log');     el.style.flexDirection='column'; el.style.flex='1'; el.style.minHeight='0'; }
+        if (this._activeTab === 'fetches') { const el = panel.querySelector('#sgdbg-tab-fetches'); el.style.flexDirection='column'; el.style.flex='1'; el.style.minHeight='0'; }
         if (this._activeTab === 'sources') { const el = panel.querySelector('#sgdbg-tab-sources'); el.style.flexDirection='column'; el.style.flex='1'; el.style.minHeight='0'; }
+        if (this._activeTab === 'fetches') this._renderFetches();
         if (this._activeTab === 'sources') this._renderSources();
       });
     });
@@ -323,9 +383,14 @@ class SgDebugPanel extends HTMLElement {
     panel.querySelector('#sgdbg-src-clear')?.addEventListener('click', () => {
       this._sources = []; this._renderSources();
     });
+    panel.querySelector('#sgdbg-fetches-clear')?.addEventListener('click', () => {
+      this._vaultFetches = []; this._objFetchCount = new Map(); this._vaultFetchSeq = 0;
+      this._renderFetches(); this._updateFetchSummary();
+    });
 
-    this._logEl  = panel.querySelector('#sgdbg-log');
-    this._srcEl  = panel.querySelector('#sgdbg-sources');
+    this._logEl   = panel.querySelector('#sgdbg-log');
+    this._srcEl   = panel.querySelector('#sgdbg-sources');
+    this._fetchEl = panel.querySelector('#sgdbg-fetches-log');
     this._logFilter = '';
   }
 
@@ -389,7 +454,11 @@ class SgDebugPanel extends HTMLElement {
   _applyOpen() {
     this._panel.classList.toggle('open', this._open);
     this._btn.classList.toggle('active', this._open);
-    if (this._open) { this._renderLog(); if (this._activeTab==='sources') this._renderSources(); }
+    if (this._open) {
+      this._renderLog();
+      if (this._activeTab === 'fetches') this._renderFetches();
+      if (this._activeTab === 'sources') this._renderSources();
+    }
   }
 
   // ── Log ───────────────────────────────────────────────────────────────────
@@ -521,6 +590,60 @@ class SgDebugPanel extends HTMLElement {
     });
   }
 
+  // ── Fetches ───────────────────────────────────────────────────────────────
+
+  _renderFetches() {
+    const el = this._fetchEl;
+    if (!el) return;
+    if (!this._vaultFetches.length) {
+      el.innerHTML = '<div class="sgdbg-fetches-empty">No vault requests captured yet.<br>Load a page or article to populate.</div>';
+      return;
+    }
+    el.innerHTML = this._vaultFetches.map(f => {
+      const isDupBlob = f.objType === 'blob' && f.dupNum > 0;
+      const rowCls = ['sgdbg-frow', f.objType ?? 'other',
+        isDupBlob ? 'dup-blob' : '',
+        f.ok === false ? 'fetch-err' : ''].filter(Boolean).join(' ');
+      const durCls = f.durationMs == null ? '' : f.durationMs > 500 ? ' vslow' : f.durationMs > 200 ? ' slow' : '';
+      const displayId = f.objId.startsWith('obj-') ? f.objId
+                      : f.objId.length > 16 ? f.objId.slice(0, 16) + '…'
+                      : f.objId;
+      const durText = f.durationMs != null ? `${f.durationMs}ms` : '…';
+      const sizeText = f.sizekb ? ` · ${f.sizekb}KB` : '';
+      return `<div class="${rowCls}">
+        <span class="sgdbg-f-seq">#${f.seq}</span>
+        <span class="sgdbg-f-ts">${f.ts}</span>
+        <span class="sgdbg-f-type">${f.objType ?? '?'}</span>
+        <span class="sgdbg-f-id">${esc(displayId)} <span class="sgdbg-f-vid">[${esc(f.vaultId)}]</span></span>
+        <span class="sgdbg-f-right">
+          <span class="sgdbg-f-dur${durCls}">${durText}${sizeText}</span>
+          ${isDupBlob ? `<span class="sgdbg-f-dup">dup ×${f.dupNum + 1}</span>` : ''}
+        </span>
+      </div>`;
+    }).join('');
+  }
+
+  _updateFetchSummary() {
+    const sumEl = this._panel?.querySelector('#sgdbg-fetches-summary');
+    if (!sumEl) return;
+    const total  = this._vaultFetches.length;
+    const blobs  = this._vaultFetches.filter(f => f.objType === 'blob');
+    const uniq   = new Set(blobs.map(f => f.objId)).size;
+    const dups   = blobs.filter(f => f.dupNum > 0).length;
+    const byType = {};
+    for (const f of this._vaultFetches) byType[f.objType] = (byType[f.objType] ?? 0) + 1;
+    const parts = [`${total} req`];
+    if (byType.blob)   parts.push(`${byType.blob} blob${byType.blob > 1 ? 's' : ''} (${uniq} uniq)`);
+    if (byType.ref)    parts.push(`${byType.ref} ref`);
+    if (byType.commit) parts.push(`${byType.commit} commit`);
+    if (byType.tree)   parts.push(`${byType.tree} tree`);
+    if (dups > 0)      parts.push(`⚠ ${dups} dup${dups > 1 ? 's' : ''}`);
+    sumEl.textContent = parts.join(' · ');
+    // Badge on the tab button
+    const tabBtn = this._panel?.querySelector('.sgdbg-tab[data-tab="fetches"]');
+    if (tabBtn) tabBtn.textContent = dups > 0 ? `Fetches ⚠${dups}` : `Fetches${total ? ` ${total}` : ''}`;
+  }
+
   // ── fetch patch ───────────────────────────────────────────────────────────
 
   _patchFetch() {
@@ -537,6 +660,34 @@ class SgDebugPanel extends HTMLElement {
         const short   = decoded.replace(/^https?:\/\/[^/]+/, '').slice(0, 100);
         const kind    = isVault ? 'vault' : isGH ? 'gh' : 'nav';
         const t0      = performance.now();
+
+        // Pre-request: classify vault path and record in fetches log
+        let vfe = null;  // vault fetch entry
+        if (isVault) {
+          const parts   = decoded.split('/');
+          // URL shape: https://send.sgraph.ai/api/vault/read/{vaultId}/{pathSegments...}
+          // parts[6] = vaultId, parts[7+] = path type
+          const vaultId = parts[6] ?? '?';
+          const subPath = parts.slice(7).join('/');
+          const objType = subPath.startsWith('ref/')    ? 'ref'
+                        : subPath.startsWith('tree/')   ? 'tree'
+                        : subPath.startsWith('commit/') ? 'commit'
+                        : subPath.includes('obj-cas-imm') || subPath.startsWith('bare/') ? 'blob'
+                        : 'other';
+          const objId   = parts.pop() ?? '';
+          const prevCnt = self._objFetchCount.get(objId) ?? 0;
+          self._objFetchCount.set(objId, prevCnt + 1);
+          vfe = {
+            seq:      ++self._vaultFetchSeq,
+            ts:       new Date().toLocaleTimeString('en-GB', { hour12:false, second:'2-digit', fractionalSecondDigits:2 }),
+            objType, objId, vaultId,
+            dupNum:   prevCnt,   // >0 means this is a duplicate
+            ok:       null, durationMs: null, sizekb: null,
+          };
+          self._vaultFetches.push(vfe);
+          self._updateFetchSummary();
+          if (self._open && self._activeTab === 'fetches') self._renderFetches();
+        }
 
         try {
           const res  = await self._origFetch.call(this, input, init);
@@ -564,10 +715,22 @@ class SgDebugPanel extends HTMLElement {
               detail:   res.ok ? null : `HTTP ${res.status} ${res.statusText}`,
             });
           }
+
+          // Post-request: fill in duration + size for vault fetch entry
+          if (vfe) {
+            vfe.ok = res.ok;
+            vfe.durationMs = ms;
+            const cl = res.headers.get('content-length');
+            if (cl) vfe.sizekb = (parseInt(cl, 10) / 1024).toFixed(1);
+            self._updateFetchSummary();
+            if (self._open && self._activeTab === 'fetches') self._renderFetches();
+          }
+
           return res;
         } catch (err) {
           const ms = Math.round(performance.now() - t0);
           self._pushLog({ kind: `${kind}-err`, msg: `✗ ${short}`, sub: `${ms}ms · ${err.message}`, detail: err.stack });
+          if (vfe) { vfe.ok = false; vfe.durationMs = ms; self._updateFetchSummary(); if (self._open && self._activeTab === 'fetches') self._renderFetches(); }
           throw err;
         }
       }
