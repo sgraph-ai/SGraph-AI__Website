@@ -1,0 +1,14 @@
+{
+  "schema": "sg-render/v1",
+  "type": "llm.json",
+  "content_type": "application/json; charset=utf-8",
+  "vault": {
+    "id": "ub9jj0gq",
+    "read_key": "fJaOQDUcy2QCXSJzfmspg6tCFP94d253qD2NXyxQBeM",
+    "nav_path": "_nav.json"
+  },
+  "site": {
+    "title": "Invest in SGraph",
+    "base_path": "/en-gb/invest"
+  }
+}

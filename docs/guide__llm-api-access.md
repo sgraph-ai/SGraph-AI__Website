@@ -141,6 +141,20 @@ Every library page has all three. The slug is the same in all cases.
 
 All slugs are listed in `/llms.txt`.
 
+### Other content areas
+
+The same `.md` / `.llm.json` convention works for the **Invest** sub-site
+(vault `ub9jj0gq`), which is not linked from the main nav:
+
+```
+Markdown:   /en-gb/invest/<slug>.md
+JSON:       /en-gb/invest/<slug>.llm.json
+```
+
+Example: `/en-gb/invest/the-ask.md`. New areas are added by dropping a manifest
+into `core/edge-render/v1/manifests/` and registering the base path in the
+orchestrator's `AREAS` table — no Lambda change.
+
 ---
 
 ## How the Content Stays Live
