@@ -36,17 +36,38 @@
  *   nav:select  — detail: { title, slug, content_object_id, render, schema,
  *                           sectionTitle, parentTitle, vault_id, read_key }
  */
+// Attributes that require a vault re-fetch when changed.
+// Display-only attributes (active-slug, tree-label, version, etc.) only need a re-render.
+const _SIDE_NAV_DATA_ATTRS = new Set(['src', 'vault-id', 'read-key', 'nav-object-id', 'nav-path', 'extra-links']);
+
 class SgSideNav extends HTMLElement {
   static get observedAttributes() {
     return ['src', 'vault-id', 'read-key', 'nav-object-id', 'nav-path',
             'active-slug', 'auto-select', 'tree-label', 'version', 'extra-links', 'home-href'];
   }
 
-  connectedCallback() { this._load(); }
+  connectedCallback() { this._scheduleLoad(true); }
 
   attributeChangedCallback(name) {
     if (name !== 'active-slug') this._dataLoaded = false;
-    this._load();
+    if (_SIDE_NAV_DATA_ATTRS.has(name)) this._pendingDataChange = true;
+    this._scheduleLoad(false);
+  }
+
+  // Coalesce a burst of synchronous attribute mutations into a single call.
+  // If the pending work only requires a re-render (display attrs only), skip
+  // the vault fetch and use the already-loaded sections from last load.
+  _scheduleLoad(forceData) {
+    if (forceData) this._pendingDataChange = true;
+    if (this._loadScheduled) return;
+    this._loadScheduled = true;
+    queueMicrotask(() => {
+      this._loadScheduled = false;
+      const needsFetch = this._pendingDataChange || !this._sections;
+      this._pendingDataChange = false;
+      if (needsFetch) this._load();
+      else            this._render(this._sections);
+    });
   }
 
   async _load() {
@@ -78,6 +99,7 @@ class SgSideNav extends HTMLElement {
       this._lastSync = Date.now();
       const sections = (data.library ?? data.dev ?? data).sections ?? [];
       await this._injectExtraLinks(sections);
+      this._sections = sections;   // cache for re-renders
       this._render(sections);
     } catch (err) {
       this.innerHTML = `<p class="sg-side-nav__error">Nav failed to load.</p>`;
@@ -99,6 +121,7 @@ class SgSideNav extends HTMLElement {
       const root = data.library ?? data.dev ?? data;
       section._loadedArticles = root.children ?? root.articles ?? [];
       section._loading = false;
+      this._sections = sections;   // keep cache in sync
       this._render(sections);
     } catch (err) {
       console.error('sg-side-nav: section load error', section.title, err);

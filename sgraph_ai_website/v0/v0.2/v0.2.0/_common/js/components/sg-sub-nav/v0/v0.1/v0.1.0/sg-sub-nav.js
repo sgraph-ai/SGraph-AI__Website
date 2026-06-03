@@ -25,8 +25,14 @@ class SgSubNav extends HTMLElement {
             'vault-id', 'read-key', 'nav-object-id', 'nav-path', 'search-placeholder'];
   }
 
-  connectedCallback() { this._render(); }
-  attributeChangedCallback() { this._render(); }
+  connectedCallback() { this._scheduleRender(); }
+  attributeChangedCallback() { this._scheduleRender(); }
+
+  _scheduleRender() {
+    if (this._renderScheduled) return;
+    this._renderScheduled = true;
+    queueMicrotask(() => { this._renderScheduled = false; this._render(); });
+  }
 
   async _render() {
     const title       = this.getAttribute('site-title') ?? '';
