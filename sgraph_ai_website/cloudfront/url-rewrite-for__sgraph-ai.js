@@ -6,6 +6,7 @@
 // What it does:
 //   /                              → /index.html
 //   /en-gb/library/SLUG/           → /en-gb/library/index.html   (SPA rewrite)
+//   /en-gb/invest/SLUG/            → /en-gb/invest/index.html    (SPA rewrite)
 //   /en-gb/dev/SLUG/               → /en-gb/dev/index.html       (SPA rewrite, except real sub-pages)
 //   /en-gb/dev/vault-peek/         → /en-gb/dev/vault-peek/index.html  (real sub-page, not rewritten)
 //   /en-gb/library/                → /en-gb/library/index.html
@@ -30,7 +31,7 @@
 //
 //   Then associate with distribution as Viewer Request.
 
-var CF_VERSION = 'v0.1.0';
+var CF_VERSION = 'v0.1.3';
 
 function handler(event) {
     var request = event.request;
@@ -43,10 +44,21 @@ function handler(event) {
 
     // SPA sub-site rewrites — must run before the generic index.html append.
     // Only apply to trailing-slash URIs (bare paths are handled below with a redirect).
+    //
+    // IMPORTANT: do NOT rewrite *.md / *.llm.json / llms.txt here. Those are served
+    // as pure text by the sg-edge-render Lambda@Edge at origin-request (which runs
+    // AFTER this viewer-request function). They have a dot and no trailing slash, so
+    // they fall through to the bottom unchanged and reach the origin-request Lambda.
 
     // Library: all sub-paths are SPA slug routes → serve library index
     if (uri.endsWith('/') && uri.startsWith('/en-gb/library/') && uri !== '/en-gb/library/') {
         request.uri = '/en-gb/library/index.html';
+        return request;
+    }
+
+    // Invest: all sub-paths are SPA slug routes → serve invest index
+    if (uri.endsWith('/') && uri.startsWith('/en-gb/invest/') && uri !== '/en-gb/invest/') {
+        request.uri = '/en-gb/invest/index.html';
         return request;
     }
 
