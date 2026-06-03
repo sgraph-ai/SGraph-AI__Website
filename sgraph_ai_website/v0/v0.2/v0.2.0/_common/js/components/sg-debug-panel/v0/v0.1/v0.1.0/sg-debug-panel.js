@@ -494,6 +494,13 @@ class SgDebugPanel extends HTMLElement {
     this._srcEl   = panel.querySelector('#sgdbg-sources');
     this._fetchEl = panel.querySelector('#sgdbg-fetches-log');
     this._logFilter = '';
+
+    // Auto-scroll: pinned to bottom by default; un-pins when user scrolls up
+    this._fetchScrollPinned = true;
+    this._fetchEl.addEventListener('scroll', () => {
+      const el = this._fetchEl;
+      this._fetchScrollPinned = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+    });
   }
 
   // ── Button placement ──────────────────────────────────────────────────────
@@ -742,6 +749,7 @@ class SgDebugPanel extends HTMLElement {
     }
     if (this._fetchView === 'list') this._renderFetchesList(el);
     else                            this._renderFetchesTrace(el);
+    if (this._fetchScrollPinned) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
   }
 
   _renderFetchesList(el) {
