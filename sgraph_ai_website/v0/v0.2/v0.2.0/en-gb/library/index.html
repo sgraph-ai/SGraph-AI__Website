@@ -232,7 +232,13 @@
   }
 
   const initialSlug = slugFromPath();
-  if (initialSlug) sideNav.setAttribute('active-slug', initialSlug);
+  // Don't set active-slug in .md mode — auto-select handles the highlight,
+  // and active-slug would fire nav:select which would overwrite the raw view.
+  if (initialSlug && !isMdMode()) sideNav.setAttribute('active-slug', initialSlug);
+
+  // Suppress nav:select during .md raw-view: the nav:loaded handler owns the render.
+  // Reset to false after the first suppressed event so subsequent sidebar clicks work.
+  let _mdModeActive = isMdMode();
 
   document.addEventListener('nav:loaded', e => {
     const navElapsedMs = performance.now() - _navStartMs;
@@ -292,6 +298,7 @@
 
   // Article selected via sidebar
   document.addEventListener('nav:select', e => {
+    if (_mdModeActive) { _mdModeActive = false; return; }
     const { title, slug, sectionTitle, parentTitle, content_object_id, render, vault_id, read_key } = e.detail;
     const targetPath = `/en-gb/library/${slug}/`;
     if (location.pathname !== targetPath) {
