@@ -179,8 +179,9 @@ class SgDebugPanel extends HTMLElement {
       .sgdbg-entry.system .sgdbg-kind { color: #4ade80; }
       .sgdbg-entry.gh     .sgdbg-kind,
       .sgdbg-entry.warn   .sgdbg-kind { color: #fbbf24; }
+      .sgdbg-msg-line { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
       .sgdbg-msg  { color: #cbd5e1; word-break: break-all; }
-      .sgdbg-sub  { color: #475569; font-size: 10px; margin-top: 2px; }
+      .sgdbg-sub  { color: #475569; font-size: 10px; white-space: nowrap; flex-shrink: 0; }
       .sgdbg-detail {
         display: none; grid-column: 1 / -1;
         background: #1e293b; border-radius: 4px; margin: 4px 0;
@@ -618,8 +619,10 @@ class SgDebugPanel extends HTMLElement {
         <span class="sgdbg-ts">${e.ts}</span>
         <span class="sgdbg-kind">${badge}</span>
         <div>
-          <div class="sgdbg-msg">${esc(e.msg??'')}</div>
-          ${e.sub ? `<div class="sgdbg-sub">${esc(e.sub)}</div>` : ''}
+          <div class="sgdbg-msg-line">
+            <span class="sgdbg-msg">${esc(e.msg??'')}</span>
+            ${e.sub ? `<span class="sgdbg-sub">${esc(e.sub)}</span>` : ''}
+          </div>
           ${e.detail ? `<div class="sgdbg-detail">${esc(typeof e.detail==='string'?e.detail:JSON.stringify(e.detail,null,2))}</div>` : ''}
           ${hasContent ? `<div class="sgdbg-detail">${contentHl}</div>` : ''}
         </div>
