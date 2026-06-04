@@ -43,7 +43,7 @@ function gcmDecrypt(key, buf) {
 const decMeta = (key, s) => gcmDecrypt(key, b64(s)).toString('utf8')
 
 async function readObject(vaultId, objectId, key) {
-  const url = `${VAULT_API}/api/vault/read/${vaultId}/${encodeURIComponent(objPath(objectId))}`
+  const url = `${VAULT_API}/api/vault/read/${vaultId}/${objPath(objectId).split('/').map(encodeURIComponent).join('/')}`
   const r = await fetch(url)
   if (!r.ok) throw new Error(`vault read ${objectId}: ${r.status}`)
   return gcmDecrypt(key, Buffer.from(await r.arrayBuffer()))
