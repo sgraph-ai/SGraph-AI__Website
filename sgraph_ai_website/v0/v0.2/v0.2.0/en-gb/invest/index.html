@@ -109,6 +109,10 @@
   const READ_KEY = 'fJaOQDUcy2QCXSJzfmspg6tCFP94d253qD2NXyxQBeM';
   const BASE     = '/en-gb/invest/';
 
+  // Right-hand "On this page" TOC. Disabled for invest — the rail is reserved
+  // for an upcoming chat pane. Flip to true to restore the heading TOC.
+  const TOC_ENABLED = false;
+
   function slugFromPath() {
     const segments = location.pathname.split('/').filter(Boolean);
     // /en-gb/invest/<slug...>  →  segments[0]=en-gb, [1]=invest, [2+]=slug
@@ -438,6 +442,7 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     document.getElementById('toc-list').innerHTML = '';
+    if (!TOC_ENABLED) return;
     headingObserver = new MutationObserver(() => {
       clearTimeout(headingObserver._t);
       headingObserver._t = setTimeout(() => buildToc(renderEl), 150);
