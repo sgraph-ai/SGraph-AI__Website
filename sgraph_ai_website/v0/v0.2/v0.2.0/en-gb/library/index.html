@@ -348,6 +348,7 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     articleEl.hidden = false;
+    window.scrollTo({ top: 0, behavior: 'auto' });
 
     setBreadcrumbs('Library', section.title, null);
 
@@ -401,6 +402,7 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     articleEl.hidden = false;
+    window.scrollTo({ top: 0, behavior: 'auto' });
 
     setBreadcrumbs('Library', groupNode.sectionTitle, groupNode.parentTitle || null, groupNode.title);
 

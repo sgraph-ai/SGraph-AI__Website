@@ -274,6 +274,7 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     articleEl.hidden = false;
+    window.scrollTo({ top: 0, behavior: 'auto' });
     setBreadcrumbs(section.title, null, null);
     const articles = section.children ?? [];
     document.getElementById('article-render').innerHTML = `
@@ -314,6 +315,7 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     articleEl.hidden = false;
+    window.scrollTo({ top: 0, behavior: 'auto' });
     setBreadcrumbs(groupNode.sectionTitle, groupNode.parentTitle || null, groupNode.title);
     const children = (groupNode.children ?? []).map(c => ({
       ...c, slug: compoundSlug(groupNode.slug, c.slug),
