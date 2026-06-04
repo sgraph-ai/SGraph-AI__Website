@@ -982,6 +982,7 @@ class SgArticleViewer extends HTMLElement {
     endDom();
 
     this._addCopyButtons();
+    this._renderMermaidDiagrams();
 
     document.dispatchEvent(new CustomEvent('viewer:rendered', {
       detail: { meta },
@@ -1027,6 +1028,35 @@ class SgArticleViewer extends HTMLElement {
 
       wrap.appendChild(btn);
     });
+  }
+
+  // Lazy-load mermaid@11 (supports Wardley maps) only for pages that use it.
+  // Mermaid is loaded once per page and reused for multiple diagrams.
+  async _renderMermaidDiagrams() {
+    const els = [...this.querySelectorAll('.sg-mermaid[data-src]')];
+    if (!els.length) return;
+    let mermaid;
+    try {
+      ({ default: mermaid } = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs'));
+      mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+    } catch (err) {
+      els.forEach(el => {
+        el.innerHTML = `<div class="sg-mermaid__error">Could not load diagram renderer: ${escHtml(err.message)}</div>`;
+      });
+      return;
+    }
+    for (const el of els) {
+      const src = decodeURIComponent(el.dataset.src);
+      el.removeAttribute('data-src');
+      el.textContent = '';
+      try {
+        const id = `sg-mermaid-${++_mermaidSeq}`;
+        const { svg } = await mermaid.render(id, src);
+        el.innerHTML = svg;
+      } catch (err) {
+        el.innerHTML = `<div class="sg-mermaid__error">${escHtml(err.message)}</div>`;
+      }
+    }
   }
 
   _renderJson(text) {
@@ -1420,9 +1450,12 @@ async function _loadYaml() {
 }
 
 // ── Fenced-block pre-processor ────────────────────────────────────────────────
+let _mermaidSeq = 0;
+
 const FENCED_TYPES = new Set([
   'comparison', 'feature-cards', 'code-comparison', 'timeline',
   'checklist', 'skill-cards', 'component-gallery', 'component-table', 'proposal-card',
+  'key-points', 'mermaid',
 ]);
 
 function applyFencedBlocks(body, yamlLoad) {
@@ -1430,6 +1463,10 @@ function applyFencedBlocks(body, yamlLoad) {
     /^```([\w-]+)\n([\s\S]*?)^```/gm,
     (match, type, content) => {
       if (!FENCED_TYPES.has(type)) return match;
+      // Mermaid uses its own syntax — bypass YAML parse entirely
+      if (type === 'mermaid') {
+        try { return renderMermaid(content); } catch { return match; }
+      }
       let data;
       try { data = yamlLoad(content); } catch { return match; }
       try {
@@ -1442,6 +1479,7 @@ function applyFencedBlocks(body, yamlLoad) {
         if (type === 'component-gallery')  return renderComponentGallery(data);
         if (type === 'component-table')    return renderComponentTable(data);
         if (type === 'proposal-card')      return renderProposalCard(data);
+        if (type === 'key-points')         return renderKeyPoints(data);
       } catch { return match; }
       return match;
     }
@@ -1606,6 +1644,49 @@ function renderProposalCard(data) {
     </div>
     <div class="proposal-card__methods">${methods}</div>
   </div>`;
+}
+
+// ── key-points ────────────────────────────────────────────────────────────────
+// YAML schema:
+//   title: "Optional heading"       (optional)
+//   points:
+//     - lead: "Bold lead sentence."
+//       body: "Supporting text that follows inline."
+//       icon: "🔐"                  (optional — shows emoji instead of number badge)
+function renderKeyPoints(data) {
+  const title = data.title
+    ? `<div class="kp-list__title">${escHtml(data.title)}</div>`
+    : '';
+  const items = (data.points ?? []).map((p, i) => {
+    const badge = p.icon
+      ? `<span class="kp-item__icon">${escHtml(p.icon)}</span>`
+      : `<span class="kp-item__num">${i + 1}</span>`;
+    const body = p.body
+      ? ` <span class="kp-item__text">${escHtml(p.body)}</span>`
+      : '';
+    return `<div class="kp-item">
+      ${badge}
+      <div class="kp-item__body">
+        <span class="kp-item__lead">${escHtml(p.lead ?? '')}</span>${body}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="kp-list">${title}${items}</div>`;
+}
+
+// ── mermaid ───────────────────────────────────────────────────────────────────
+// Raw mermaid syntax (not YAML). Lazy-loads mermaid@11 from CDN on first use.
+// Wardley map syntax: use `%%{init: {'theme':'neutral'}}%%` at top of diagram.
+//
+// Usage in markdown:
+//   ```mermaid
+//   graph TD
+//     A[Start] --> B[End]
+//   ```
+function renderMermaid(source) {
+  return `<div class="sg-mermaid" data-src="${encodeURIComponent(source.trim())}">` +
+         `<div class="sg-mermaid__loading">Loading diagram…</div>` +
+         `</div>`;
 }
 
 customElements.define('sg-article-viewer', SgArticleViewer);
