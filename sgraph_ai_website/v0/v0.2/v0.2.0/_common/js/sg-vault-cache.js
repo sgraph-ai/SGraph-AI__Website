@@ -74,6 +74,12 @@
     return url.indexOf('send.sgraph.ai') !== -1;
   }
 
+  // The vault read API serves path segments with literal slashes; %2F-encoded
+  // slashes bypass the server's fast path. Browsers send literal slashes, but
+  // encodeURIComponent(path) in the vault client (and our own callers) emits
+  // %2F. Decode them back to '/' so every vault request hits the optimised path.
+  function unescapeSlashes(url) { return url.replace(/%2[Ff]/g, '/'); }
+
   // obj-cas-imm-* are content-addressed immutable — safe to persist forever.
   // ref / commit / tree objects change with vault publishes — only deduped in-flight.
   function isImmutable(url) {
@@ -124,6 +130,14 @@
   window.fetch = function sgVaultCacheFetch(input, init) {
     var url = typeof input === 'string' ? input : (input && input.url ? input.url : '');
     if (!isVaultUrl(url)) return _origFetch(input, init);
+
+    // Rewrite %2F → '/' so the request reaches the server's optimised path.
+    // Done before key/immutability checks so the IDB key is consistent too.
+    var normUrl = unescapeSlashes(url);
+    if (normUrl !== url) {
+      input = typeof input === 'string' ? normUrl : new Request(normUrl, input);
+      url   = normUrl;
+    }
 
     var t0  = performance.now();
     var key = idbKey(url);

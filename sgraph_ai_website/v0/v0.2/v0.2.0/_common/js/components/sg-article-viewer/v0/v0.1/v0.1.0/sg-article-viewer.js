@@ -414,7 +414,10 @@ class SgArticleViewer extends HTMLElement {
       endStep();
 
       // Fetch — TTFB (connect + server + first byte)
-      const objUrl = `https://send.sgraph.ai/api/vault/read/${vaultId}/${encodeURIComponent(fileIdToPath(objectId))}`;
+      // Encode each segment but keep literal slashes — the server's optimised
+      // path needs real '/' separators, not %2F.
+      const objPath = fileIdToPath(objectId).split('/').map(encodeURIComponent).join('/');
+      const objUrl = `https://send.sgraph.ai/api/vault/read/${vaultId}/${objPath}`;
       endStep = stepStart('fetch');
       const response = await fetch(objUrl);
       if (!response.ok) throw new Error(`Failed to fetch object ${objectId}: ${response.status} ${response.statusText}`);
