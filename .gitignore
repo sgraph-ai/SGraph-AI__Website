@@ -9,3 +9,4 @@ __pycache__/
 .venv/
 .env
 tests/e2e/screenshots/
+.claude/

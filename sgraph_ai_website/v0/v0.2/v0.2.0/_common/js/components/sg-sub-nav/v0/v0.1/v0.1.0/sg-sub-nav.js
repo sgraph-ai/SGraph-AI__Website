@@ -25,8 +25,14 @@ class SgSubNav extends HTMLElement {
             'vault-id', 'read-key', 'nav-object-id', 'nav-path', 'search-placeholder'];
   }
 
-  connectedCallback() { this._render(); }
-  attributeChangedCallback() { this._render(); }
+  connectedCallback() { this._scheduleRender(); }
+  attributeChangedCallback() { this._scheduleRender(); }
+
+  _scheduleRender() {
+    if (this._renderScheduled) return;
+    this._renderScheduled = true;
+    queueMicrotask(() => { this._renderScheduled = false; this._render(); });
+  }
 
   async _render() {
     const title       = this.getAttribute('site-title') ?? '';
@@ -48,10 +54,12 @@ class SgSubNav extends HTMLElement {
       try {
         const { importReadKey, readObject } =
           await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
-        const resolvedId = navPath && !navObjectId
-          ? await _sgSubNavResolve('https://send.sgraph.ai', vaultId, readKey, navPath)
-          : navObjectId;
-        const cryptoKey = await importReadKey(readKey);
+        let resolvedId = navObjectId;
+        if (navPath && !navObjectId) {
+          this._vaultCtx = await _openVaultCtx('https://send.sgraph.ai', vaultId, readKey);
+          resolvedId = await _resolvePathWithCtx(this._vaultCtx, navPath);
+        }
+        const cryptoKey = this._vaultCtx?.cryptoKey ?? await importReadKey(readKey);
         const buf = await readObject('https://send.sgraph.ai', vaultId, resolvedId, cryptoKey);
         const data = JSON.parse(new TextDecoder().decode(buf));
         crossLinks = data.cross_links
@@ -138,9 +146,7 @@ class SgSubNav extends HTMLElement {
 
 customElements.define('sg-sub-nav', SgSubNav);
 
-// Resolve a stable vault file path to the current content-addressed object ID.
-// Uses sessionStorage cache keyed by commitId — automatic miss on new publish.
-async function _sgSubNavResolve(apiBaseUrl, vaultId, readKeyBase64Url, navPath) {
+async function _openVaultCtx(apiBaseUrl, vaultId, readKeyBase64Url) {
   const client = await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
   const b64  = readKeyBase64Url.replace(/-/g, '+').replace(/_/g, '/');
   const pad  = b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=');
@@ -149,23 +155,39 @@ async function _sgSubNavResolve(apiBaseUrl, vaultId, readKeyBase64Url, navPath) 
   const cryptoKey = await client.importReadKey(readKeyBase64Url);
   const refHex    = await client.deriveFileIdHex(readKeyBytes, `sg-vault-v1:file-id:ref:${vaultId}`);
   const refFileId = client.formatFileId('ref', 'pid', 'muw', refHex);
-  const vault = { keys: { readKey: cryptoKey, readKeyBytes, refFileId, vaultId },
-                  apiBaseUrl: apiBaseUrl.replace(/\/$/, ''), vaultId };
+  const vault = {
+    keys:       { readKey: cryptoKey, readKeyBytes, refFileId, vaultId },
+    apiBaseUrl: apiBaseUrl.replace(/\/$/, ''),
+    vaultId,
+  };
   const ref      = await client.readFileAsJson(vault, refFileId);
   const commitId = ref.commit_id ?? ref.commitId ?? ref.target;
-  const cacheKey = `sg-nav:${vaultId}:${navPath}:${commitId}`;
+  if (!commitId) throw new Error('sg-sub-nav: vault ref has no commit ID');
+  return { client, vault, commitId, cryptoKey };
+}
+
+async function _resolvePathWithCtx(ctx, path) {
+  const cacheKey = `sg-nav:${ctx.vault.vaultId}:${path}:${ctx.commitId}`;
   const cached   = sessionStorage.getItem(cacheKey);
   if (cached) return cached;
-  const commit = await client.readFileAsJson(vault, commitId);
-  const treeId = commit.tree_id ?? commit.treeId ?? commit.tree;
-  let entries  = (await client.walkTree(vault, treeId)).entries ?? [];
-  for (const [i, part] of navPath.split('/').filter(Boolean).entries()) {
-    const entry = entries.find(e => e.name === part);
-    if (!entry) throw new Error(`sg-sub-nav: '${part}' not found in vault tree`);
-    if (i === navPath.split('/').filter(Boolean).length - 1) {
+
+  const commit  = await ctx.client.readFileAsJson(ctx.vault, ctx.commitId);
+  const treeId  = commit.tree_id ?? commit.treeId ?? commit.tree;
+  if (!treeId) throw new Error('sg-sub-nav: commit has no tree ID');
+
+  let entries = (await ctx.client.walkTree(ctx.vault, treeId)).entries ?? [];
+  const parts = path.split('/').filter(Boolean);
+
+  for (let i = 0; i < parts.length; i++) {
+    const entry = entries.find(e => e.name === parts[i]);
+    if (!entry) throw new Error(`sg-sub-nav: '${parts[i]}' not found in vault tree`);
+    if (i === parts.length - 1) {
+      if (!entry.blob_id) throw new Error(`sg-sub-nav: '${path}' is a directory, not a file`);
       sessionStorage.setItem(cacheKey, entry.blob_id);
       return entry.blob_id;
     }
-    entries = (await client.walkTree(vault, entry.tree_id)).entries ?? [];
+    if (!entry.tree_id) throw new Error(`sg-sub-nav: '${parts[i]}' is not a directory`);
+    entries = (await ctx.client.walkTree(ctx.vault, entry.tree_id)).entries ?? [];
   }
+  throw new Error(`sg-sub-nav: '${path}' could not be fully resolved`);
 }

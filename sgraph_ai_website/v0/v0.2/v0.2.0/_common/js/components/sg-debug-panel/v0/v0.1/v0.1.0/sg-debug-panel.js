@@ -1,8 +1,15 @@
 /**
- * sg-debug-panel v0.1.5
+ * sg-debug-panel v0.1.8
  *
- * Floating debug overlay for sgraph.ai sub-sites. Two tabs:
+ * Floating debug overlay for sgraph.ai sub-sites. Three tabs:
  *   Log     — intercepted fetch calls (vault / GitHub API) + custom nav:* events
+ *   Fetches — every vault request as a sequenced list OR a Jaeger/X-Ray-style
+ *             waterfall trace: bars positioned by start offset, sized by duration,
+ *             colour-coded by source component (detected via call stack).
+ *             If sg-vault-cache is present, cache hits (IDB ✓) and in-flight
+ *             dedup waits (→ inflight) are shown as distinct bar styles with
+ *             their own colour coding. An IDB stats bar shows live cache size.
+ *             Duplicate network blob fetches are flagged ("dup ×N").
  *   Sources — raw nav JSON tree + last decrypted vault content
  *
  * Only active on qa / dev / localhost — no-op on prod.
@@ -22,17 +29,22 @@ class SgDebugPanel extends HTMLElement {
               : 'prod';
     if (env === 'prod') return;
 
-    this._log          = [];
-    this._sources      = [];   // { kind, label, content }
-    this._vaultContent = new Map();   // objectId → decrypted text
-    this._open         = localStorage.getItem('sg-debug-open') === 'true';
-    this._activeTab    = localStorage.getItem('sg-debug-tab') ?? 'log';
+    this._log           = [];
+    this._sources       = [];   // { kind, label, content }
+    this._vaultContent  = new Map();   // objectId → decrypted text
+    this._vaultFetches  = [];   // ordered vault fetch entries
+    this._objFetchCount = new Map();   // objectId → number of times fetched
+    this._vaultFetchSeq = 0;
+    this._traceT0       = null; // performance.now() of first vault fetch (trace origin)
+    this._open          = localStorage.getItem('sg-debug-open') === 'true';
+    this._activeTab     = localStorage.getItem('sg-debug-tab') ?? 'log';
+    this._fetchView     = localStorage.getItem('sg-debug-fetchview') ?? 'trace';
 
     this._buildUI();
     this._patchFetch();
     this._listenEvents();
     this._listenKeyboard();
-    this._pushLog({ kind: 'system', msg: `sg-debug-panel v0.1.5 · ${env} · ${location.pathname}` });
+    this._pushLog({ kind: 'system', msg: `sg-debug-panel v0.1.8 · ${env} · ${location.pathname}` });
   }
 
   disconnectedCallback() {
@@ -167,8 +179,9 @@ class SgDebugPanel extends HTMLElement {
       .sgdbg-entry.system .sgdbg-kind { color: #4ade80; }
       .sgdbg-entry.gh     .sgdbg-kind,
       .sgdbg-entry.warn   .sgdbg-kind { color: #fbbf24; }
+      .sgdbg-msg-line { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
       .sgdbg-msg  { color: #cbd5e1; word-break: break-all; }
-      .sgdbg-sub  { color: #475569; font-size: 10px; margin-top: 2px; }
+      .sgdbg-sub  { color: #475569; font-size: 10px; white-space: nowrap; flex-shrink: 0; }
       .sgdbg-detail {
         display: none; grid-column: 1 / -1;
         background: #1e293b; border-radius: 4px; margin: 4px 0;
@@ -209,6 +222,113 @@ class SgDebugPanel extends HTMLElement {
       .sgdbg-source-item.open .sgdbg-source-body { display: block; }
       .sgdbg-src-empty { padding: 2rem; text-align: center; color: #334155; font-size: 11px; }
 
+      /* Fetches tab */
+      .sgdbg-fetches-log { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0; overscroll-behavior: contain; }
+      .sgdbg-frow {
+        display: grid;
+        grid-template-columns: 28px 64px 44px 1fr auto;
+        gap: 0 6px; padding: 3px 14px;
+        border-bottom: 1px solid #1e293b0a;
+        border-left: 2px solid #334155;
+        align-items: baseline;
+      }
+      .sgdbg-frow.blob   { border-left-color: #7c3aed88; }
+      .sgdbg-frow.ref    { border-left-color: #0369a1; }
+      .sgdbg-frow.tree   { border-left-color: #16a34a; }
+      .sgdbg-frow.commit { border-left-color: #475569; }
+      .sgdbg-frow.other  { border-left-color: #334155; }
+      .sgdbg-frow.dup-blob { border-left-color: #f59e0b; background: #f59e0b07; }
+      .sgdbg-frow.fetch-err { border-left-color: #dc2626; }
+      .sgdbg-f-seq  { color: #334155; font-size: 9px; text-align: right; white-space: nowrap; }
+      .sgdbg-f-ts   { color: #475569; font-size: 10px; white-space: nowrap; }
+      .sgdbg-f-type {
+        font-size: 9px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .05em; white-space: nowrap;
+      }
+      .sgdbg-frow.blob   .sgdbg-f-type { color: #a78bfa; }
+      .sgdbg-frow.ref    .sgdbg-f-type { color: #38bdf8; }
+      .sgdbg-frow.tree   .sgdbg-f-type { color: #4ade80; }
+      .sgdbg-frow.commit .sgdbg-f-type { color: #94a3b8; }
+      .sgdbg-frow.other  .sgdbg-f-type { color: #475569; }
+      .sgdbg-frow.dup-blob .sgdbg-f-type { color: #fbbf24; }
+      .sgdbg-f-id  { color: #cbd5e1; font-size: 11px; word-break: break-all; min-width: 0; }
+      .sgdbg-f-id .sgdbg-f-vid { color: #334155; font-size: 9px; }
+      .sgdbg-f-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+      .sgdbg-f-dur  { color: #475569; font-size: 10px; white-space: nowrap; }
+      .sgdbg-f-dur.slow  { color: #fbbf24; }
+      .sgdbg-f-dur.vslow { color: #f87171; }
+      .sgdbg-f-dup {
+        font-size: 9px; font-weight: 700; color: #f59e0b;
+        background: #f59e0b11; border: 1px solid #f59e0b44;
+        border-radius: 3px; padding: 0 4px; white-space: nowrap;
+      }
+      .sgdbg-fetches-empty { padding: 2rem; text-align: center; color: #334155; font-size: 11px; }
+      .sgdbg-f-src { font-weight: 700; font-size: 9px; text-transform: lowercase; margin-right: 4px; }
+
+      /* IDB stats bar */
+      .sgdbg-idb-bar {
+        display: flex; align-items: center; gap: 8px;
+        padding: 5px 14px; border-bottom: 1px solid #1e293b;
+        background: #16a34a0d; flex-shrink: 0;
+      }
+      .sgdbg-idb-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #4ade80; letter-spacing: .06em; }
+      .sgdbg-idb-stats { font-size: 10px; color: #94a3b8; }
+      .sgdbg-idb-inflight { font-size: 10px; color: #fbbf24; margin-left: auto; }
+
+      /* Cache-type row variants */
+      .sgdbg-frow.idb-hit  { border-left-color: #16a34a; background: #16a34a07; }
+      .sgdbg-frow.inflight { border-left-color: #a78bfa; background: #7c3aed07; }
+      .sgdbg-frow.idb-hit  .sgdbg-f-type { color: #4ade80; }
+      .sgdbg-frow.inflight .sgdbg-f-type { color: #c4b5fd; }
+
+      /* Fetches — trace / waterfall (Jaeger / X-Ray style) */
+      .sgdbg-trace-legend {
+        display: flex; flex-wrap: wrap; gap: 4px 12px;
+        padding: 6px 14px; border-bottom: 1px solid #1e293b;
+        font-size: 10px; color: #94a3b8; flex-shrink: 0;
+      }
+      .sgdbg-trace-legend-item { display: inline-flex; align-items: center; gap: 4px; }
+      .sgdbg-trace-swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+      .sgdbg-trace-axis {
+        position: relative; height: 16px; margin-left: 132px;
+        border-bottom: 1px solid #1e293b; flex-shrink: 0;
+      }
+      .sgdbg-trace-tick {
+        position: absolute; top: 2px; transform: translateX(-50%);
+        font-size: 9px; color: #475569; white-space: nowrap;
+      }
+      .sgdbg-trace-tick:first-child { transform: none; }
+      .sgdbg-trace-tick:last-child  { transform: translateX(-100%); }
+      .sgdbg-trace-rows { padding: 2px 0; }
+      .sgdbg-trace-row {
+        display: grid; grid-template-columns: 132px 1fr;
+        align-items: center; gap: 0; min-height: 18px;
+        border-bottom: 1px solid #1e293b0a;
+      }
+      .sgdbg-trace-row:hover { background: #1e293b66; }
+      .sgdbg-trace-row.dup { background: #f59e0b08; }
+      .sgdbg-trace-gutter {
+        display: flex; align-items: center; gap: 5px;
+        padding: 0 6px 0 14px; overflow: hidden; white-space: nowrap;
+      }
+      .sgdbg-trace-seq  { color: #334155; font-size: 9px; }
+      .sgdbg-trace-src  { font-size: 9px; font-weight: 700; text-overflow: ellipsis; overflow: hidden; }
+      .sgdbg-trace-type { font-size: 8px; font-weight: 700; text-transform: uppercase; opacity: .8; }
+      .sgdbg-trace-track {
+        position: relative; height: 14px; margin-right: 8px;
+      }
+      .sgdbg-trace-bar {
+        position: absolute; top: 2px; height: 10px; border-radius: 2px;
+        min-width: 2px; opacity: .85;
+      }
+      .sgdbg-trace-bar.inflight  { opacity: .5; background-image: repeating-linear-gradient(45deg, #ffffff22 0 4px, transparent 4px 8px); }
+      .sgdbg-trace-bar.idb-cached { opacity: 1; height: 8px; top: 3px; min-width: 4px; border-radius: 1px; }
+      .sgdbg-trace-row.err .sgdbg-trace-bar { background: #dc2626 !important; }
+      .sgdbg-trace-bar-label {
+        position: absolute; top: 0; font-size: 9px; color: #94a3b8;
+        white-space: nowrap; padding: 0 5px; line-height: 14px; pointer-events: none;
+      }
+
       /* Footer */
       .sgdbg-foot {
         padding: 8px 14px; border-top: 1px solid #1e293b;
@@ -243,6 +363,7 @@ class SgDebugPanel extends HTMLElement {
           <span class="sgdbg-title">◉ Debug</span>
           <div class="sgdbg-tabs">
             <button class="sgdbg-tab${this._activeTab==='log'?' active':''}" data-tab="log">Log</button>
+            <button class="sgdbg-tab${this._activeTab==='fetches'?' active':''}" data-tab="fetches">Fetches</button>
             <button class="sgdbg-tab${this._activeTab==='sources'?' active':''}" data-tab="sources">Sources</button>
           </div>
           <div class="sgdbg-counts">
@@ -263,6 +384,25 @@ class SgDebugPanel extends HTMLElement {
             <button class="sgdbg-tbtn" id="sgdbg-clear">Clear</button>
           </div>
           <div class="sgdbg-log" id="sgdbg-log"></div>
+        </div>
+
+        <!-- FETCHES tab -->
+        <div id="sgdbg-tab-fetches" style="${this._activeTab==='fetches'?'display:flex;flex-direction:column;flex:1;min-height:0':'display:none'}">
+          <div class="sgdbg-toolbar">
+            <span id="sgdbg-fetches-summary" style="font-size:10px;color:#475569;flex:1">0 requests</span>
+            <button class="sgdbg-tbtn${this._fetchView!=='list'?' on':''}" id="sgdbg-fetches-trace">Trace</button>
+            <button class="sgdbg-tbtn${this._fetchView==='list'?' on':''}" id="sgdbg-fetches-list">List</button>
+            <button class="sgdbg-tbtn" id="sgdbg-fetches-clear">Clear</button>
+            <button class="sgdbg-tbtn" id="sgdbg-idb-clear" title="Clear IndexedDB cache">IDB ✕</button>
+          </div>
+          <div class="sgdbg-idb-bar" id="sgdbg-idb-bar" hidden>
+            <span class="sgdbg-idb-label">IDB cache</span>
+            <span id="sgdbg-idb-stats" class="sgdbg-idb-stats">—</span>
+            <span id="sgdbg-idb-inflight" class="sgdbg-idb-inflight"></span>
+          </div>
+          <div class="sgdbg-fetches-log" id="sgdbg-fetches-log">
+            <div class="sgdbg-fetches-empty">No vault requests captured yet.<br>Load a page or article to populate.</div>
+          </div>
         </div>
 
         <!-- SOURCES tab -->
@@ -296,9 +436,12 @@ class SgDebugPanel extends HTMLElement {
         localStorage.setItem('sg-debug-tab', this._activeTab);
         panel.querySelectorAll('.sgdbg-tab').forEach(t => t.classList.toggle('active', t === tab));
         panel.querySelector('#sgdbg-tab-log').style.display     = this._activeTab==='log'     ? 'flex' : 'none';
+        panel.querySelector('#sgdbg-tab-fetches').style.display = this._activeTab==='fetches' ? 'flex' : 'none';
         panel.querySelector('#sgdbg-tab-sources').style.display = this._activeTab==='sources' ? 'flex' : 'none';
         if (this._activeTab === 'log')     { const el = panel.querySelector('#sgdbg-tab-log');     el.style.flexDirection='column'; el.style.flex='1'; el.style.minHeight='0'; }
+        if (this._activeTab === 'fetches') { const el = panel.querySelector('#sgdbg-tab-fetches'); el.style.flexDirection='column'; el.style.flex='1'; el.style.minHeight='0'; }
         if (this._activeTab === 'sources') { const el = panel.querySelector('#sgdbg-tab-sources'); el.style.flexDirection='column'; el.style.flex='1'; el.style.minHeight='0'; }
+        if (this._activeTab === 'fetches') this._renderFetches();
         if (this._activeTab === 'sources') this._renderSources();
       });
     });
@@ -323,10 +466,42 @@ class SgDebugPanel extends HTMLElement {
     panel.querySelector('#sgdbg-src-clear')?.addEventListener('click', () => {
       this._sources = []; this._renderSources();
     });
+    panel.querySelector('#sgdbg-fetches-clear')?.addEventListener('click', () => {
+      this._vaultFetches = []; this._objFetchCount = new Map();
+      this._vaultFetchSeq = 0; this._traceT0 = null;
+      this._renderFetches(); this._updateFetchSummary();
+    });
+    const setFetchView = (view) => {
+      this._fetchView = view;
+      localStorage.setItem('sg-debug-fetchview', view);
+      panel.querySelector('#sgdbg-fetches-trace').classList.toggle('on', view !== 'list');
+      panel.querySelector('#sgdbg-fetches-list').classList.toggle('on', view === 'list');
+      this._renderFetches();
+    };
+    panel.querySelector('#sgdbg-fetches-trace')?.addEventListener('click', () => setFetchView('trace'));
+    panel.querySelector('#sgdbg-fetches-list')?.addEventListener('click',  () => setFetchView('list'));
 
-    this._logEl  = panel.querySelector('#sgdbg-log');
-    this._srcEl  = panel.querySelector('#sgdbg-sources');
+    panel.querySelector('#sgdbg-idb-clear')?.addEventListener('click', () => {
+      window.sgVaultCache?.clearIdb().then(() => this._refreshIdbStats());
+    });
+
+    // Show IDB stats bar only if vault cache is present; refresh periodically
+    if (window.sgVaultCache) {
+      panel.querySelector('#sgdbg-idb-bar').hidden = false;
+      this._refreshIdbStats();
+    }
+
+    this._logEl   = panel.querySelector('#sgdbg-log');
+    this._srcEl   = panel.querySelector('#sgdbg-sources');
+    this._fetchEl = panel.querySelector('#sgdbg-fetches-log');
     this._logFilter = '';
+
+    // Auto-scroll: pinned to bottom by default; un-pins when user scrolls up
+    this._fetchScrollPinned = true;
+    this._fetchEl.addEventListener('scroll', () => {
+      const el = this._fetchEl;
+      this._fetchScrollPinned = el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+    });
   }
 
   // ── Button placement ──────────────────────────────────────────────────────
@@ -389,7 +564,11 @@ class SgDebugPanel extends HTMLElement {
   _applyOpen() {
     this._panel.classList.toggle('open', this._open);
     this._btn.classList.toggle('active', this._open);
-    if (this._open) { this._renderLog(); if (this._activeTab==='sources') this._renderSources(); }
+    if (this._open) {
+      this._renderLog();
+      if (this._activeTab === 'fetches') this._renderFetches();
+      if (this._activeTab === 'sources') this._renderSources();
+    }
   }
 
   // ── Log ───────────────────────────────────────────────────────────────────
@@ -440,8 +619,10 @@ class SgDebugPanel extends HTMLElement {
         <span class="sgdbg-ts">${e.ts}</span>
         <span class="sgdbg-kind">${badge}</span>
         <div>
-          <div class="sgdbg-msg">${esc(e.msg??'')}</div>
-          ${e.sub ? `<div class="sgdbg-sub">${esc(e.sub)}</div>` : ''}
+          <div class="sgdbg-msg-line">
+            <span class="sgdbg-msg">${esc(e.msg??'')}</span>
+            ${e.sub ? `<span class="sgdbg-sub">${esc(e.sub)}</span>` : ''}
+          </div>
           ${e.detail ? `<div class="sgdbg-detail">${esc(typeof e.detail==='string'?e.detail:JSON.stringify(e.detail,null,2))}</div>` : ''}
           ${hasContent ? `<div class="sgdbg-detail">${contentHl}</div>` : ''}
         </div>
@@ -521,6 +702,220 @@ class SgDebugPanel extends HTMLElement {
     });
   }
 
+  // ── Fetches ───────────────────────────────────────────────────────────────
+
+  // Identify the component that initiated a fetch, by inspecting the call stack.
+  // The patched fetch wrapper and the vault-client library frames are skipped so
+  // the first *application* frame (a custom element module or page script) wins.
+  _detectSource() {
+    const stack = (new Error()).stack || '';
+    const lines = stack.split('\n');
+    for (const line of lines) {
+      if (line.includes('sg-debug-panel')) continue;   // the patch itself
+      if (line.includes('sg-vault-client')) continue;  // the crypto/IO library
+      const m = line.match(/([\w.\-]+)\.(?:js|mjs|html)(?::\d+:\d+)?/);
+      if (!m) continue;
+      const file = m[1];
+      if (file.includes('sg-side-nav'))       return 'side-nav';
+      if (file.includes('sg-sub-nav'))        return 'sub-nav';
+      if (file.includes('sg-search'))         return 'search';
+      if (file.includes('sg-article-viewer')) return 'article-viewer';
+      if (file.includes('sg-debug-panel'))    continue;
+      if (file === 'index' || file.endsWith('index')) return 'page';
+      // Any other named module/page becomes its short name
+      return file.split('/').pop();
+    }
+    return 'page';
+  }
+
+  _sourceColor(source) {
+    const PALETTE = {
+      'side-nav':       '#38bdf8',
+      'sub-nav':        '#a78bfa',
+      'search':         '#4ade80',
+      'article-viewer': '#fbbf24',
+      'page':           '#f472b6',
+    };
+    if (PALETTE[source]) return PALETTE[source];
+    // Stable hash → hue for any other source
+    let h = 0;
+    for (let i = 0; i < (source ?? '').length; i++) h = (h * 31 + source.charCodeAt(i)) % 360;
+    return `hsl(${h}, 65%, 62%)`;
+  }
+
+  _renderFetches() {
+    const el = this._fetchEl;
+    if (!el) return;
+    if (!this._vaultFetches.length) {
+      el.innerHTML = '<div class="sgdbg-fetches-empty">No vault requests captured yet.<br>Load a page or article to populate.</div>';
+      return;
+    }
+    if (this._fetchView === 'list') this._renderFetchesList(el);
+    else                            this._renderFetchesTrace(el);
+    if (this._fetchScrollPinned) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+  }
+
+  _renderFetchesList(el) {
+    el.innerHTML = this._vaultFetches.map(f => {
+      const ct        = f.cacheType ?? 'network';
+      const isDupBlob = f.objType === 'blob' && f.dupNum > 0 && ct === 'network';
+      const rowCls    = ['sgdbg-frow',
+        ct === 'idb-hit'  ? 'idb-hit'  :
+        ct === 'inflight' ? 'inflight'  :
+        f.objType ?? 'other',
+        isDupBlob ? 'dup-blob' : '',
+        f.ok === false ? 'fetch-err' : ''].filter(Boolean).join(' ');
+      const durCls    = f.durationMs == null ? '' : f.durationMs > 500 ? ' vslow' : f.durationMs > 200 ? ' slow' : '';
+      const displayId = f.objId.startsWith('obj-') ? f.objId
+                      : f.objId.length > 16 ? f.objId.slice(0, 16) + '…'
+                      : f.objId;
+      const durText   = f.durationMs != null ? `${f.durationMs}ms` : '…';
+      const sizeText  = f.sizekb ? ` · ${f.sizekb}KB` : '';
+      const srcColor  = this._sourceColor(f.source);
+      const typeLabel = ct === 'idb-hit' ? 'IDB ✓'
+                      : ct === 'inflight' ? '→ dedup'
+                      : (f.objType ?? '?');
+      return `<div class="${rowCls}">
+        <span class="sgdbg-f-seq">#${f.seq}</span>
+        <span class="sgdbg-f-ts">${f.ts}</span>
+        <span class="sgdbg-f-type">${typeLabel}</span>
+        <span class="sgdbg-f-id">
+          <span class="sgdbg-f-src" style="color:${srcColor}">${esc(f.source ?? '?')}</span>
+          ${esc(displayId)} <span class="sgdbg-f-vid">[${esc(f.vaultId)}]</span>
+        </span>
+        <span class="sgdbg-f-right">
+          <span class="sgdbg-f-dur${durCls}">${durText}${sizeText}</span>
+          ${isDupBlob ? `<span class="sgdbg-f-dup">dup ×${f.dupNum + 1}</span>` : ''}
+        </span>
+      </div>`;
+    }).join('');
+  }
+
+  // Jaeger / X-Ray style waterfall: each request is a span positioned by its
+  // start offset and sized by duration. Bars are colour-coded by source
+  // component so parallel duplicate dependency chains are visually obvious.
+  _renderFetchesTrace(el) {
+    const fetches = this._vaultFetches;
+    const base = this._traceT0 ?? fetches[0].startPerf;
+    // Total span = from first start to the latest end (use elapsed-so-far for in-flight)
+    const now  = performance.now();
+    let maxEnd = 0;
+    for (const f of fetches) {
+      const end = f.startPerf + (f.durationMs != null ? f.durationMs : (now - f.startPerf));
+      if (end - base > maxEnd) maxEnd = end - base;
+    }
+    const total = Math.max(maxEnd, 1);
+
+    // Time axis ticks (~5 divisions)
+    const tickCount = 5;
+    const ticks = Array.from({ length: tickCount + 1 }, (_, i) => {
+      const ms = Math.round((total / tickCount) * i);
+      const pct = (i / tickCount) * 100;
+      return `<span class="sgdbg-trace-tick" style="left:${pct}%">${ms}ms</span>`;
+    }).join('');
+
+    // Source legend (distinct sources in first-seen order)
+    const seenSrc = [];
+    for (const f of fetches) if (!seenSrc.includes(f.source)) seenSrc.push(f.source);
+    const legend = [
+      ...seenSrc.map(s =>
+        `<span class="sgdbg-trace-legend-item">
+           <span class="sgdbg-trace-swatch" style="background:${this._sourceColor(s)}"></span>${esc(s ?? '?')}
+         </span>`),
+      ...(fetches.some(f => f.cacheType === 'idb-hit')
+        ? [`<span class="sgdbg-trace-legend-item"><span class="sgdbg-trace-swatch" style="background:#16a34a"></span>IDB ✓</span>`] : []),
+      ...(fetches.some(f => f.cacheType === 'inflight')
+        ? [`<span class="sgdbg-trace-legend-item"><span class="sgdbg-trace-swatch" style="background:#7c3aed"></span>→ dedup</span>`] : []),
+    ].join('');
+
+    const rows = fetches.map(f => {
+      const ct          = f.cacheType ?? 'network';
+      const startOffset = f.startPerf - base;
+      const dur         = f.durationMs != null ? f.durationMs : (now - f.startPerf);
+      const leftPct     = (startOffset / total) * 100;
+      // IDB hits and inflight waits show as a narrow marker at their start position
+      const widthPct    = ct === 'idb-hit' ? Math.max((dur / total) * 100, 0.3)
+                        : Math.max((dur / total) * 100, 0.6);
+      const labelLeft   = leftPct < 55;
+      const srcColor    = this._sourceColor(f.source);
+      const barColor    = ct === 'idb-hit'  ? '#16a34a'
+                        : ct === 'inflight' ? '#7c3aed'
+                        : srcColor;
+      const isDupBlob   = f.objType === 'blob' && f.dupNum > 0 && ct === 'network';
+      const displayId   = f.objId.length > 22 ? f.objId.slice(0, 22) + '…' : f.objId;
+      const pending     = f.durationMs == null;
+      const durText     = pending ? '…' : `${f.durationMs}ms`;
+      const typeLabel   = ct === 'idb-hit' ? 'IDB' : ct === 'inflight' ? 'dedup' : (f.objType ?? '?');
+      const barExtra    = isDupBlob ? ';outline:1px solid #f59e0b' : '';
+      const barCls      = ct === 'inflight' ? ' inflight'
+                        : ct === 'idb-hit'  ? ' idb-cached'
+                        : pending            ? ' inflight'
+                        : '';
+      const labelText   = ct === 'idb-hit' ? `IDB ✓ ${displayId}` : ct === 'inflight' ? `→ dedup ${durText}` : `${displayId} · ${durText}`;
+      const rowCls      = `sgdbg-trace-row${isDupBlob ? ' dup' : ''}${f.ok === false ? ' err' : ''}`;
+      return `<div class="${rowCls}">
+        <div class="sgdbg-trace-gutter">
+          <span class="sgdbg-trace-seq">#${f.seq}</span>
+          <span class="sgdbg-trace-src" style="color:${srcColor}">${esc(f.source ?? '?')}</span>
+          <span class="sgdbg-trace-type">${typeLabel}</span>
+        </div>
+        <div class="sgdbg-trace-track">
+          <div class="sgdbg-trace-bar${barCls}"
+               style="left:${leftPct}%;width:${widthPct}%;background:${barColor}${barExtra}"
+               title="${esc(`${typeLabel} ${displayId} · ${durText}`)}"></div>
+          <span class="sgdbg-trace-bar-label" style="${labelLeft ? `left:calc(${leftPct}% + ${widthPct}% + 3px)` : `right:calc(${100 - leftPct}% + 3px)`}">${esc(labelText)}${isDupBlob ? ` <span class="sgdbg-f-dup">dup ×${f.dupNum + 1}</span>` : ''}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `
+      <div class="sgdbg-trace-legend">${legend}</div>
+      <div class="sgdbg-trace-axis">${ticks}</div>
+      <div class="sgdbg-trace-rows">${rows}</div>`;
+  }
+
+  _updateFetchSummary() {
+    const sumEl = this._panel?.querySelector('#sgdbg-fetches-summary');
+    if (!sumEl) return;
+    const total     = this._vaultFetches.length;
+    const networks  = this._vaultFetches.filter(f => f.cacheType === 'network' || f.cacheType == null);
+    const idbHits   = this._vaultFetches.filter(f => f.cacheType === 'idb-hit').length;
+    const inflights = this._vaultFetches.filter(f => f.cacheType === 'inflight').length;
+    const blobs     = networks.filter(f => f.objType === 'blob');
+    const uniq      = new Set(blobs.map(f => f.objId)).size;
+    const dups      = blobs.filter(f => f.dupNum > 0).length;
+    const byType    = {};
+    for (const f of networks) byType[f.objType] = (byType[f.objType] ?? 0) + 1;
+    const parts = [`${total} req`];
+    if (networks.length < total) parts.push(`${networks.length} net`);
+    if (idbHits)    parts.push(`${idbHits} IDB✓`);
+    if (inflights)  parts.push(`${inflights} dedup`);
+    if (byType.blob)   parts.push(`${byType.blob} blob${byType.blob > 1 ? 's' : ''} (${uniq} uniq)`);
+    if (byType.ref)    parts.push(`${byType.ref} ref`);
+    if (byType.commit) parts.push(`${byType.commit} commit`);
+    if (byType.tree)   parts.push(`${byType.tree} tree`);
+    if (dups > 0)      parts.push(`⚠ ${dups} dup${dups > 1 ? 's' : ''}`);
+    sumEl.textContent = parts.join(' · ');
+    const tabBtn = this._panel?.querySelector('.sgdbg-tab[data-tab="fetches"]');
+    if (tabBtn) tabBtn.textContent = dups > 0 ? `Fetches ⚠${dups}` : `Fetches${total ? ` ${total}` : ''}`;
+  }
+
+  _refreshIdbStats() {
+    const bar  = this._panel?.querySelector('#sgdbg-idb-bar');
+    const stat = this._panel?.querySelector('#sgdbg-idb-stats');
+    const inf  = this._panel?.querySelector('#sgdbg-idb-inflight');
+    if (!bar || !stat) return;
+    if (!window.sgVaultCache) { bar.hidden = true; return; }
+    bar.hidden = false;
+    window.sgVaultCache.idbStats().then(s => {
+      if (stat) stat.textContent = `${s.count} objects · ${(s.bytes / 1024).toFixed(0)} KB`;
+    }).catch(() => {});
+    if (inf) {
+      const n = window.sgVaultCache.inFlightCount;
+      inf.textContent = n > 0 ? `${n} in-flight` : '';
+    }
+  }
+
   // ── fetch patch ───────────────────────────────────────────────────────────
 
   _patchFetch() {
@@ -537,6 +932,38 @@ class SgDebugPanel extends HTMLElement {
         const short   = decoded.replace(/^https?:\/\/[^/]+/, '').slice(0, 100);
         const kind    = isVault ? 'vault' : isGH ? 'gh' : 'nav';
         const t0      = performance.now();
+
+        // Pre-request: classify vault path and record in fetches log
+        let vfe = null;  // vault fetch entry
+        if (isVault) {
+          const parts   = decoded.split('/');
+          // URL shape: https://send.sgraph.ai/api/vault/read/{vaultId}/{pathSegments...}
+          // parts[6] = vaultId, parts[7+] = path type
+          const vaultId = parts[6] ?? '?';
+          const subPath = parts.slice(7).join('/');
+          const objType = subPath.startsWith('ref/')    ? 'ref'
+                        : subPath.startsWith('tree/')   ? 'tree'
+                        : subPath.startsWith('commit/') ? 'commit'
+                        : subPath.includes('obj-cas-imm') || subPath.startsWith('bare/') ? 'blob'
+                        : 'other';
+          const objId   = parts.pop() ?? '';
+          const prevCnt = self._objFetchCount.get(objId) ?? 0;
+          self._objFetchCount.set(objId, prevCnt + 1);
+          vfe = {
+            seq:       ++self._vaultFetchSeq,
+            ts:        new Date().toLocaleTimeString('en-GB', { hour12:false, second:'2-digit', fractionalSecondDigits:2 }),
+            objType, objId, vaultId,
+            source:    self._detectSource(),   // calling component (from stack)
+            dupNum:    prevCnt,                 // >0 means this is a duplicate
+            startPerf: t0,                      // performance.now() at request start
+            cacheType: null,                    // filled in post-response: 'idb-hit'|'inflight'|'network'
+            ok:        null, durationMs: null, sizekb: null,
+          };
+          if (self._traceT0 == null) self._traceT0 = t0;
+          self._vaultFetches.push(vfe);
+          self._updateFetchSummary();
+          if (self._open && self._activeTab === 'fetches') self._renderFetches();
+        }
 
         try {
           const res  = await self._origFetch.call(this, input, init);
@@ -564,10 +991,29 @@ class SgDebugPanel extends HTMLElement {
               detail:   res.ok ? null : `HTTP ${res.status} ${res.statusText}`,
             });
           }
+
+          // Post-request: fill in duration + size + cache type for vault fetch entry
+          if (vfe) {
+            vfe.ok = res.ok;
+            vfe.durationMs = ms;
+            const sgCache = res.headers.get('x-sg-cache');
+            vfe.cacheType = sgCache ?? 'network';  // 'idb-hit' | 'inflight' | 'network'
+            if (sgCache === 'inflight') {
+              const wms = parseInt(res.headers.get('x-sg-wait-ms') ?? '0', 10);
+              vfe.durationMs = wms;  // show actual wait time, not full network time
+            }
+            const cl = res.headers.get('content-length');
+            if (cl) vfe.sizekb = (parseInt(cl, 10) / 1024).toFixed(1);
+            self._updateFetchSummary();
+            if (self._open && self._activeTab === 'fetches') self._renderFetches();
+            if (sgCache && sgCache !== 'network') self._refreshIdbStats();
+          }
+
           return res;
         } catch (err) {
           const ms = Math.round(performance.now() - t0);
           self._pushLog({ kind: `${kind}-err`, msg: `✗ ${short}`, sub: `${ms}ms · ${err.message}`, detail: err.stack });
+          if (vfe) { vfe.ok = false; vfe.durationMs = ms; self._updateFetchSummary(); if (self._open && self._activeTab === 'fetches') self._renderFetches(); }
           throw err;
         }
       }
