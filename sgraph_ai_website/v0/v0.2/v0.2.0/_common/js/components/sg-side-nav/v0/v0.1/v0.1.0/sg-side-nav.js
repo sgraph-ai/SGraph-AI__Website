@@ -199,8 +199,12 @@ class SgSideNav extends HTMLElement {
       });
     }
 
-    // Expand section + article-folder that contains the active slug
-    if (activeSlug) {
+    // Expand section + article-folder that contains the active slug — but ONLY
+    // when the active slug has actually changed. Re-running this on every render
+    // would re-expand a node the user just collapsed (the active section can
+    // never be closed otherwise), since _render fires again on each toggle.
+    if (activeSlug && activeSlug !== this._autoExpandedSlug) {
+      this._autoExpandedSlug = activeSlug;
       sections.forEach((s, i) => {
         const arts = s._loadedArticles ?? s.children ?? s.articles ?? [];
         arts.forEach(a => {

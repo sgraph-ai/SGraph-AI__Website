@@ -375,6 +375,11 @@ class SgArticleViewer extends HTMLElement {
     const seq = ++this._loadSeq;
     this._ensureStructure();
 
+    // New article selected — reset window scroll to the top. The sub-site shell
+    // scrolls the window (sidebar + TOC are position:sticky), so without this the
+    // reader lands at the previous article's scroll offset on the new content.
+    window.scrollTo({ top: 0, behavior: 'auto' });
+
     // Build trace object immediately so Layer 2 can read it live during loading
     const t0 = performance.now();
     this._loadT0 = t0;
