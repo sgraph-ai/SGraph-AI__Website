@@ -332,6 +332,32 @@ class SgArticleViewer extends HTMLElement {
     to   { transform: translateY(0);    opacity: 1; }
   }
 }
+
+/* ── Code block copy button ──────────────────────────────────────── */
+.article-codeblock { position: relative; }
+.article-copy-btn {
+  position: absolute;
+  top: 8px; right: 8px;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: inherit; font-size: 12px; line-height: 1;
+  padding: 5px 9px; border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.10); color: #FAF7F2;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.article-codeblock:hover .article-copy-btn,
+.article-copy-btn:focus-visible { opacity: 1; }
+.article-copy-btn:hover { background: rgba(255,255,255,0.20); }
+.article-copy-btn--done {
+  opacity: 1;
+  background: #16a34a; border-color: #16a34a; color: #fff;
+}
+/* Touch devices can't hover — keep the button visible */
+@media (hover: none) {
+  .article-copy-btn { opacity: 0.7; }
+}
 `;
     document.head.appendChild(style);
   }
@@ -955,12 +981,52 @@ class SgArticleViewer extends HTMLElement {
       </div>`;
     endDom();
 
+    this._addCopyButtons();
+
     document.dispatchEvent(new CustomEvent('viewer:rendered', {
       detail: { meta },
     }));
 
     this._resolveVaultImages(vaultId, readKey);
     this._resolveVaultPdfs(vaultId, readKey);
+  }
+
+  // Add a hover-reveal "Copy" button to every code block in the rendered body.
+  // Each <pre> is wrapped in a positioned container so the button can anchor to
+  // its top-right without scrolling away with overflowed code.
+  _addCopyButtons() {
+    this.querySelectorAll('.article-body pre').forEach(pre => {
+      if (pre.parentElement?.classList.contains('article-codeblock')) return;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'article-codeblock';
+      pre.parentNode.insertBefore(wrap, pre);
+      wrap.appendChild(pre);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'article-copy-btn';
+      btn.textContent = 'Copy';
+      btn.setAttribute('aria-label', 'Copy code to clipboard');
+
+      btn.addEventListener('click', async () => {
+        const code = pre.querySelector('code') ?? pre;
+        try {
+          await navigator.clipboard.writeText(code.innerText);
+          btn.textContent = 'Copied';
+          btn.classList.add('article-copy-btn--done');
+        } catch {
+          btn.textContent = 'Failed';
+        }
+        clearTimeout(btn._resetT);
+        btn._resetT = setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('article-copy-btn--done');
+        }, 1500);
+      });
+
+      wrap.appendChild(btn);
+    });
   }
 
   _renderJson(text) {
@@ -1012,6 +1078,8 @@ class SgArticleViewer extends HTMLElement {
         this.querySelector('.json-raw-view').hidden      = view === 'rendered';
       });
     });
+
+    this._addCopyButtons();
 
     document.dispatchEvent(new CustomEvent('viewer:rendered', { detail: { meta: {} } }));
   }
