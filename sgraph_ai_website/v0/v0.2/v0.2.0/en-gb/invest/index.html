@@ -170,6 +170,7 @@
 
   let allArticles = [];
   let allSections = [];
+  let navHome = null;
   let headingObserver = null;
 
   const _navStartMs = performance.now();
@@ -210,6 +211,7 @@
     if (!Array.isArray(sections) || sections.length === 0) return;
     hideLoading();
     allSections = sections;
+    navHome = e.detail?.home ?? null;
     allArticles = sections.flatMap(s => flattenNavTree(s.children ?? [], s.title, '', null));
     const navElapsedSec = (navElapsedMs / 1000).toFixed(2);
     document.dispatchEvent(new CustomEvent('debug:nav-json',
@@ -217,8 +219,7 @@
 
     const slug = slugFromPath();
     if (!slug) {
-      // Bare root → first section's index (its `index` child renders as the home).
-      showSectionIndex(sections[0]);
+      showHome();
     } else {
       // A bare section slug (e.g. /en-gb/invest/the-case/) shows the section index.
       const matchedSection = sections.find(s => toSlug(s.title) === slug);
@@ -265,7 +266,7 @@
 
   window.addEventListener('popstate', () => {
     const slug = slugFromPath();
-    if (!slug) { showSectionIndex(allSections[0]); return; }
+    if (!slug) { showHome(); return; }
     const matchedSection = allSections.find(s => toSlug(s.title) === slug);
     if (matchedSection) { showSectionIndex(matchedSection); return; }
     const btn = sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`);
@@ -290,6 +291,24 @@
     if (!objectId) { showNotFound(slug); return; }
     showArticle(objectId, node.render ?? 'markdown', node.vault_id ?? null, node.read_key ?? null);
     buildNextPrev(slug);
+  }
+
+  // Bare area root (/en-gb/invest/). Renders the nav's root `home` page (the area
+  // index, e.g. invest/index.md). Falls back to the first section, then landing.
+  function showHome() {
+    if (navHome && (navHome.content_object_id || navHome.content_path)) {
+      landing.hidden = true;
+      articleToc.hidden = true;
+      shell.classList.remove('with-toc');
+      articleEl.hidden = false;
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      setBreadcrumbs(null, null, null);
+      document.getElementById('next-prev').innerHTML = '';
+      showNodeContent(navHome, '');
+      return;
+    }
+    if (allSections[0]) showSectionIndex(allSections[0]);
+    else showLanding();
   }
 
   function showSectionIndex(section) {
@@ -430,8 +449,11 @@
     const el = document.getElementById('article-crumbs');
     const parts = ['Invest', section, parent, article].filter(Boolean);
     el.innerHTML = parts.map((p, i) => {
-      if (i === 0) return `<a class="sub-site__crumbs-link" href="${BASE}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
-      if (i < parts.length - 1) return `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`;
+      const last = i === parts.length - 1;
+      if (i === 0) return last
+        ? `<span class="sub-site__crumbs-here">${p}</span>`
+        : `<a class="sub-site__crumbs-link" href="${BASE}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
+      if (!last) return `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`;
       return `<span class="sub-site__crumbs-here">${p}</span>`;
     }).join('');
   }

@@ -17,7 +17,14 @@
  * Nav JSON shapes:
  *   { "library": { "sections": [...] } }
  *   { "dev":     { "sections": [...] } }
+ *   { "invest":  { "sections": [...] } }
  *   { "sections": [...] }
+ *
+ * Root fields:
+ *   sections[]        — top-level sub-section folders
+ *   home              — optional area index page (the bare-root landing), e.g.
+ *                       { "title": "...", "content_path": "invest/index.md" }.
+ *                       Passed through to the host page via nav:loaded.detail.home.
  *
  * Section fields:
  *   children[]        — inline articles (canonical since nav v3.12)
@@ -34,7 +41,7 @@
  *   children[]        — renders article as a collapsible folder
  *
  * Fires:
- *   nav:loaded  — detail: { sections, totalArticles }
+ *   nav:loaded  — detail: { sections, totalArticles, home }
  *   nav:select  — detail: { title, slug, content_object_id, render, schema,
  *                           sectionTitle, parentTitle, vault_id, read_key }
  */
@@ -103,7 +110,11 @@ class SgSideNav extends HTMLElement {
         return;
       }
       this._lastSync = Date.now();
-      const sections = (data.library ?? data.dev ?? data.invest ?? data).sections ?? [];
+      const root = data.library ?? data.dev ?? data.invest ?? data;
+      const sections = root.sections ?? [];
+      // Optional root-level home page (the area index, e.g. invest/index.md).
+      // Surfaced to the host page via nav:loaded so the bare area root can render it.
+      this._navHome = root.home ?? null;
       await this._injectExtraLinks(sections);
       this._sections = sections;
       this._render(sections);
@@ -499,7 +510,7 @@ class SgSideNav extends HTMLElement {
 
       this.dispatchEvent(new CustomEvent('nav:loaded', {
         bubbles: true,
-        detail: { sections, totalArticles },
+        detail: { sections, totalArticles, home: this._navHome ?? null },
       }));
 
       if (activeSlug) {
