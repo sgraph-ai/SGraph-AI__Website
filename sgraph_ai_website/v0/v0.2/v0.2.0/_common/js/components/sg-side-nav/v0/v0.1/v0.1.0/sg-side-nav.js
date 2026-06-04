@@ -103,7 +103,7 @@ class SgSideNav extends HTMLElement {
         return;
       }
       this._lastSync = Date.now();
-      const sections = (data.library ?? data.dev ?? data).sections ?? [];
+      const sections = (data.library ?? data.dev ?? data.invest ?? data).sections ?? [];
       await this._injectExtraLinks(sections);
       this._sections = sections;
       this._render(sections);
@@ -124,7 +124,7 @@ class SgSideNav extends HTMLElement {
       const cryptoKey = await importReadKey(readKey);
       const buf = await readObject('https://send.sgraph.ai', vaultId, section.nav_object_id, cryptoKey);
       const data = JSON.parse(new TextDecoder().decode(buf));
-      const root = data.library ?? data.dev ?? data;
+      const root = data.library ?? data.dev ?? data.invest ?? data;
       section._loadedArticles = root.children ?? root.articles ?? [];
       section._loading = false;
       this._sections = sections;   // keep cache in sync
@@ -176,6 +176,23 @@ class SgSideNav extends HTMLElement {
         sections.push({ title: item.section, children: [entry] });
       }
     }
+  }
+
+  /**
+   * Resolve a stable vault file path (content_path) to its current blob ID,
+   * reusing the nav's already-open vault context.  Public so the host page can
+   * render content_path-backed pages (e.g. a section index / home) without
+   * routing through a sidebar click.
+   *
+   * @param {string} path — e.g. 'invest/home.md'
+   * @returns {Promise<string>} obj-cas-imm-* blob ID
+   */
+  async resolveContentPath(path) {
+    const vid = this.getAttribute('vault-id');
+    const rk  = this.getAttribute('read-key');
+    const ctx = this._vaultCtx ??
+      (this._vaultCtx = await _openVaultCtx('https://send.sgraph.ai', vid, rk));
+    return _resolvePathWithCtx(ctx, path);
   }
 
   _render(sections) {

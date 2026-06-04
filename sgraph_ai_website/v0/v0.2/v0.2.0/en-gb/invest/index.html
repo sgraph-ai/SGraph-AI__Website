@@ -217,22 +217,27 @@
 
     const slug = slugFromPath();
     if (!slug) {
-      // Single-section area: show the section index directly
+      // Bare root → first section's index (its `index` child renders as the home).
       showSectionIndex(sections[0]);
     } else {
-      const found = findArticleBySlug(sections, slug);
-      if (found) {
-        setBreadcrumbs(found.sectionTitle, found.parentTitle || null, found.title);
-        if (found.content_object_id) {
-          showArticle(found.content_object_id, found.render ?? 'markdown', found.vault_id ?? null, found.read_key ?? null);
-          buildNextPrev(slug);
-        } else if ((found.children ?? []).length) {
-          showGroupIndex(found);
+      // A bare section slug (e.g. /en-gb/invest/the-case/) shows the section index.
+      const matchedSection = sections.find(s => toSlug(s.title) === slug);
+      if (matchedSection) {
+        showSectionIndex(matchedSection);
+      } else {
+        const found = findArticleBySlug(sections, slug);
+        if (found) {
+          setBreadcrumbs(found.sectionTitle, found.parentTitle || null, found.title);
+          if (found.content_object_id || found.content_path) {
+            showNodeContent(found, slug);
+          } else if ((found.children ?? []).length) {
+            showGroupIndex(found);
+          } else {
+            showNotFound(slug);
+          }
         } else {
           showNotFound(slug);
         }
-      } else {
-        showNotFound(slug);
       }
     }
   });
@@ -268,8 +273,40 @@
     else sideNav.setAttribute('active-slug', slug);
   });
 
+  // Render an article node's content. Supports both pinned content_object_id and
+  // live content_path (resolved to the current blob via the side-nav's open vault
+  // context, so vault edits go live without a _nav.json rewrite).
+  async function showNodeContent(node, slug) {
+    let objectId = node.content_object_id;
+    if (!objectId && node.content_path) {
+      try {
+        objectId = await sideNav.resolveContentPath(node.content_path);
+      } catch (err) {
+        console.error('invest: content_path resolution failed', node.content_path, err);
+        showNotFound(slug);
+        return;
+      }
+    }
+    if (!objectId) { showNotFound(slug); return; }
+    showArticle(objectId, node.render ?? 'markdown', node.vault_id ?? null, node.read_key ?? null);
+    buildNextPrev(slug);
+  }
+
   function showSectionIndex(section) {
     if (!section) { showLanding(); return; }
+    // If the section declares an `index` child, render it as the section body
+    // (this is how the bare area root resolves to a single home page).
+    if (section.index) {
+      const indexArticle = (section.children ?? []).find(a => a.slug === section.index);
+      if (indexArticle && (indexArticle.content_object_id || indexArticle.content_path)) {
+        landing.hidden = true;
+        articleEl.hidden = false;
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        setBreadcrumbs(section.title, null, null);
+        showNodeContent(indexArticle, indexArticle.slug);
+        return;
+      }
+    }
     landing.hidden = true;
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
