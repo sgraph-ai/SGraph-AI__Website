@@ -28,7 +28,9 @@
  *
  * Article fields:
  *   href              — renders as <a> (link-out)
- *   content_object_id — renders as <button> (fires nav:select)
+ *   content_object_id — renders as <button> (fires nav:select with pinned blob ID)
+ *   content_path      — renders as <button> (fires nav:select after resolving current
+ *                       blob from the vault tree at click time; cache busts on new commit)
  *   children[]        — renders article as a collapsible folder
  *
  * Fires:
@@ -36,17 +38,38 @@
  *   nav:select  — detail: { title, slug, content_object_id, render, schema,
  *                           sectionTitle, parentTitle, vault_id, read_key }
  */
+// Attributes that require a vault re-fetch when changed.
+// Display-only attributes (active-slug, tree-label, version, etc.) only need a re-render.
+const _SIDE_NAV_DATA_ATTRS = new Set(['src', 'vault-id', 'read-key', 'nav-object-id', 'nav-path', 'extra-links']);
+
 class SgSideNav extends HTMLElement {
   static get observedAttributes() {
     return ['src', 'vault-id', 'read-key', 'nav-object-id', 'nav-path',
             'active-slug', 'auto-select', 'tree-label', 'version', 'extra-links', 'home-href'];
   }
 
-  connectedCallback() { this._load(); }
+  connectedCallback() { this._scheduleLoad(true); }
 
   attributeChangedCallback(name) {
     if (name !== 'active-slug') this._dataLoaded = false;
-    this._load();
+    if (_SIDE_NAV_DATA_ATTRS.has(name)) this._pendingDataChange = true;
+    this._scheduleLoad(false);
+  }
+
+  // Coalesce a burst of synchronous attribute mutations into a single call.
+  // If the pending work only requires a re-render (display attrs only), skip
+  // the vault fetch and use the already-loaded sections from last load.
+  _scheduleLoad(forceData) {
+    if (forceData) this._pendingDataChange = true;
+    if (this._loadScheduled) return;
+    this._loadScheduled = true;
+    queueMicrotask(() => {
+      this._loadScheduled = false;
+      const needsFetch = this._pendingDataChange || !this._sections;
+      this._pendingDataChange = false;
+      if (needsFetch) this._load();
+      else            this._render(this._sections);
+    });
   }
 
   async _load() {
@@ -58,16 +81,20 @@ class SgSideNav extends HTMLElement {
 
     try {
       let data;
-      // Resolve stable path → current object ID, then fetch as normal
-      const resolvedId = navPath && vaultId && readKey && !navObjectId
-        ? await _resolveNavObjectId('https://send.sgraph.ai', vaultId, readKey, navPath)
-        : navObjectId;
 
-      if (resolvedId && vaultId && readKey) {
+      if (navPath && vaultId && readKey && !navObjectId) {
+        // Open vault context once — reuse it for content_path resolution at click time
+        this._vaultCtx = await _openVaultCtx('https://send.sgraph.ai', vaultId, readKey);
+        const navBlobId = await _resolvePathWithCtx(this._vaultCtx, navPath);
+        const buf = await this._vaultCtx.client.readObject(
+          'https://send.sgraph.ai', vaultId, navBlobId, this._vaultCtx.cryptoKey
+        );
+        data = JSON.parse(new TextDecoder().decode(buf));
+      } else if (navObjectId && vaultId && readKey) {
         const { importReadKey, readObject } =
           await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
         const cryptoKey = await importReadKey(readKey);
-        const buf = await readObject('https://send.sgraph.ai', vaultId, resolvedId, cryptoKey);
+        const buf = await readObject('https://send.sgraph.ai', vaultId, navObjectId, cryptoKey);
         data = JSON.parse(new TextDecoder().decode(buf));
       } else if (src) {
         const res = await fetch(src);
@@ -78,6 +105,7 @@ class SgSideNav extends HTMLElement {
       this._lastSync = Date.now();
       const sections = (data.library ?? data.dev ?? data).sections ?? [];
       await this._injectExtraLinks(sections);
+      this._sections = sections;
       this._render(sections);
     } catch (err) {
       this.innerHTML = `<p class="sg-side-nav__error">Nav failed to load.</p>`;
@@ -99,6 +127,7 @@ class SgSideNav extends HTMLElement {
       const root = data.library ?? data.dev ?? data;
       section._loadedArticles = root.children ?? root.articles ?? [];
       section._loading = false;
+      this._sections = sections;   // keep cache in sync
       this._render(sections);
     } catch (err) {
       console.error('sg-side-nav: section load error', section.title, err);
@@ -230,6 +259,7 @@ class SgSideNav extends HTMLElement {
       return `<button class="${cls}"
                        data-slug="${article.slug ?? ''}"
                        data-object-id="${article.content_object_id ?? ''}"
+                       data-content-path="${article.content_path ?? ''}"
                        data-render="${article.render ?? 'markdown'}"
                        data-schema="${article.schema ?? ''}"
                        data-title="${article.title}"
@@ -254,10 +284,12 @@ class SgSideNav extends HTMLElement {
       }).join('');
 
       // Title row: button if article has its own content, else plain label
-      const titleEl = article.content_object_id
+      const hasContent = article.content_object_id || article.content_path;
+      const titleEl = hasContent
         ? `<button class="sg-side-nav__doc sg-side-nav__doc--folder-title${isActive ? ' sg-side-nav__doc--active' : ''}"
                            data-slug="${article.slug ?? ''}"
-                           data-object-id="${article.content_object_id}"
+                           data-object-id="${article.content_object_id ?? ''}"
+                           data-content-path="${article.content_path ?? ''}"
                            data-render="${article.render ?? 'markdown'}"
                            data-schema="${article.schema ?? ''}"
                            data-title="${article.title}"
@@ -402,17 +434,33 @@ class SgSideNav extends HTMLElement {
 
     // Article clicks (buttons only — <a> tags navigate normally)
     this.querySelectorAll('.sg-side-nav__doc[data-object-id]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         this.querySelectorAll('.sg-side-nav__doc')
             .forEach(b => b.classList.remove('sg-side-nav__doc--active'));
         btn.classList.add('sg-side-nav__doc--active');
         this.setAttribute('active-slug', btn.dataset.slug);
+
+        // Resolve content_path → current blob ID if no pinned object ID
+        let objectId = btn.dataset.objectId;
+        if (!objectId && btn.dataset.contentPath) {
+          const vid = btn.dataset.vaultId || this.getAttribute('vault-id');
+          const rk  = btn.dataset.readKey  || this.getAttribute('read-key');
+          try {
+            const ctx = this._vaultCtx
+              ?? await _openVaultCtx('https://send.sgraph.ai', vid, rk);
+            objectId = await _resolvePathWithCtx(ctx, btn.dataset.contentPath);
+          } catch (err) {
+            console.error('sg-side-nav: content_path resolution failed', err);
+            return;
+          }
+        }
+
         this.dispatchEvent(new CustomEvent('nav:select', {
           bubbles: true,
           detail: {
             title:             btn.dataset.title,
             slug:              btn.dataset.slug,
-            content_object_id: btn.dataset.objectId,
+            content_object_id: objectId,
             render:            btn.dataset.render,
             schema:            btn.dataset.schema   || null,
             sectionTitle:      btn.dataset.section ?? '',
@@ -441,20 +489,36 @@ class SgSideNav extends HTMLElement {
           this.querySelectorAll('.sg-side-nav__doc')
               .forEach(b => b.classList.remove('sg-side-nav__doc--active'));
           target.classList.add('sg-side-nav__doc--active');
-          this.dispatchEvent(new CustomEvent('nav:select', {
-            bubbles: true,
-            detail: {
-              title:             target.dataset.title,
-              slug:              target.dataset.slug,
-              content_object_id: target.dataset.objectId,
-              render:            target.dataset.render,
-              schema:            target.dataset.schema   || null,
-              sectionTitle:      target.dataset.section ?? '',
-              parentTitle:       target.dataset.parentTitle || null,
-              vault_id:          target.dataset.vaultId || null,
-              read_key:          target.dataset.readKey || null,
-            },
-          }));
+          // Resolve content_path asynchronously if needed
+          (async () => {
+            let objectId = target.dataset.objectId;
+            if (!objectId && target.dataset.contentPath) {
+              const vid = target.dataset.vaultId || this.getAttribute('vault-id');
+              const rk  = target.dataset.readKey  || this.getAttribute('read-key');
+              try {
+                const ctx = this._vaultCtx
+                  ?? await _openVaultCtx('https://send.sgraph.ai', vid, rk);
+                objectId = await _resolvePathWithCtx(ctx, target.dataset.contentPath);
+              } catch (err) {
+                console.error('sg-side-nav: auto-select content_path resolution failed', err);
+                return;
+              }
+            }
+            this.dispatchEvent(new CustomEvent('nav:select', {
+              bubbles: true,
+              detail: {
+                title:             target.dataset.title,
+                slug:              target.dataset.slug,
+                content_object_id: objectId,
+                render:            target.dataset.render,
+                schema:            target.dataset.schema   || null,
+                sectionTitle:      target.dataset.section ?? '',
+                parentTitle:       target.dataset.parentTitle || null,
+                vault_id:          target.dataset.vaultId || null,
+                read_key:          target.dataset.readKey || null,
+              },
+            }));
+          })();
         }
       }
     }
@@ -468,70 +532,71 @@ function _compoundSlug(parentSlug, childSlug) {
 }
 
 /**
- * Resolve a stable vault file path to its current content-addressed object ID.
+ * Open a vault context: derive key material, fetch the vault ref, and return a
+ * reusable context object.  The ref fetch is the only non-cacheable request;
+ * everything else (commit, trees, blobs) is obj-cas-imm-* and IDB-cached.
  *
- * Walk: default ref → commit → root tree → path segments → blob_id.
- * Caches the result in sessionStorage keyed by commitId so a new @Content
- * publish (new HEAD commit) is automatically a cache miss on the next load.
- *
- * @param {string} apiBaseUrl       - e.g. 'https://send.sgraph.ai'
- * @param {string} vaultId          - vault ID (e.g. 'pmcv9tfe')
- * @param {string} readKeyBase64Url - base64url AES-256-GCM read key
- * @param {string} navPath          - stable path in tree (e.g. 'library/_nav.json')
- * @returns {Promise<string>}        content-addressed object ID (obj-cas-imm-...)
+ * @returns {{ client, vault, commitId, cryptoKey }}
  */
-async function _resolveNavObjectId(apiBaseUrl, vaultId, readKeyBase64Url, navPath) {
+async function _openVaultCtx(apiBaseUrl, vaultId, readKeyBase64Url) {
   const client = await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
-
-  // Decode base64url read key → raw bytes (needed for HMAC-based ID derivation)
   const b64  = readKeyBase64Url.replace(/-/g, '+').replace(/_/g, '/');
   const pad  = b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=');
   const bstr = atob(pad);
   const readKeyBytes = Uint8Array.from({ length: bstr.length }, (_, i) => bstr.charCodeAt(i));
-
   const cryptoKey = await client.importReadKey(readKeyBase64Url);
-
-  // Derive the vault's default ref file ID via HMAC
   const refHex    = await client.deriveFileIdHex(readKeyBytes, `sg-vault-v1:file-id:ref:${vaultId}`);
   const refFileId = client.formatFileId('ref', 'pid', 'muw', refHex);
-
   const vault = {
     keys:       { readKey: cryptoKey, readKeyBytes, refFileId, vaultId },
     apiBaseUrl: apiBaseUrl.replace(/\/$/, ''),
     vaultId,
   };
-
-  // Fetch the ref to learn current HEAD commit ID (1 request — used for cache key)
   const ref      = await client.readFileAsJson(vault, refFileId);
   const commitId = ref.commit_id ?? ref.commitId ?? ref.target;
   if (!commitId) throw new Error('sg-side-nav: vault ref has no commit ID');
+  return { client, vault, commitId, cryptoKey };
+}
 
-  const cacheKey = `sg-nav:${vaultId}:${navPath}:${commitId}`;
+/**
+ * Resolve a stable vault file path to its current blob ID using an already-opened
+ * vault context.  Caches the result in sessionStorage keyed by commitId so a new
+ * publish (new HEAD commit) is automatically a cache miss on the next page load.
+ *
+ * @param {{ client, vault, commitId }} ctx — from _openVaultCtx
+ * @param {string} path — e.g. 'invest/index.md' or 'library/_nav.json'
+ * @returns {Promise<string>} content-addressed blob ID (obj-cas-imm-...)
+ */
+async function _resolvePathWithCtx(ctx, path) {
+  const cacheKey = `sg-nav:${ctx.vault.vaultId}:${path}:${ctx.commitId}`;
   const cached   = sessionStorage.getItem(cacheKey);
   if (cached) return cached;
 
-  // Cache miss: walk commit → root tree → path
-  const commit = await client.readFileAsJson(vault, commitId);
-  const treeId = commit.tree_id ?? commit.treeId ?? commit.tree;
-  if (!treeId) throw new Error('sg-side-nav: commit has no tree ID');
+  const commit  = await ctx.client.readFileAsJson(ctx.vault, ctx.commitId);
+  const treeId  = commit.tree_id ?? commit.treeId ?? commit.tree;
+  if (!treeId) throw new Error(`sg-side-nav: commit has no tree ID`);
 
-  let entries = (await client.walkTree(vault, treeId)).entries ?? [];
-  const parts = navPath.split('/').filter(Boolean);
+  let entries = (await ctx.client.walkTree(ctx.vault, treeId)).entries ?? [];
+  const parts = path.split('/').filter(Boolean);
 
   for (let i = 0; i < parts.length; i++) {
     const entry = entries.find(e => e.name === parts[i]);
-    if (!entry) throw new Error(`sg-side-nav: path segment '${parts[i]}' not found in vault tree`);
+    if (!entry) throw new Error(`sg-side-nav: '${parts[i]}' not found in vault tree`);
     if (i === parts.length - 1) {
-      const blobId = entry.blob_id;
-      if (!blobId) throw new Error(`sg-side-nav: '${navPath}' resolves to a subtree, not a file`);
-      sessionStorage.setItem(cacheKey, blobId);
-      return blobId;
+      if (!entry.blob_id) throw new Error(`sg-side-nav: '${path}' is a directory, not a file`);
+      sessionStorage.setItem(cacheKey, entry.blob_id);
+      return entry.blob_id;
     }
     if (!entry.tree_id) throw new Error(`sg-side-nav: '${parts[i]}' is not a directory`);
-    entries = (await client.walkTree(vault, entry.tree_id)).entries ?? [];
+    entries = (await ctx.client.walkTree(ctx.vault, entry.tree_id)).entries ?? [];
   }
+  throw new Error(`sg-side-nav: '${path}' could not be fully resolved`);
+}
 
-  throw new Error(`sg-side-nav: '${navPath}' could not be fully resolved`);
+/** Thin wrapper used by _injectExtraLinks (preserves existing call signature). */
+async function _resolveNavObjectId(apiBaseUrl, vaultId, readKeyBase64Url, navPath) {
+  const ctx = await _openVaultCtx(apiBaseUrl, vaultId, readKeyBase64Url);
+  return _resolvePathWithCtx(ctx, navPath);
 }
 
 customElements.define('sg-side-nav', SgSideNav);

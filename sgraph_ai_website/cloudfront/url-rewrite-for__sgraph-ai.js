@@ -8,7 +8,9 @@
 //   /en-gb/library/SLUG/           → /en-gb/library/index.html   (SPA rewrite)
 //   /en-gb/invest/SLUG/            → /en-gb/invest/index.html    (SPA rewrite)
 //   /en-gb/dev/SLUG/               → /en-gb/dev/index.html       (SPA rewrite, except real sub-pages)
-//   /en-gb/dev/vault-peek/         → /en-gb/dev/vault-peek/index.html  (real sub-page, not rewritten)
+//   /en-gb/dev/vaults/             → /en-gb/dev/vaults/index.html       (real sub-page, not rewritten)
+//   /en-gb/dev/ci/                 → /en-gb/dev/ci/index.html           (real sub-page, not rewritten)
+//   /en-gb/dev/style-guide/        → /en-gb/dev/style-guide/index.html  (real sub-page, not rewritten)
 //   /en-gb/library/                → /en-gb/library/index.html
 //   /product                       → 302 → /product/             (add trailing slash)
 //   /favicon.ico                   → /favicon.ico                (no change)
@@ -31,7 +33,7 @@
 //
 //   Then associate with distribution as Viewer Request.
 
-var CF_VERSION = 'v0.1.3';
+var CF_VERSION = 'v0.1.4';
 
 function handler(event) {
     var request = event.request;
@@ -63,7 +65,11 @@ function handler(event) {
     }
 
     // Dev: sub-paths are SPA slug routes, except known real sub-pages
-    var DEV_REAL_PAGES = ['/en-gb/dev/vault-peek/'];
+    var DEV_REAL_PAGES = [
+        '/en-gb/dev/vaults/',
+        '/en-gb/dev/ci/',
+        '/en-gb/dev/style-guide/'
+    ];
     if (uri.endsWith('/') && uri.startsWith('/en-gb/dev/') && uri !== '/en-gb/dev/' &&
         !DEV_REAL_PAGES.some(function(p) { return uri === p; })) {
         request.uri = '/en-gb/dev/index.html';

@@ -358,7 +358,9 @@ class SgSearch extends HTMLElement {
     if (!vaultId || !readKey) throw new Error('sg-search: vault-id and read-key required for vault nodes');
 
     const { fileIdToPath } = await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
-    const url = `https://send.sgraph.ai/api/vault/read/${vaultId}/${encodeURIComponent(fileIdToPath(objectId))}`;
+    // Encode each segment but keep literal slashes (server's optimised path needs real '/').
+    const objPath = fileIdToPath(objectId).split('/').map(encodeURIComponent).join('/');
+    const url = `https://send.sgraph.ai/api/vault/read/${vaultId}/${objPath}`;
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`vault node ${objectId}: ${resp.status}`);
     const encrypted = await resp.arrayBuffer();
