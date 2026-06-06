@@ -343,7 +343,7 @@
       setBreadcrumbs('Library', null, null);
       document.getElementById('next-prev').innerHTML = '';
       showArticle(navHome.content_object_id, navHome.render ?? 'markdown',
-                  navHome.vault_id ?? null, navHome.read_key ?? null);
+                  navHome.vault_id ?? null, navHome.read_key ?? null, { suppressToc: true });
       return;
     }
     showLanding();
@@ -485,7 +485,7 @@
     });
   }
 
-  function showArticle(objectId, render, vaultId, readKey) {
+  function showArticle(objectId, render, vaultId, readKey, opts = {}) {
     landing.hidden = true;
     articleEl.hidden = false;
 
@@ -499,17 +499,19 @@
     el.setAttribute('render',    render   || 'markdown');
     renderEl.appendChild(el);
 
-    // Build TOC once content renders
+    // Build TOC once content renders (suppressed for home article)
     if (headingObserver) headingObserver.disconnect();
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     document.getElementById('toc-list').innerHTML = '';
 
-    headingObserver = new MutationObserver(() => {
-      clearTimeout(headingObserver._t);
-      headingObserver._t = setTimeout(() => buildToc(renderEl), 150);
-    });
-    headingObserver.observe(renderEl, { childList: true, subtree: true });
+    if (!opts.suppressToc) {
+      headingObserver = new MutationObserver(() => {
+        clearTimeout(headingObserver._t);
+        headingObserver._t = setTimeout(() => buildToc(renderEl), 150);
+      });
+      headingObserver.observe(renderEl, { childList: true, subtree: true });
+    }
   }
 
   function setBreadcrumbs(site, section, parent, article) {
