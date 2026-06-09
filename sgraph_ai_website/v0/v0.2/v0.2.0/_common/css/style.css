@@ -3731,6 +3731,67 @@ sg-article-viewer { display: block; }
   .proposal-method { grid-template-columns: 1fr; gap: 2px; }
 }
 
+/* ── Key-points list ──────────────────────────────────────── */
+
+.kp-list {
+  margin: var(--sp-4) 0;
+  border: 1px solid var(--ss-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.kp-list__title {
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--ss-fg-faint);
+  padding: 9px 20px;
+  border-bottom: 1px solid var(--ss-border);
+  background: rgba(0,0,0,0.025);
+}
+.kp-item {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--ss-border);
+  border-left: 3px solid var(--accent, #0fa37f);
+}
+.kp-item:last-child { border-bottom: none; }
+.kp-item__num {
+  flex-shrink: 0;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--accent, #0fa37f);
+  color: #fff;
+  font-size: 0.68rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 2px;
+}
+.kp-item__icon { flex-shrink: 0; font-size: 1.1rem; line-height: 1.4; margin-top: 1px; }
+.kp-item__body { flex: 1; font-size: 0.9375rem; line-height: 1.55; color: var(--ss-fg); }
+.kp-item__lead { font-weight: 700; }
+.kp-item__text { color: var(--ss-fg-soft); }
+
+/* ── Mermaid diagram ──────────────────────────────────────── */
+
+.sg-mermaid {
+  margin: var(--sp-4) 0;
+  display: flex; justify-content: center;
+  overflow-x: auto;
+  border: 1px solid var(--ss-border); border-radius: 10px;
+  padding: 24px;
+  background: var(--ss-bg);
+}
+.sg-mermaid svg { max-width: 100%; height: auto; display: block; }
+.sg-mermaid__loading {
+  font-size: 0.875rem; color: var(--ss-fg-faint);
+  padding: 2rem; font-style: italic;
+}
+.sg-mermaid__error {
+  font-size: 0.8125rem; color: #dc2626;
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  background: #fef2f2;
+  padding: 12px 16px; border-radius: 6px;
+  width: 100%;
+}
+
 /* ── Sub-site minimal footer (replaces sg-site-footer) ──── */
 
 .sub-site-footer {

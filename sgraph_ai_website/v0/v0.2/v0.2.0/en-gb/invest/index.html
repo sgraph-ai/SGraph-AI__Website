@@ -109,6 +109,10 @@
   const READ_KEY = 'fJaOQDUcy2QCXSJzfmspg6tCFP94d253qD2NXyxQBeM';
   const BASE     = '/en-gb/invest/';
 
+  // Right-hand "On this page" TOC. Disabled for invest — the rail is reserved
+  // for an upcoming chat pane. Flip to true to restore the heading TOC.
+  const TOC_ENABLED = false;
+
   function slugFromPath() {
     const segments = location.pathname.split('/').filter(Boolean);
     // /en-gb/invest/<slug...>  →  segments[0]=en-gb, [1]=invest, [2+]=slug
@@ -170,6 +174,7 @@
 
   let allArticles = [];
   let allSections = [];
+  let navHome = null;
   let headingObserver = null;
 
   const _navStartMs = performance.now();
@@ -210,6 +215,7 @@
     if (!Array.isArray(sections) || sections.length === 0) return;
     hideLoading();
     allSections = sections;
+    navHome = e.detail?.home ?? null;
     allArticles = sections.flatMap(s => flattenNavTree(s.children ?? [], s.title, '', null));
     const navElapsedSec = (navElapsedMs / 1000).toFixed(2);
     document.dispatchEvent(new CustomEvent('debug:nav-json',
@@ -217,22 +223,26 @@
 
     const slug = slugFromPath();
     if (!slug) {
-      // Single-section area: show the section index directly
-      showSectionIndex(sections[0]);
+      showHome();
     } else {
-      const found = findArticleBySlug(sections, slug);
-      if (found) {
-        setBreadcrumbs(found.sectionTitle, found.parentTitle || null, found.title);
-        if (found.content_object_id) {
-          showArticle(found.content_object_id, found.render ?? 'markdown', found.vault_id ?? null, found.read_key ?? null);
-          buildNextPrev(slug);
-        } else if ((found.children ?? []).length) {
-          showGroupIndex(found);
+      // A bare section slug (e.g. /en-gb/invest/the-case/) shows the section index.
+      const matchedSection = sections.find(s => toSlug(s.title) === slug);
+      if (matchedSection) {
+        showSectionIndex(matchedSection);
+      } else {
+        const found = findArticleBySlug(sections, slug);
+        if (found) {
+          setBreadcrumbs(found.sectionTitle, found.parentTitle || null, found.title);
+          if (found.content_object_id || found.content_path) {
+            showNodeContent(found, slug);
+          } else if ((found.children ?? []).length) {
+            showGroupIndex(found);
+          } else {
+            showNotFound(slug);
+          }
         } else {
           showNotFound(slug);
         }
-      } else {
-        showNotFound(slug);
       }
     }
   });
@@ -260,7 +270,7 @@
 
   window.addEventListener('popstate', () => {
     const slug = slugFromPath();
-    if (!slug) { showSectionIndex(allSections[0]); return; }
+    if (!slug) { showHome(); return; }
     const matchedSection = allSections.find(s => toSlug(s.title) === slug);
     if (matchedSection) { showSectionIndex(matchedSection); return; }
     const btn = sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(slug)}"]`);
@@ -268,12 +278,63 @@
     else sideNav.setAttribute('active-slug', slug);
   });
 
+  // Render an article node's content. Supports both pinned content_object_id and
+  // live content_path (resolved to the current blob via the side-nav's open vault
+  // context, so vault edits go live without a _nav.json rewrite).
+  async function showNodeContent(node, slug) {
+    let objectId = node.content_object_id;
+    if (!objectId && node.content_path) {
+      try {
+        objectId = await sideNav.resolveContentPath(node.content_path);
+      } catch (err) {
+        console.error('invest: content_path resolution failed', node.content_path, err);
+        showNotFound(slug);
+        return;
+      }
+    }
+    if (!objectId) { showNotFound(slug); return; }
+    showArticle(objectId, node.render ?? 'markdown', node.vault_id ?? null, node.read_key ?? null);
+    buildNextPrev(slug);
+  }
+
+  // Bare area root (/en-gb/invest/). Renders the nav's root `home` page (the area
+  // index, e.g. invest/index.md). Falls back to the first section, then landing.
+  function showHome() {
+    if (navHome && (navHome.content_object_id || navHome.content_path)) {
+      landing.hidden = true;
+      articleToc.hidden = true;
+      shell.classList.remove('with-toc');
+      articleEl.hidden = false;
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      setBreadcrumbs(null, null, null);
+      document.getElementById('next-prev').innerHTML = '';
+      showNodeContent(navHome, '');
+      return;
+    }
+    if (allSections[0]) showSectionIndex(allSections[0]);
+    else showLanding();
+  }
+
   function showSectionIndex(section) {
     if (!section) { showLanding(); return; }
+    // If the section declares an `index` child, render it as the section body
+    // (this is how the bare area root resolves to a single home page).
+    if (section.index) {
+      const indexArticle = (section.children ?? []).find(a => a.slug === section.index);
+      if (indexArticle && (indexArticle.content_object_id || indexArticle.content_path)) {
+        landing.hidden = true;
+        articleEl.hidden = false;
+        window.scrollTo({ top: 0, behavior: 'auto' });
+        setBreadcrumbs(section.title, null, null);
+        showNodeContent(indexArticle, indexArticle.slug);
+        return;
+      }
+    }
     landing.hidden = true;
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     articleEl.hidden = false;
+    window.scrollTo({ top: 0, behavior: 'auto' });
     setBreadcrumbs(section.title, null, null);
     const articles = section.children ?? [];
     document.getElementById('article-render').innerHTML = `
@@ -314,6 +375,7 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     articleEl.hidden = false;
+    window.scrollTo({ top: 0, behavior: 'auto' });
     setBreadcrumbs(groupNode.sectionTitle, groupNode.parentTitle || null, groupNode.title);
     const children = (groupNode.children ?? []).map(c => ({
       ...c, slug: compoundSlug(groupNode.slug, c.slug),
@@ -380,6 +442,7 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     document.getElementById('toc-list').innerHTML = '';
+    if (!TOC_ENABLED) return;
     headingObserver = new MutationObserver(() => {
       clearTimeout(headingObserver._t);
       headingObserver._t = setTimeout(() => buildToc(renderEl), 150);
@@ -391,8 +454,11 @@
     const el = document.getElementById('article-crumbs');
     const parts = ['Invest', section, parent, article].filter(Boolean);
     el.innerHTML = parts.map((p, i) => {
-      if (i === 0) return `<a class="sub-site__crumbs-link" href="${BASE}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
-      if (i < parts.length - 1) return `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`;
+      const last = i === parts.length - 1;
+      if (i === 0) return last
+        ? `<span class="sub-site__crumbs-here">${p}</span>`
+        : `<a class="sub-site__crumbs-link" href="${BASE}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
+      if (!last) return `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`;
       return `<span class="sub-site__crumbs-here">${p}</span>`;
     }).join('');
   }

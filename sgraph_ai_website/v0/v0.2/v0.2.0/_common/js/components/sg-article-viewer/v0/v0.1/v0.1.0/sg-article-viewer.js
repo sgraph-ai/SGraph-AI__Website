@@ -332,6 +332,32 @@ class SgArticleViewer extends HTMLElement {
     to   { transform: translateY(0);    opacity: 1; }
   }
 }
+
+/* ── Code block copy button ──────────────────────────────────────── */
+.article-codeblock { position: relative; }
+.article-copy-btn {
+  position: absolute;
+  top: 8px; right: 8px;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: inherit; font-size: 12px; line-height: 1;
+  padding: 5px 9px; border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(255,255,255,0.10); color: #FAF7F2;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.article-codeblock:hover .article-copy-btn,
+.article-copy-btn:focus-visible { opacity: 1; }
+.article-copy-btn:hover { background: rgba(255,255,255,0.20); }
+.article-copy-btn--done {
+  opacity: 1;
+  background: #16a34a; border-color: #16a34a; color: #fff;
+}
+/* Touch devices can't hover — keep the button visible */
+@media (hover: none) {
+  .article-copy-btn { opacity: 0.7; }
+}
 `;
     document.head.appendChild(style);
   }
@@ -374,6 +400,11 @@ class SgArticleViewer extends HTMLElement {
 
     const seq = ++this._loadSeq;
     this._ensureStructure();
+
+    // New article selected — reset window scroll to the top. The sub-site shell
+    // scrolls the window (sidebar + TOC are position:sticky), so without this the
+    // reader lands at the previous article's scroll offset on the new content.
+    window.scrollTo({ top: 0, behavior: 'auto' });
 
     // Build trace object immediately so Layer 2 can read it live during loading
     const t0 = performance.now();
@@ -950,12 +981,82 @@ class SgArticleViewer extends HTMLElement {
       </div>`;
     endDom();
 
+    this._addCopyButtons();
+    this._renderMermaidDiagrams();
+
     document.dispatchEvent(new CustomEvent('viewer:rendered', {
       detail: { meta },
     }));
 
     this._resolveVaultImages(vaultId, readKey);
     this._resolveVaultPdfs(vaultId, readKey);
+  }
+
+  // Add a hover-reveal "Copy" button to every code block in the rendered body.
+  // Each <pre> is wrapped in a positioned container so the button can anchor to
+  // its top-right without scrolling away with overflowed code.
+  _addCopyButtons() {
+    this.querySelectorAll('.article-body pre').forEach(pre => {
+      if (pre.parentElement?.classList.contains('article-codeblock')) return;
+
+      const wrap = document.createElement('div');
+      wrap.className = 'article-codeblock';
+      pre.parentNode.insertBefore(wrap, pre);
+      wrap.appendChild(pre);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'article-copy-btn';
+      btn.textContent = 'Copy';
+      btn.setAttribute('aria-label', 'Copy code to clipboard');
+
+      btn.addEventListener('click', async () => {
+        const code = pre.querySelector('code') ?? pre;
+        try {
+          await navigator.clipboard.writeText(code.innerText);
+          btn.textContent = 'Copied';
+          btn.classList.add('article-copy-btn--done');
+        } catch {
+          btn.textContent = 'Failed';
+        }
+        clearTimeout(btn._resetT);
+        btn._resetT = setTimeout(() => {
+          btn.textContent = 'Copy';
+          btn.classList.remove('article-copy-btn--done');
+        }, 1500);
+      });
+
+      wrap.appendChild(btn);
+    });
+  }
+
+  // Lazy-load mermaid@11 (supports Wardley maps) only for pages that use it.
+  // Mermaid is loaded once per page and reused for multiple diagrams.
+  async _renderMermaidDiagrams() {
+    const els = [...this.querySelectorAll('.sg-mermaid[data-src]')];
+    if (!els.length) return;
+    let mermaid;
+    try {
+      ({ default: mermaid } = await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs'));
+      mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+    } catch (err) {
+      els.forEach(el => {
+        el.innerHTML = `<div class="sg-mermaid__error">Could not load diagram renderer: ${escHtml(err.message)}</div>`;
+      });
+      return;
+    }
+    for (const el of els) {
+      const src = decodeURIComponent(el.dataset.src);
+      el.removeAttribute('data-src');
+      el.textContent = '';
+      try {
+        const id = `sg-mermaid-${++_mermaidSeq}`;
+        const { svg } = await mermaid.render(id, src);
+        el.innerHTML = svg;
+      } catch (err) {
+        el.innerHTML = `<div class="sg-mermaid__error">${escHtml(err.message)}</div>`;
+      }
+    }
   }
 
   _renderJson(text) {
@@ -1007,6 +1108,8 @@ class SgArticleViewer extends HTMLElement {
         this.querySelector('.json-raw-view').hidden      = view === 'rendered';
       });
     });
+
+    this._addCopyButtons();
 
     document.dispatchEvent(new CustomEvent('viewer:rendered', { detail: { meta: {} } }));
   }
@@ -1347,9 +1450,12 @@ async function _loadYaml() {
 }
 
 // ── Fenced-block pre-processor ────────────────────────────────────────────────
+let _mermaidSeq = 0;
+
 const FENCED_TYPES = new Set([
   'comparison', 'feature-cards', 'code-comparison', 'timeline',
   'checklist', 'skill-cards', 'component-gallery', 'component-table', 'proposal-card',
+  'key-points', 'mermaid',
 ]);
 
 function applyFencedBlocks(body, yamlLoad) {
@@ -1357,6 +1463,10 @@ function applyFencedBlocks(body, yamlLoad) {
     /^```([\w-]+)\n([\s\S]*?)^```/gm,
     (match, type, content) => {
       if (!FENCED_TYPES.has(type)) return match;
+      // Mermaid uses its own syntax — bypass YAML parse entirely
+      if (type === 'mermaid') {
+        try { return renderMermaid(content); } catch { return match; }
+      }
       let data;
       try { data = yamlLoad(content); } catch { return match; }
       try {
@@ -1369,6 +1479,7 @@ function applyFencedBlocks(body, yamlLoad) {
         if (type === 'component-gallery')  return renderComponentGallery(data);
         if (type === 'component-table')    return renderComponentTable(data);
         if (type === 'proposal-card')      return renderProposalCard(data);
+        if (type === 'key-points')         return renderKeyPoints(data);
       } catch { return match; }
       return match;
     }
@@ -1533,6 +1644,49 @@ function renderProposalCard(data) {
     </div>
     <div class="proposal-card__methods">${methods}</div>
   </div>`;
+}
+
+// ── key-points ────────────────────────────────────────────────────────────────
+// YAML schema:
+//   title: "Optional heading"       (optional)
+//   points:
+//     - lead: "Bold lead sentence."
+//       body: "Supporting text that follows inline."
+//       icon: "🔐"                  (optional — shows emoji instead of number badge)
+function renderKeyPoints(data) {
+  const title = data.title
+    ? `<div class="kp-list__title">${escHtml(data.title)}</div>`
+    : '';
+  const items = (data.points ?? []).map((p, i) => {
+    const badge = p.icon
+      ? `<span class="kp-item__icon">${escHtml(p.icon)}</span>`
+      : `<span class="kp-item__num">${i + 1}</span>`;
+    const body = p.body
+      ? ` <span class="kp-item__text">${escHtml(p.body)}</span>`
+      : '';
+    return `<div class="kp-item">
+      ${badge}
+      <div class="kp-item__body">
+        <span class="kp-item__lead">${escHtml(p.lead ?? '')}</span>${body}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="kp-list">${title}${items}</div>`;
+}
+
+// ── mermaid ───────────────────────────────────────────────────────────────────
+// Raw mermaid syntax (not YAML). Lazy-loads mermaid@11 from CDN on first use.
+// Wardley map syntax: use `%%{init: {'theme':'neutral'}}%%` at top of diagram.
+//
+// Usage in markdown:
+//   ```mermaid
+//   graph TD
+//     A[Start] --> B[End]
+//   ```
+function renderMermaid(source) {
+  return `<div class="sg-mermaid" data-src="${encodeURIComponent(source.trim())}">` +
+         `<div class="sg-mermaid__loading">Loading diagram…</div>` +
+         `</div>`;
 }
 
 customElements.define('sg-article-viewer', SgArticleViewer);

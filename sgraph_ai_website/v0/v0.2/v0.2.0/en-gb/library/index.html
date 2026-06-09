@@ -194,6 +194,7 @@
 
   let allArticles = [];
   let allSections = [];
+  let navHome = null;
   let headingObserver = null;
 
   const _navStartMs = performance.now();
@@ -237,6 +238,7 @@
     if (!Array.isArray(sections) || sections.length === 0) return; // ignore partial/empty nav events
     hideLoading();
     allSections = sections;
+    navHome = e.detail?.home ?? null;
     // Flatten into a linear reading order: each section's articles, and for any
     // parent article with children[], the parent followed by its child pages
     // (with compound slugs). Drives prev/next navigation on every page type.
@@ -256,7 +258,7 @@
 
     const slug = slugFromPath();
     if (!slug) {
-      showLanding();
+      showHome();
     } else {
       const matchedSection = sections.find(s => toSlug(s.title) === slug);
       if (matchedSection) {
@@ -314,7 +316,7 @@
   // Browser back/forward
   window.addEventListener('popstate', () => {
     const slug = slugFromPath();
-    if (!slug) { showLanding(); return; }
+    if (!slug) { showHome(); return; }
 
     const matchedSection = allSections.find(s => toSlug(s.title) === slug);
     if (matchedSection) { showSectionIndex(matchedSection); return; }
@@ -329,6 +331,22 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     landing.hidden = false;
+  }
+
+  function showHome() {
+    if (navHome && (navHome.content_object_id || navHome.content_path)) {
+      landing.hidden = true;
+      articleToc.hidden = true;
+      shell.classList.remove('with-toc');
+      articleEl.hidden = false;
+      window.scrollTo({ top: 0, behavior: 'auto' });
+      setBreadcrumbs('Library', null, null);
+      document.getElementById('next-prev').innerHTML = '';
+      showArticle(navHome.content_object_id, navHome.render ?? 'markdown',
+                  navHome.vault_id ?? null, navHome.read_key ?? null, { suppressToc: true });
+      return;
+    }
+    showLanding();
   }
 
   function showSectionIndex(section) {
@@ -348,6 +366,7 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     articleEl.hidden = false;
+    window.scrollTo({ top: 0, behavior: 'auto' });
 
     setBreadcrumbs('Library', section.title, null);
 
@@ -401,6 +420,7 @@
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     articleEl.hidden = false;
+    window.scrollTo({ top: 0, behavior: 'auto' });
 
     setBreadcrumbs('Library', groupNode.sectionTitle, groupNode.parentTitle || null, groupNode.title);
 
@@ -465,7 +485,7 @@
     });
   }
 
-  function showArticle(objectId, render, vaultId, readKey) {
+  function showArticle(objectId, render, vaultId, readKey, opts = {}) {
     landing.hidden = true;
     articleEl.hidden = false;
 
@@ -479,17 +499,19 @@
     el.setAttribute('render',    render   || 'markdown');
     renderEl.appendChild(el);
 
-    // Build TOC once content renders
+    // Build TOC once content renders (suppressed for home article)
     if (headingObserver) headingObserver.disconnect();
     articleToc.hidden = true;
     shell.classList.remove('with-toc');
     document.getElementById('toc-list').innerHTML = '';
 
-    headingObserver = new MutationObserver(() => {
-      clearTimeout(headingObserver._t);
-      headingObserver._t = setTimeout(() => buildToc(renderEl), 150);
-    });
-    headingObserver.observe(renderEl, { childList: true, subtree: true });
+    if (!opts.suppressToc) {
+      headingObserver = new MutationObserver(() => {
+        clearTimeout(headingObserver._t);
+        headingObserver._t = setTimeout(() => buildToc(renderEl), 150);
+      });
+      headingObserver.observe(renderEl, { childList: true, subtree: true });
+    }
   }
 
   function setBreadcrumbs(site, section, parent, article) {

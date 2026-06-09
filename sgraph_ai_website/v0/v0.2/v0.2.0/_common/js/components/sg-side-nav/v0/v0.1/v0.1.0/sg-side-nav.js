@@ -17,7 +17,14 @@
  * Nav JSON shapes:
  *   { "library": { "sections": [...] } }
  *   { "dev":     { "sections": [...] } }
+ *   { "invest":  { "sections": [...] } }
  *   { "sections": [...] }
+ *
+ * Root fields:
+ *   sections[]        — top-level sub-section folders
+ *   home              — optional area index page (the bare-root landing), e.g.
+ *                       { "title": "...", "content_path": "invest/index.md" }.
+ *                       Passed through to the host page via nav:loaded.detail.home.
  *
  * Section fields:
  *   children[]        — inline articles (canonical since nav v3.12)
@@ -34,7 +41,7 @@
  *   children[]        — renders article as a collapsible folder
  *
  * Fires:
- *   nav:loaded  — detail: { sections, totalArticles }
+ *   nav:loaded  — detail: { sections, totalArticles, home }
  *   nav:select  — detail: { title, slug, content_object_id, render, schema,
  *                           sectionTitle, parentTitle, vault_id, read_key }
  */
@@ -103,7 +110,11 @@ class SgSideNav extends HTMLElement {
         return;
       }
       this._lastSync = Date.now();
-      const sections = (data.library ?? data.dev ?? data).sections ?? [];
+      const root = data.library ?? data.dev ?? data.invest ?? data;
+      const sections = root.sections ?? [];
+      // Optional root-level home page (the area index, e.g. invest/index.md).
+      // Surfaced to the host page via nav:loaded so the bare area root can render it.
+      this._navHome = root.home ?? null;
       await this._injectExtraLinks(sections);
       this._sections = sections;
       this._render(sections);
@@ -124,7 +135,7 @@ class SgSideNav extends HTMLElement {
       const cryptoKey = await importReadKey(readKey);
       const buf = await readObject('https://send.sgraph.ai', vaultId, section.nav_object_id, cryptoKey);
       const data = JSON.parse(new TextDecoder().decode(buf));
-      const root = data.library ?? data.dev ?? data;
+      const root = data.library ?? data.dev ?? data.invest ?? data;
       section._loadedArticles = root.children ?? root.articles ?? [];
       section._loading = false;
       this._sections = sections;   // keep cache in sync
@@ -178,6 +189,23 @@ class SgSideNav extends HTMLElement {
     }
   }
 
+  /**
+   * Resolve a stable vault file path (content_path) to its current blob ID,
+   * reusing the nav's already-open vault context.  Public so the host page can
+   * render content_path-backed pages (e.g. a section index / home) without
+   * routing through a sidebar click.
+   *
+   * @param {string} path — e.g. 'invest/home.md'
+   * @returns {Promise<string>} obj-cas-imm-* blob ID
+   */
+  async resolveContentPath(path) {
+    const vid = this.getAttribute('vault-id');
+    const rk  = this.getAttribute('read-key');
+    const ctx = this._vaultCtx ??
+      (this._vaultCtx = await _openVaultCtx('https://send.sgraph.ai', vid, rk));
+    return _resolvePathWithCtx(ctx, path);
+  }
+
   _render(sections) {
     const activeSlug = this.getAttribute('active-slug') ?? '';
     const version    = this.getAttribute('version') ?? '';
@@ -199,8 +227,12 @@ class SgSideNav extends HTMLElement {
       });
     }
 
-    // Expand section + article-folder that contains the active slug
-    if (activeSlug) {
+    // Expand section + article-folder that contains the active slug — but ONLY
+    // when the active slug has actually changed. Re-running this on every render
+    // would re-expand a node the user just collapsed (the active section can
+    // never be closed otherwise), since _render fires again on each toggle.
+    if (activeSlug && activeSlug !== this._autoExpandedSlug) {
+      this._autoExpandedSlug = activeSlug;
       sections.forEach((s, i) => {
         const arts = s._loadedArticles ?? s.children ?? s.articles ?? [];
         arts.forEach(a => {
@@ -478,7 +510,7 @@ class SgSideNav extends HTMLElement {
 
       this.dispatchEvent(new CustomEvent('nav:loaded', {
         bubbles: true,
-        detail: { sections, totalArticles },
+        detail: { sections, totalArticles, home: this._navHome ?? null },
       }));
 
       if (activeSlug) {

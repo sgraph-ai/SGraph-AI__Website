@@ -43,7 +43,7 @@ function gcmDecrypt(key, buf) {
 const decMeta = (key, s) => gcmDecrypt(key, b64(s)).toString('utf8')
 
 async function readObject(vaultId, objectId, key) {
-  const url = `${VAULT_API}/api/vault/read/${vaultId}/${encodeURIComponent(objPath(objectId))}`
+  const url = `${VAULT_API}/api/vault/read/${vaultId}/${objPath(objectId).split('/').map(encodeURIComponent).join('/')}`
   const r = await fetch(url)
   if (!r.ok) throw new Error(`vault read ${objectId}: ${r.status}`)
   return gcmDecrypt(key, Buffer.from(await r.arrayBuffer()))
@@ -75,7 +75,7 @@ async function resolvePath(vaultId, key, navPath) {
 // ─────────────────────────── nav article lookup ──────────────────────────────
 
 function findArticle(nav, slug) {
-  const sections = (nav.library ?? nav).sections ?? []
+  const sections = (nav.library ?? nav.invest ?? nav).sections ?? []
   const search = articles => {
     for (const a of articles) {
       if (a.slug === slug) return a
@@ -96,7 +96,7 @@ function findArticle(nav, slug) {
 // Lambda never changes.
 
 function renderLlmsTxt(manifest, nav, ctx) {
-  const sections = (nav.library ?? nav).sections ?? []
+  const sections = (nav.library ?? nav.invest ?? nav).sections ?? []
   const exSection = new Set(manifest.include?.exclude_sections ?? [])
   const exSlug = new Set(manifest.include?.exclude_slugs ?? [])
   const max = manifest.include?.max_pages ?? Infinity
@@ -135,10 +135,17 @@ async function renderMarkdown(manifest, nav, ctx) {
   const { slug, commit } = ctx
   const article = findArticle(nav, slug)
   if (!article) throw new Error(`article not found: ${slug}`)
-  if (!article.content_object_id) throw new Error(`no content_object_id for: ${slug}`)
 
   const key = b64url(manifest.vault.read_key)
-  const buf = await readObject(manifest.vault.id, article.content_object_id, key)
+  let objectId = article.content_object_id
+  if (!objectId && article.content_path) {
+    const { blob } = await resolvePath(manifest.vault.id, key, article.content_path)
+    if (!blob) throw new Error(`could not resolve content_path for: ${slug}`)
+    objectId = blob
+  }
+  if (!objectId) throw new Error(`no content for: ${slug}`)
+
+  const buf = await readObject(manifest.vault.id, objectId, key)
   const body = buf.toString('utf8')
 
   return { body, meta: { slug, title: article.title } }
@@ -148,10 +155,17 @@ async function renderLlmJson(manifest, nav, ctx) {
   const { slug, commit, baseUrl } = ctx
   const article = findArticle(nav, slug)
   if (!article) throw new Error(`article not found: ${slug}`)
-  if (!article.content_object_id) throw new Error(`no content_object_id for: ${slug}`)
 
   const key = b64url(manifest.vault.read_key)
-  const buf = await readObject(manifest.vault.id, article.content_object_id, key)
+  let objectId = article.content_object_id
+  if (!objectId && article.content_path) {
+    const { blob } = await resolvePath(manifest.vault.id, key, article.content_path)
+    if (!blob) throw new Error(`could not resolve content_path for: ${slug}`)
+    objectId = blob
+  }
+  if (!objectId) throw new Error(`no content for: ${slug}`)
+
+  const buf = await readObject(manifest.vault.id, objectId, key)
   const content_markdown = buf.toString('utf8')
 
   const result = {
@@ -167,7 +181,7 @@ async function renderLlmJson(manifest, nav, ctx) {
     },
     source: {
       vault_id: manifest.vault.id,
-      object_id: article.content_object_id,
+      object_id: objectId,
       commit_id: commit,
     },
     resolved_at: new Date().toISOString(),
