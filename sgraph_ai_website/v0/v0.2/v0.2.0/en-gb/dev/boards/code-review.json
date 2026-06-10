@@ -1,0 +1,129 @@
+{
+  "schema": "project-workstreams-v2",
+  "title": "Code Review 2026-06-09",
+  "description": "10 prioritised items from the full-repo code review. Items 1–4 are blocking pre-launch; items 5–10 are steady-state improvements.",
+  "workstreams": [
+    {
+      "id": "CR-01",
+      "title": "XSS: HTML sanitization",
+      "description": "Vendor DOMPurify; shared quote-safe escHtml; apply across every vault render path.",
+      "color": "#ef4444",
+      "status": "next",
+      "tasks": [
+        { "id": "CR-01a", "title": "Vendor DOMPurify alongside fuse.js in _common/js/vendor/", "status": "queued" },
+        { "id": "CR-01b", "title": "Wrap every marked.parse output with DOMPurify.sanitize in sg-article-viewer", "status": "queued" },
+        { "id": "CR-01c", "title": "One shared escHtml module that escapes &, <, >, \", ' (replace three ad-hoc copies)", "status": "queued" },
+        { "id": "CR-01d", "title": "Apply escHtml at every nav-derived innerHTML interpolation in sg-side-nav, sg-sub-nav, and all three SPA shells", "status": "queued" },
+        { "id": "CR-01e", "title": "Allowlist link protocols in marked renderer (https?, mailto:, relative URLs only)", "status": "queued" },
+        { "id": "CR-01f", "title": "Replace onclick-string patterns with addEventListener + dataset (dev shell CI rows, run cards)", "status": "queued" }
+      ]
+    },
+    {
+      "id": "CR-02",
+      "title": "Lambda: host allowlist (RCE surface)",
+      "description": "Lambda@Edge builds orchestrator URL from request headers, then import()s it. Validate host against hardcoded allowlist before fetching.",
+      "color": "#ef4444",
+      "status": "next",
+      "tasks": [
+        { "id": "CR-02a", "title": "Add host allowlist in infra/lambda-edge/sg-edge-render/index.mjs:61 before orchestrator fetch", "status": "queued" }
+      ]
+    },
+    {
+      "id": "CR-03",
+      "title": "CI: pinning + permissions",
+      "description": "Prod dispatch deploys whatever branch it runs on; external actions pinned to mutable @dev branch with secrets:inherit.",
+      "color": "#f59e0b",
+      "status": "next",
+      "tasks": [
+        { "id": "CR-03a", "title": "Add ref: ${{ inputs.git_branch }} to checkout step in ci-pipeline.yml", "status": "queued" },
+        { "id": "CR-03b", "title": "Pin owasp-sbot/OSBot-GitHub-Actions actions to commit SHAs", "status": "queued" },
+        { "id": "CR-03c", "title": "Add least-privilege permissions blocks to all five workflow files", "status": "queued" },
+        { "id": "CR-03d", "title": "Migrate from static AWS_ACCESS_KEY_ID/SECRET to OIDC role assumption", "status": "queued" }
+      ]
+    },
+    {
+      "id": "CR-04",
+      "title": "CI: gating tests",
+      "description": "Push → deploy with zero checks. Smoke test is non-gating. Edge-render harness and Playwright spec both unwired from CI.",
+      "color": "#f59e0b",
+      "status": "next",
+      "tasks": [
+        { "id": "CR-04a", "title": "Make post-deploy smoke exit non-zero on failure (deploy_static_site.py:472)", "status": "queued" },
+        { "id": "CR-04b", "title": "Wire tests/edge-render/run-local.mjs into CI as gating job (run per manifest route)", "status": "queued" },
+        { "id": "CR-04c", "title": "Add package.json + portable Playwright config; fix hardcoded machine paths in tests/e2e/qa-vault-content.spec.js", "status": "queued" }
+      ]
+    },
+    {
+      "id": "CR-05",
+      "title": "Extract shared sub-site-shell.js",
+      "description": "~450–500 of ~1500 combined inline lines across library/dev/invest are duplicated and have already drifted. Extract one shared ES module.",
+      "color": "#6366f1",
+      "status": "queued",
+      "tasks": [
+        { "id": "CR-05a", "title": "Extract routing, loading state, TOC, breadcrumbs, prev/next, section/group/404 views into _common/js/sub-site-shell.js", "status": "queued" },
+        { "id": "CR-05b", "title": "Parameterize by { base, siteTitle, vaultId, readKey }; expose as ES module default", "status": "queued" },
+        { "id": "CR-05c", "title": "Dev CI/kanban views become plug-in renderers passed in via options object", "status": "queued" },
+        { "id": "CR-05d", "title": "Port showHome + suppressToc and all other drift fixes to dev and invest shells simultaneously", "status": "queued" }
+      ]
+    },
+    {
+      "id": "CR-06",
+      "title": "Runtime bugs: race, cache, leaks",
+      "description": "Stale render race in article-viewer; vault-cache replays errors as HTTP 200; blob URL leaks across navigations.",
+      "color": "#f59e0b",
+      "status": "next",
+      "tasks": [
+        { "id": "CR-06a", "title": "Pass seq into _renderArticle; bail before innerHTML inject if seq !== this._loadSeq", "status": "queued" },
+        { "id": "CR-06b", "title": "Coalesce attributeChangedCallback via queueMicrotask in sg-article-viewer (mirrors sg-side-nav pattern)", "status": "queued" },
+        { "id": "CR-06c", "title": "Store + replay {buf, status, statusText} in sg-vault-cache.js:193 for deduped joiners", "status": "queued" },
+        { "id": "CR-06d", "title": "Call _revokeBlobUrls() at top of _load() in sg-article-viewer, not only in disconnectedCallback", "status": "queued" }
+      ]
+    },
+    {
+      "id": "CR-07",
+      "title": "Deploy: Cache-Control + content-type",
+      "description": "All files deploy as no-store (site is uncached end-to-end). Html sync pass forces text/html on .mjs, .xml, .txt.",
+      "color": "#3b82f6",
+      "status": "queued",
+      "tasks": [
+        { "id": "CR-07a", "title": "Restore tiered Cache-Control in deploy_static_site.py: 300s HTML / 1d CSS+JS / 7d fonts+images", "status": "queued" },
+        { "id": "CR-07b", "title": "Fix html sync pass: include only *.html; let a catch-all pass handle remaining types with guessed MIME", "status": "queued" }
+      ]
+    },
+    {
+      "id": "CR-08",
+      "title": "Vendor CDN dependencies",
+      "description": "marked@9 and js-yaml@4 loaded from floating CDN tags on pages that hold vault read keys. No SRI. Vendor locally.",
+      "color": "#3b82f6",
+      "status": "queued",
+      "tasks": [
+        { "id": "CR-08a", "title": "Vendor marked@latest in _common/js/vendor/ (like fuse.js)", "status": "queued" },
+        { "id": "CR-08b", "title": "Vendor js-yaml@4 in _common/js/vendor/", "status": "queued" }
+      ]
+    },
+    {
+      "id": "CR-09",
+      "title": "CSS + dead code cleanup",
+      "description": "style.css is 3863 lines holding 4 design eras. Two unreferenced header versions. Full v0.1 parallel site tree.",
+      "color": "#6b7280",
+      "status": "queued",
+      "tasks": [
+        { "id": "CR-09a", "title": "Split style.css into base.css / marketing.css / sub-site.css / article-rich.css", "status": "queued" },
+        { "id": "CR-09b", "title": "Delete sg-site-header v1.0.4 and v1.0.5 directories (zero pages reference them)", "status": "queued" },
+        { "id": "CR-09c", "title": "Delete sgraph_ai_website/v0/v0.1/v0.1.0/ parallel site tree", "status": "queued" }
+      ]
+    },
+    {
+      "id": "CR-10",
+      "title": "404s, document.title, noscript/meta",
+      "description": "Edge renderer returns 502 for unknown slugs; SPA document.title never updates; no <noscript> or meta description on SPA shells.",
+      "color": "#6b7280",
+      "status": "queued",
+      "tasks": [
+        { "id": "CR-10a", "title": "Map 'article not found' / 'no mapping' to 404 in edge renderer; log details to CloudWatch only", "status": "queued" },
+        { "id": "CR-10b", "title": "Update document.title on nav:select in library, dev, and invest shells (one line each)", "status": "queued" },
+        { "id": "CR-10c", "title": "Add <noscript> message + meta description/OG/canonical to library, dev, invest index.html", "status": "queued" }
+      ]
+    }
+  ]
+}

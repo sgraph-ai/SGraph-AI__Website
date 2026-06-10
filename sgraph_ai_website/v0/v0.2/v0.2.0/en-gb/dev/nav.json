@@ -50,6 +50,14 @@
             "render": "json",
             "schema": "project-releases-v1",
             "description": "Release history and shipped task archive."
+          },
+          {
+            "title": "Code Review Items",
+            "slug": "code-review",
+            "content_object_id": "/en-gb/dev/boards/code-review.json",
+            "render": "json",
+            "schema": "project-workstreams-v2",
+            "description": "10 prioritised items from the 2026-06-09 full-repo code review."
           }
         ]
       }

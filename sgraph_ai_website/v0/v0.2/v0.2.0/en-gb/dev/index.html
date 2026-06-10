@@ -219,11 +219,19 @@
     renderEl.innerHTML = '<div style="padding:2rem 0;color:#888;font-size:.9rem">Loading…</div>';
 
     try {
-      const { importReadKey, readObject } =
-        await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
-      const key = await importReadKey(readKey);
-      const buf = await readObject('https://send.sgraph.ai', vaultId, objectId, key);
-      const text = new TextDecoder().decode(buf);
+      let text;
+      // Static path (starts with /) — plain fetch, no vault decryption needed
+      if (objectId.startsWith('/')) {
+        const r = await fetch(objectId, { cache: 'no-store' });
+        if (!r.ok) throw new Error(`HTTP ${r.status} loading ${objectId}`);
+        text = await r.text();
+      } else {
+        const { importReadKey, readObject } =
+          await import('/core/vault-client/v1/v1.2/v1.2.2/sg-vault-client.js');
+        const key = await importReadKey(readKey);
+        const buf = await readObject('https://send.sgraph.ai', vaultId, objectId, key);
+        text = new TextDecoder().decode(buf);
+      }
       const data = JSON.parse(text);
       const effectiveSchema = data.schema ?? schema;
       renderEl.innerHTML = renderJsonBoard(data, effectiveSchema);
@@ -233,7 +241,7 @@
         { detail: { objectId, text, kind: 'json board' } }));
     } catch (err) {
       renderEl.innerHTML =
-        `<div class="sg-article-viewer__error">Failed to load board: ${err.message}</div>`;
+        `<div class="sg-article-viewer__error">Failed to load board: ${escH(err.message)}</div>`;
       console.error('showJsonBoard:', err);
     }
   }
