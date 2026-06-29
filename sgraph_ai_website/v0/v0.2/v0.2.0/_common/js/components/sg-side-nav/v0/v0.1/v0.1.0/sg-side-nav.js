@@ -47,6 +47,10 @@
  */
 // Attributes that require a vault re-fetch when changed.
 // Display-only attributes (active-slug, tree-label, version, etc.) only need a re-render.
+// Shared escaping helpers — every vault-derived string interpolated into
+// innerHTML below must be escaped (security review: CR-01).
+import { escHtml, safeUrl } from '../../../../../sg-escape.js';
+
 const _SIDE_NAV_DATA_ATTRS = new Set(['src', 'vault-id', 'read-key', 'nav-object-id', 'nav-path', 'extra-links']);
 
 class SgSideNav extends HTMLElement {
@@ -284,22 +288,22 @@ class SgSideNav extends HTMLElement {
       const isActive = article.slug === activeSlug;
       const cls = `sg-side-nav__doc${isActive ? ' sg-side-nav__doc--active' : ''}${extraCls}`;
       if (article.href) {
-        return `<a class="${cls}" href="${article.href}" data-slug="${article.slug ?? ''}">
-                   ${docIcon}<span class="sg-side-nav__doc-label">${article.title}</span>
+        return `<a class="${cls}" href="${escHtml(safeUrl(article.href))}" data-slug="${escHtml(article.slug ?? '')}">
+                   ${docIcon}<span class="sg-side-nav__doc-label">${escHtml(article.title)}</span>
                  </a>`;
       }
       return `<button class="${cls}"
-                       data-slug="${article.slug ?? ''}"
-                       data-object-id="${article.content_object_id ?? ''}"
-                       data-content-path="${article.content_path ?? ''}"
-                       data-render="${article.render ?? 'markdown'}"
-                       data-schema="${article.schema ?? ''}"
-                       data-title="${article.title}"
-                       data-section="${sectionTitle}"
-                       data-parent-title="${parentTitle}"
-                       data-vault-id="${article.vault_id ?? ''}"
-                       data-read-key="${article.read_key ?? ''}">
-                ${docIcon}<span class="sg-side-nav__doc-label">${article.title}</span>
+                       data-slug="${escHtml(article.slug ?? '')}"
+                       data-object-id="${escHtml(article.content_object_id ?? '')}"
+                       data-content-path="${escHtml(article.content_path ?? '')}"
+                       data-render="${escHtml(article.render ?? 'markdown')}"
+                       data-schema="${escHtml(article.schema ?? '')}"
+                       data-title="${escHtml(article.title)}"
+                       data-section="${escHtml(sectionTitle)}"
+                       data-parent-title="${escHtml(parentTitle)}"
+                       data-vault-id="${escHtml(article.vault_id ?? '')}"
+                       data-read-key="${escHtml(article.read_key ?? '')}">
+                ${docIcon}<span class="sg-side-nav__doc-label">${escHtml(article.title)}</span>
               </button>`;
     };
 
@@ -319,26 +323,26 @@ class SgSideNav extends HTMLElement {
       const hasContent = article.content_object_id || article.content_path;
       const titleEl = hasContent
         ? `<button class="sg-side-nav__doc sg-side-nav__doc--folder-title${isActive ? ' sg-side-nav__doc--active' : ''}"
-                           data-slug="${article.slug ?? ''}"
-                           data-object-id="${article.content_object_id ?? ''}"
-                           data-content-path="${article.content_path ?? ''}"
-                           data-render="${article.render ?? 'markdown'}"
-                           data-schema="${article.schema ?? ''}"
-                           data-title="${article.title}"
-                           data-section="${sectionTitle}"
+                           data-slug="${escHtml(article.slug ?? '')}"
+                           data-object-id="${escHtml(article.content_object_id ?? '')}"
+                           data-content-path="${escHtml(article.content_path ?? '')}"
+                           data-render="${escHtml(article.render ?? 'markdown')}"
+                           data-schema="${escHtml(article.schema ?? '')}"
+                           data-title="${escHtml(article.title)}"
+                           data-section="${escHtml(sectionTitle)}"
                            data-parent-title=""
-                           data-vault-id="${article.vault_id ?? ''}"
-                           data-read-key="${article.read_key ?? ''}">
-                    <span class="sg-side-nav__doc-label">${article.title}</span>
+                           data-vault-id="${escHtml(article.vault_id ?? '')}"
+                           data-read-key="${escHtml(article.read_key ?? '')}">
+                    <span class="sg-side-nav__doc-label">${escHtml(article.title)}</span>
                   </button>`
         : `<span class="sg-side-nav__article-folder-label"
-                  data-article-folder-key="${folderKey}">${article.title}</span>`;
+                  data-article-folder-key="${escHtml(folderKey)}">${escHtml(article.title)}</span>`;
 
       return `
         <div class="sg-side-nav__article-folder">
           <div class="sg-side-nav__article-folder-hd">
             <span class="sg-side-nav__chev${isCollapsed ? '' : ' sg-side-nav__chev--open'}"
-                  data-article-chev="${folderKey}">
+                  data-article-chev="${escHtml(folderKey)}">
               ${chevronSvg}
             </span>
             ${folderIcon}
@@ -381,8 +385,8 @@ class SgSideNav extends HTMLElement {
             </span>
             ${folderIcon}
             <span class="sg-side-nav__folder-label"
-                  data-section-title="${section.title}"
-                  data-section-slug="${sectionSlug}">${section.title}</span>
+                  data-section-title="${escHtml(section.title)}"
+                  data-section-slug="${escHtml(sectionSlug)}">${escHtml(section.title)}</span>
           </div>
           ${collapsed ? '' : `<div class="sg-side-nav__children">${docsHtml}</div>`}
         </div>`;
@@ -390,21 +394,21 @@ class SgSideNav extends HTMLElement {
 
     const footer = version ? `
       <div class="sg-side-nav__footer">
-        <span class="sg-side-nav__version">${version} · ${env}</span>
+        <span class="sg-side-nav__version">${escHtml(version)} · ${escHtml(env)}</span>
       </div>` : '';
 
     const homeHref  = this.getAttribute('home-href') ?? '';
     const homeLabel = treeLabel || 'Home';
     const homeLink  = homeHref
-      ? `<a class="sg-side-nav__home" href="${homeHref}">← ${homeLabel}</a>`
+      ? `<a class="sg-side-nav__home" href="${escHtml(safeUrl(homeHref))}">← ${escHtml(homeLabel)}</a>`
       : '';
 
     this.innerHTML = `
       <button class="sg-side-nav__toggle" title="Toggle sidebar" aria-label="Toggle sidebar"></button>
       ${homeLink}
       <div class="sg-side-nav__header">
-        ${treeLabel.toUpperCase()} TREE
-        <span class="sg-side-nav__count">${totalArticles}</span>
+        ${escHtml(treeLabel.toUpperCase())} TREE
+        <span class="sg-side-nav__count">${escHtml(totalArticles)}</span>
       </div>
       ${tree || '<p class="sg-side-nav__empty">No articles yet.</p>'}
       ${footer}`;

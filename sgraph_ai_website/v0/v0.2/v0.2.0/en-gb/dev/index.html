@@ -105,7 +105,20 @@
     return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/, '');
   }
 
-  const escH = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Quote-complete escape (& < > " ') — safe in element AND attribute contexts.
+  // Mirrors _common/js/sg-escape.js (CR-01). Used for all vault- and API-derived
+  // strings interpolated below.
+  const escH = s => String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  // Allow only safe URL schemes; reject javascript:/data:/etc. → '#'.
+  const safeUrl = u => {
+    u = String(u ?? '').trim();
+    if (/^(https?:|mailto:|tel:)/i.test(u)) return u;
+    if (/^(\/|\.|#|\?)/.test(u)) return u;
+    if (/^[a-z0-9._-]+(\/|$)/i.test(u)) return u;
+    return '#';
+  };
 
   const shell      = document.getElementById('sub-site-shell');
   const sideNav    = document.querySelector('sg-side-nav');
@@ -350,7 +363,7 @@
             const upd   = run.updated_at?new Date(run.updated_at):null;
             const dur   = start&&upd?fmtDur((upd-start)/1000):null;
             const commitMsg = (run.head_commit?.message??run.display_title??'').split('\n')[0];
-            return `<div onclick="window.open('${escH(run.html_url)}','_blank','noopener')"
+            return `<div data-run-url="${escH(safeUrl(run.html_url))}"
                 style="display:grid;grid-template-columns:26px 1fr auto;gap:.5rem;align-items:start;
                 padding:.7rem .9rem;border:1px solid #e5e5e4;border-radius:7px;margin-bottom:.4rem;
                 background:#fff;cursor:pointer;transition:box-shadow .15s"
@@ -374,6 +387,13 @@
             </div>`;
           }).join('')}
         </div>`).join('');
+      // Delegated open-in-new-tab (replaces inline onclick — CR-01).
+      el.querySelectorAll('[data-run-url]').forEach(card => {
+        card.addEventListener('click', () => {
+          const url = card.getAttribute('data-run-url');
+          if (url && url !== '#') window.open(url, '_blank', 'noopener');
+        });
+      });
     };
 
     document.getElementById('ci-refresh')?.addEventListener('click', fetchRuns);
@@ -393,7 +413,7 @@
       const color = STATUS_COLORS[s] ?? '#94a3b8';
       return `<span style="display:inline-block;padding:2px 8px;border-radius:9999px;
         font-size:.72rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
-        background:${color}22;color:${color};border:1px solid ${color}44">${s}</span>`;
+        background:${color}22;color:${color};border:1px solid ${color}44">${escH(s)}</span>`;
     };
     const card = (title, meta, body) => `
       <div style="background:#fafaf9;border:1px solid #e5e5e4;border-radius:8px;
@@ -413,9 +433,9 @@
       const issues = data.issues ?? (Array.isArray(data) ? data : []);
       return issues.map(i =>
         card(
-          `<code style="font-size:.75rem;color:#888">${i.id}</code> ${i.title}`,
-          `${badge(i.status ?? 'open')}${i.priority ? badge(i.priority) : ''}${i.owner ? ` <span style="font-size:.8rem;color:#888">${i.owner}</span>` : ''}`,
-          i.description ?? ''
+          `<code style="font-size:.75rem;color:#888">${escH(i.id)}</code> ${escH(i.title)}`,
+          `${badge(i.status ?? 'open')}${i.priority ? badge(i.priority) : ''}${i.owner ? ` <span style="font-size:.8rem;color:#888">${escH(i.owner)}</span>` : ''}`,
+          escH(i.description ?? '')
         )
       ).join('');
     }
@@ -424,9 +444,9 @@
       const agents = data.agents ?? (Array.isArray(data) ? data : []);
       return agents.map(a =>
         card(
-          `${a.alias ?? a.id}`,
-          `${badge(a.session_status ?? 'idle')}${a.model ? ` <span style="font-size:.8rem;color:#888">${a.model}</span>` : ''}`,
-          [a.domain, a.current_task ? `Current task: ${a.current_task}` : ''].filter(Boolean).join(' · ')
+          `${escH(a.alias ?? a.id)}`,
+          `${badge(a.session_status ?? 'idle')}${a.model ? ` <span style="font-size:.8rem;color:#888">${escH(a.model)}</span>` : ''}`,
+          [a.domain, a.current_task ? `Current task: ${a.current_task}` : ''].filter(Boolean).map(escH).join(' · ')
         )
       ).join('');
     }
@@ -437,18 +457,18 @@
         <div style="margin-bottom:2rem">
           <h2 style="font-size:1.05rem;font-weight:700;margin:0 0 .75rem;
               display:flex;align-items:center;gap:.75rem">
-            ${r.version} ${badge(r.status ?? 'planned')}
-            ${r.date ? `<span style="font-size:.8rem;font-weight:400;color:#888">${r.date}</span>` : ''}
+            ${escH(r.version)} ${badge(r.status ?? 'planned')}
+            ${r.date ? `<span style="font-size:.8rem;font-weight:400;color:#888">${escH(r.date)}</span>` : ''}
           </h2>
           ${(r.tasks ?? []).map(t =>
             `<div style="padding:.4rem 0;border-bottom:1px solid #f0f0ef;font-size:.875rem">
-              <code style="font-size:.75rem;color:#888">${t.id}</code> ${t.title}
-              ${t.owner ? `<span style="float:right;color:#aaa;font-size:.75rem">${t.owner}</span>` : ''}
+              <code style="font-size:.75rem;color:#888">${escH(t.id)}</code> ${escH(t.title)}
+              ${t.owner ? `<span style="float:right;color:#aaa;font-size:.75rem">${escH(t.owner)}</span>` : ''}
             </div>`
           ).join('')}
           ${(r.issues ?? []).map(i =>
             `<div style="padding:.4rem 0;border-bottom:1px solid #f0f0ef;font-size:.875rem">
-              <code style="font-size:.75rem;color:#888">${i.id}</code> ${i.title}
+              <code style="font-size:.75rem;color:#888">${escH(i.id)}</code> ${escH(i.title)}
             </div>`
           ).join('')}
         </div>`).join('');
@@ -459,21 +479,21 @@
       return agents.map(a => {
         const statusColor = STATUS_COLORS[a.session_status?.toLowerCase()] ?? '#94a3b8';
         return card(
-          `${a.alias ?? ''}`,
-          `${badge(a.session_status ?? 'idle')}${a.model ? ` <span style="font-size:.8rem;color:#888">${a.model}</span>` : ''}`,
-          [a.role, a.location].filter(Boolean).join(' · ')
+          `${escH(a.alias ?? '')}`,
+          `${badge(a.session_status ?? 'idle')}${a.model ? ` <span style="font-size:.8rem;color:#888">${escH(a.model)}</span>` : ''}`,
+          [a.role, a.location].filter(Boolean).map(escH).join(' · ')
         );
       }).join('');
     }
 
     // Generic fallback
     const topKey = Object.keys(data).find(k => Array.isArray(data[k]));
-    if (!topKey) return `<pre style="padding:2rem;overflow:auto;font-size:.8rem">${JSON.stringify(data, null, 2)}</pre>`;
+    if (!topKey) return `<pre style="padding:2rem;overflow:auto;font-size:.8rem">${escH(JSON.stringify(data, null, 2))}</pre>`;
     return data[topKey].map(item =>
       card(
-        item.title ?? item.name ?? item.id ?? JSON.stringify(item).slice(0, 60),
+        escH(item.title ?? item.name ?? item.id ?? JSON.stringify(item).slice(0, 60)),
         item.status ? badge(item.status) : '',
-        item.description ?? ''
+        escH(item.description ?? '')
       )
     ).join('');
   }
@@ -618,12 +638,12 @@
     document.getElementById('article-render').innerHTML = `
       <div class="article-viewer">
         <div class="article-body">
-          <h1>${section.title}</h1>
+          <h1>${escH(section.title)}</h1>
           <ul class="section-index-list">
             ${articles.map(a => `
               <li class="section-index-list__item">
-                <button class="section-index-list__link" data-slug="${a.slug ?? ''}">
-                  ${a.title}
+                <button class="section-index-list__link" data-slug="${escH(a.slug ?? '')}">
+                  ${escH(a.title)}
                 </button>
               </li>`).join('')}
           </ul>
@@ -674,10 +694,10 @@
     const el = document.getElementById('article-crumbs');
     const parts = [site, section, article].filter(Boolean);
     el.innerHTML = parts.map((p, i) => {
-      if (i === 0) return `<a class="sub-site__crumbs-link" href="${siteHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
-      if (i === 1 && parts.length > 2) return `<a class="sub-site__crumbs-link" href="${sectionHref}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
-      if (i < parts.length - 1) return `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`;
-      return `<span class="sub-site__crumbs-here">${p}</span>`;
+      if (i === 0) return `<a class="sub-site__crumbs-link" href="${escH(safeUrl(siteHref))}">${escH(p)}</a><span class="sub-site__crumbs-sep">/</span>`;
+      if (i === 1 && parts.length > 2) return `<a class="sub-site__crumbs-link" href="${escH(safeUrl(sectionHref))}">${escH(p)}</a><span class="sub-site__crumbs-sep">/</span>`;
+      if (i < parts.length - 1) return `<span>${escH(p)}</span><span class="sub-site__crumbs-sep">/</span>`;
+      return `<span class="sub-site__crumbs-here">${escH(p)}</span>`;
     }).join('');
   }
 
@@ -690,7 +710,7 @@
     const tocList = document.getElementById('toc-list');
     tocList.innerHTML = headings.map(h => `
       <li class="${h.tagName === 'H3' ? 'h3' : ''}">
-        <a class="sub-site__toc-link" href="#${h.id}">${h.textContent}</a>
+        <a class="sub-site__toc-link" href="#${escH(h.id)}">${escH(h.textContent)}</a>
       </li>`).join('');
 
     shell.classList.add('with-toc');
@@ -718,14 +738,14 @@
       return `
         <div class="section-card">
           <div class="section-card__header">
-            <button class="section-card__title" data-section="${section.title}">${section.title}</button>
-            <span class="section-card__count">${articles.length}</span>
+            <button class="section-card__title" data-section="${escH(section.title)}">${escH(section.title)}</button>
+            <span class="section-card__count">${escH(articles.length)}</span>
           </div>
           <ul class="section-card__articles">
             ${shown.map(a => a.href
-              ? `<li><a class="section-card__article" href="${a.href}">${a.title}</a></li>`
+              ? `<li><a class="section-card__article" href="${escH(safeUrl(a.href))}">${escH(a.title)}</a></li>`
               : `<li><button class="section-card__article"
-                             data-slug="${a.slug ?? ''}">${a.title}</button></li>`
+                             data-slug="${escH(a.slug ?? '')}">${escH(a.title)}</button></li>`
             ).join('')}
             ${overflow > 0 ? `<li><span class="section-card__more">+${overflow} more</span></li>` : ''}
           </ul>
@@ -763,12 +783,12 @@
       <div class="sub-site__nav-card sub-site__nav-card--prev${prev ? '' : ' sub-site__nav-card--empty'}"
            ${prev ? '' : 'aria-hidden="true"'}>
         ${prev ? `<div class="sub-site__nav-label">← Previous</div>
-                  <div class="sub-site__nav-title">${prev.title}</div>` : ''}
+                  <div class="sub-site__nav-title">${escH(prev.title)}</div>` : ''}
       </div>
       <div class="sub-site__nav-card sub-site__nav-card--next${next ? '' : ' sub-site__nav-card--empty'}"
            ${next ? '' : 'aria-hidden="true"'}>
         ${next ? `<div class="sub-site__nav-label">Next →</div>
-                  <div class="sub-site__nav-title">${next.title}</div>` : ''}
+                  <div class="sub-site__nav-title">${escH(next.title)}</div>` : ''}
       </div>`;
 
     if (prev) {

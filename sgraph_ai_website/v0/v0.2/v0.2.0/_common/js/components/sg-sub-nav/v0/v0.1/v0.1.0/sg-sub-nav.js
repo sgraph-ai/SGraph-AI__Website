@@ -19,6 +19,9 @@
  * Keyboard:
  *   ⌘K / Ctrl+K — focuses the search input
  */
+// Shared escaping — cross_links come from vault _nav.json (untrusted) (CR-01).
+import { escHtml, safeUrl } from '../../../../../sg-escape.js';
+
 class SgSubNav extends HTMLElement {
   static get observedAttributes() {
     return ['site-title', 'site-description', 'links', 'src',
@@ -81,14 +84,14 @@ class SgSubNav extends HTMLElement {
     const homeHref = `/en-gb/${title.toLowerCase()}/`;
 
     this.innerHTML = `
-      <div class="sg-sub-nav__band" aria-label="${title} sub-site">
+      <div class="sg-sub-nav__band" aria-label="${escHtml(title)} sub-site">
 
-        <a class="sg-sub-nav__home-link" href="${homeHref}" aria-label="${title} home">
-          <div class="sg-sub-nav__monogram">${letter}</div>
+        <a class="sg-sub-nav__home-link" href="${escHtml(safeUrl(homeHref))}" aria-label="${escHtml(title)} home">
+          <div class="sg-sub-nav__monogram">${escHtml(letter)}</div>
           <div class="sg-sub-nav__text">
-            <div class="sg-sub-nav__eyebrow">Sub-site · sgraph.ai/${title.toLowerCase()}</div>
-            <div class="sg-sub-nav__title">${title}</div>
-            ${description ? `<p class="sg-sub-nav__intro">${description}</p>` : ''}
+            <div class="sg-sub-nav__eyebrow">Sub-site · sgraph.ai/${escHtml(title.toLowerCase())}</div>
+            <div class="sg-sub-nav__title">${escHtml(title)}</div>
+            ${description ? `<p class="sg-sub-nav__intro">${escHtml(description)}</p>` : ''}
           </div>
         </a>
 
@@ -97,8 +100,8 @@ class SgSubNav extends HTMLElement {
             ${[{ title, active: true }, ...crossLinks.map(l => ({ title: l.title, href: l.href, active: false }))]
               .sort((a, b) => a.title.localeCompare(b.title))
               .map(t => t.active
-                ? `<span class="sg-sub-nav__tab sg-sub-nav__tab--active" role="tab" aria-selected="true">${t.title.toUpperCase()}</span>`
-                : `<a class="sg-sub-nav__tab" href="${t.href}" role="tab" aria-selected="false">${t.title.toUpperCase()}</a>`)
+                ? `<span class="sg-sub-nav__tab sg-sub-nav__tab--active" role="tab" aria-selected="true">${escHtml(t.title.toUpperCase())}</span>`
+                : `<a class="sg-sub-nav__tab" href="${escHtml(safeUrl(t.href))}" role="tab" aria-selected="false">${escHtml(String(t.title).toUpperCase())}</a>`)
               .join('')}
           </div>
 
@@ -112,8 +115,8 @@ class SgSubNav extends HTMLElement {
             </svg>
             <input class="sg-sub-nav__search-input"
                    type="search"
-                   placeholder="${placeholder}"
-                   aria-label="Search ${title}">
+                   placeholder="${escHtml(placeholder)}"
+                   aria-label="Search ${escHtml(title)}">
             <kbd class="sg-sub-nav__kbd">⌘K</kbd>
           </div>
         </div>

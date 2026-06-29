@@ -887,9 +887,10 @@ class SgArticleViewer extends HTMLElement {
 
   async _renderArticle(meta, body, vaultId, readKey, stepStart) {
     const endImport = stepStart('import-deps');
-    const [{ marked }, yamlLoad] = await Promise.all([
+    const [{ marked }, yamlLoad, purify] = await Promise.all([
       import('https://cdn.jsdelivr.net/npm/marked@9/+esm'),
       _loadYaml(),
+      _loadPurify(),
     ]);
     endImport();
 
@@ -903,10 +904,11 @@ class SgArticleViewer extends HTMLElement {
         text  = href.text;
         href  = href.href;
       }
-      const isExternal = href && /^https?:\/\//i.test(href);
+      const safeHref   = _safeUrl(href);
+      const isExternal = /^https?:\/\//i.test(safeHref);
       const titleAttr  = title ? ` title="${escHtml(title)}"` : '';
       const target     = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
-      return `<a href="${escHtml(href)}"${titleAttr}${target}>${text}</a>`;
+      return `<a href="${escHtml(safeHref)}"${titleAttr}${target}>${text}</a>`;
     };
 
     const origLink = renderer.link.bind(renderer);
@@ -952,6 +954,12 @@ class SgArticleViewer extends HTMLElement {
 
     const metaHtml = renderMetaStrip(meta);
     let bodyHtml = marked.parse(applyFencedBlocks(applyTokens(body), yamlLoad));
+
+    // Sanitize the rendered HTML before it ever touches the DOM. Vault markdown
+    // may contain raw HTML (incl. <script>/onerror=…); DOMPurify strips anything
+    // executable while preserving our data-* hooks (vault images/PDFs, mermaid)
+    // and link target/rel attributes (security review: CR-01).
+    bodyHtml = purify.sanitize(bodyHtml, { ADD_ATTR: ['target'] });
 
     // Wrap known status words in table cells with badge spans.
     const _STATUS_MAP = [
@@ -1425,12 +1433,25 @@ function sniffMime(bytes) {
   return 'application/octet-stream';
 }
 
+// Escapes & < > " ' — quote-complete so it is safe in attribute contexts too.
+// Mirrors the shared _common/js/sg-escape.js (kept local here to avoid a hard
+// import dependency on this critical render path). (Security review: CR-01.)
 function escHtml(str) {
-  return String(str)
+  return String(str ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Allow only safe URL schemes; reject javascript:/data:/etc. → '#'.
+function _safeUrl(url) {
+  const u = String(url ?? '').trim();
+  if (/^(https?:|mailto:|tel:)/i.test(u)) return u;
+  if (/^(\/|\.|#|\?)/.test(u)) return u;
+  if (/^[a-z0-9._-]+(\/|$)/i.test(u)) return u;
+  return '#';
 }
 
 function formatBytes(bytes) {
@@ -1447,6 +1468,21 @@ async function _loadYaml() {
     _yamlCache = mod.load ?? mod.default?.load;
   }
   return _yamlCache;
+}
+
+// ── HTML sanitizer (cached) ───────────────────────────────────────────────────
+// DOMPurify is vendored locally (vendor/purify.js) so we never inject unsanitized
+// marked() output into the DOM. Vault markdown can contain raw HTML; without this
+// a malicious/compromised vault could XSS the page (security review: CR-01).
+let _purifyCache = null;
+async function _loadPurify() {
+  if (!_purifyCache) {
+    const mod = await import(
+      new URL('../../../../../vendor/purify.js', import.meta.url)
+    );
+    _purifyCache = mod.default ?? mod;
+  }
+  return _purifyCache;
 }
 
 // ── Fenced-block pre-processor ────────────────────────────────────────────────

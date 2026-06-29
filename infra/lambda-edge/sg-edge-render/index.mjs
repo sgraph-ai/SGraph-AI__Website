@@ -25,8 +25,25 @@
 import { writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 
-const VERSION = 'v0.1.6'
+const VERSION = 'v0.1.7'
 const RENDER_PATH = '/core/edge-render/v1/sg-edge-render.mjs'
+
+// Hosts this function is allowed to fetch + execute the orchestrator from.
+// The orchestrator URL is built from a request-supplied header (x-sg-site-host /
+// x-forwarded-host / host), then the fetched JS is run — so the host MUST be
+// validated against this fixed allowlist first, or a spoofed header could make
+// the Lambda load attacker-controlled code. Add new environments here, never
+// trust the header alone. (Security review: CR-02.)
+const ALLOWED_HOSTS = new Set([
+  'sgraph.ai',
+  'qa.sgraph.ai',
+  'dev.sgraph.ai',
+  'main.sgraph.ai',
+])
+
+// Strip any :port and lowercase before comparing against ALLOWED_HOSTS.
+const isAllowedHost = host =>
+  typeof host === 'string' && ALLOWED_HOSTS.has(host.split(':')[0].toLowerCase())
 
 // Which requests this function answers. Everything else passes straight through
 // to the SPA / S3 origin untouched.
@@ -63,6 +80,10 @@ export const handler = async (event) => {
              ?? req.headers?.host?.[0]?.value
   const cfVer  = req.headers?.['x-sg-cf-version']?.[0]?.value ?? ''
   if (!host) return req // can't derive orchestrator URL — pass through
+
+  // Only fetch + execute the orchestrator from a known sgraph.ai host. A spoofed
+  // x-sg-site-host / x-forwarded-host must never steer the module load (CR-02).
+  if (!isAllowedHost(host)) return req // not a trusted host — pass through to S3
 
   try {
     const mod = await loadModule(`https://${host}${RENDER_PATH}`)

@@ -109,6 +109,19 @@
   const READ_KEY = 'fJaOQDUcy2QCXSJzfmspg6tCFP94d253qD2NXyxQBeM';
   const BASE     = '/en-gb/invest/';
 
+  // Quote-complete escape (& < > " ') for vault-derived strings → innerHTML.
+  // Mirrors _common/js/sg-escape.js (security review: CR-01).
+  const escHtml = s => String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  const safeUrl = u => {
+    u = String(u ?? '').trim();
+    if (/^(https?:|mailto:|tel:)/i.test(u)) return u;
+    if (/^(\/|\.|#|\?)/.test(u)) return u;
+    if (/^[a-z0-9._-]+(\/|$)/i.test(u)) return u;
+    return '#';
+  };
+
   // Right-hand "On this page" TOC. Disabled for invest — the rail is reserved
   // for an upcoming chat pane. Flip to true to restore the heading TOC.
   const TOC_ENABLED = false;
@@ -340,14 +353,14 @@
     document.getElementById('article-render').innerHTML = `
       <div class="article-viewer">
         <div class="article-body">
-          <h1>${section.title}</h1>
-          ${section.description ? `<p class="section-index-desc">${section.description}</p>` : ''}
+          <h1>${escHtml(section.title)}</h1>
+          ${section.description ? `<p class="section-index-desc">${escHtml(section.description)}</p>` : ''}
           <ul class="section-index-list">
             ${articles.map(a => `
               <li class="section-index-list__item">
-                <button class="section-index-list__link" data-slug="${a.slug ?? ''}">
-                  <span class="section-index-list__title">${a.title}</span>
-                  ${a.description ? `<span class="section-index-list__desc">${a.description}</span>` : ''}
+                <button class="section-index-list__link" data-slug="${escHtml(a.slug ?? '')}">
+                  <span class="section-index-list__title">${escHtml(a.title)}</span>
+                  ${a.description ? `<span class="section-index-list__desc">${escHtml(a.description)}</span>` : ''}
                 </button>
               </li>`).join('')}
           </ul>
@@ -383,13 +396,13 @@
     document.getElementById('article-render').innerHTML = `
       <div class="article-viewer">
         <div class="article-body">
-          <h1>${groupNode.title}</h1>
+          <h1>${escHtml(groupNode.title)}</h1>
           <ul class="section-index-list">
             ${children.map(c => `
               <li class="section-index-list__item">
-                <button class="section-index-list__link" data-slug="${c.slug ?? ''}">
-                  <span class="section-index-list__title">${c.title}</span>
-                  ${c.description ? `<span class="section-index-list__desc">${c.description}</span>` : ''}
+                <button class="section-index-list__link" data-slug="${escHtml(c.slug ?? '')}">
+                  <span class="section-index-list__title">${escHtml(c.title)}</span>
+                  ${c.description ? `<span class="section-index-list__desc">${escHtml(c.description)}</span>` : ''}
                 </button>
               </li>`).join('')}
           </ul>
@@ -417,7 +430,7 @@
           <p class="sg-not-found__code">404</p>
           <h1 class="sg-not-found__title">Page not found</h1>
           <p class="sg-not-found__desc">
-            <code class="sg-not-found__slug">${slug}</code> doesn't exist here.
+            <code class="sg-not-found__slug">${escHtml(slug)}</code> doesn't exist here.
           </p>
           <div class="sg-not-found__actions">
             <a class="sg-not-found__btn sg-not-found__btn--primary" href="/en-gb/invest/">← Invest home</a>
@@ -456,10 +469,10 @@
     el.innerHTML = parts.map((p, i) => {
       const last = i === parts.length - 1;
       if (i === 0) return last
-        ? `<span class="sub-site__crumbs-here">${p}</span>`
-        : `<a class="sub-site__crumbs-link" href="${BASE}">${p}</a><span class="sub-site__crumbs-sep">/</span>`;
-      if (!last) return `<span>${p}</span><span class="sub-site__crumbs-sep">/</span>`;
-      return `<span class="sub-site__crumbs-here">${p}</span>`;
+        ? `<span class="sub-site__crumbs-here">${escHtml(p)}</span>`
+        : `<a class="sub-site__crumbs-link" href="${escHtml(safeUrl(BASE))}">${escHtml(p)}</a><span class="sub-site__crumbs-sep">/</span>`;
+      if (!last) return `<span>${escHtml(p)}</span><span class="sub-site__crumbs-sep">/</span>`;
+      return `<span class="sub-site__crumbs-here">${escHtml(p)}</span>`;
     }).join('');
   }
 
@@ -496,12 +509,12 @@
       <div class="sub-site__nav-card sub-site__nav-card--prev${prev ? '' : ' sub-site__nav-card--empty'}"
            ${prev ? '' : 'aria-hidden="true"'}>
         ${prev ? `<div class="sub-site__nav-label">← Previous</div>
-                  <div class="sub-site__nav-title">${prev.title}</div>` : ''}
+                  <div class="sub-site__nav-title">${escHtml(prev.title)}</div>` : ''}
       </div>
       <div class="sub-site__nav-card sub-site__nav-card--next${next ? '' : ' sub-site__nav-card--empty'}"
            ${next ? '' : 'aria-hidden="true"'}>
         ${next ? `<div class="sub-site__nav-label">Next →</div>
-                  <div class="sub-site__nav-title">${next.title}</div>` : ''}
+                  <div class="sub-site__nav-title">${escHtml(next.title)}</div>` : ''}
       </div>`;
     if (prev) container.querySelector('.sub-site__nav-card--prev')
       .addEventListener('click', () => sideNav.querySelector(`.sg-side-nav__doc[data-slug="${CSS.escape(prev.slug)}"]`)?.click());
