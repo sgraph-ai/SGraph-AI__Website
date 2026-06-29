@@ -14,7 +14,7 @@
     "page_suffix": ".md"
   },
   "include": {
-    "exclude_sections": ["Blog"],
+    "exclude_sections": [],
     "exclude_slugs": [],
     "max_pages": 500
   }
