@@ -8,14 +8,14 @@
       "title": "XSS: HTML sanitization",
       "description": "Vendor DOMPurify; shared quote-safe escHtml; apply across every vault render path.",
       "color": "#ef4444",
-      "status": "next",
+      "status": "done",
       "tasks": [
-        { "id": "CR-01a", "title": "Vendor DOMPurify alongside fuse.js in _common/js/vendor/", "status": "queued" },
-        { "id": "CR-01b", "title": "Wrap every marked.parse output with DOMPurify.sanitize in sg-article-viewer", "status": "queued" },
-        { "id": "CR-01c", "title": "One shared escHtml module that escapes &, <, >, \", ' (replace three ad-hoc copies)", "status": "queued" },
-        { "id": "CR-01d", "title": "Apply escHtml at every nav-derived innerHTML interpolation in sg-side-nav, sg-sub-nav, and all three SPA shells", "status": "queued" },
-        { "id": "CR-01e", "title": "Allowlist link protocols in marked renderer (https?, mailto:, relative URLs only)", "status": "queued" },
-        { "id": "CR-01f", "title": "Replace onclick-string patterns with addEventListener + dataset (dev shell CI rows, run cards)", "status": "queued" }
+        { "id": "CR-01a", "title": "Vendor DOMPurify alongside fuse.js in _common/js/vendor/", "status": "done" },
+        { "id": "CR-01b", "title": "Wrap every marked.parse output with DOMPurify.sanitize in sg-article-viewer", "status": "done" },
+        { "id": "CR-01c", "title": "One shared escHtml module that escapes &, <, >, \", ' (sg-escape.js; used by side-nav/sub-nav; local copies completed in viewer + shells)", "status": "done" },
+        { "id": "CR-01d", "title": "Apply escHtml at every nav-derived innerHTML interpolation in sg-side-nav, sg-sub-nav, and all three SPA shells", "status": "done" },
+        { "id": "CR-01e", "title": "Allowlist link protocols in marked renderer (https?, mailto:, relative URLs only)", "status": "done" },
+        { "id": "CR-01f", "title": "Replace onclick-string patterns with addEventListener + dataset (dev shell CI rows, run cards)", "status": "done" }
       ]
     },
     {
@@ -23,9 +23,9 @@
       "title": "Lambda: host allowlist (RCE surface)",
       "description": "Lambda@Edge builds orchestrator URL from request headers, then import()s it. Validate host against hardcoded allowlist before fetching.",
       "color": "#ef4444",
-      "status": "next",
+      "status": "done",
       "tasks": [
-        { "id": "CR-02a", "title": "Add host allowlist in infra/lambda-edge/sg-edge-render/index.mjs:61 before orchestrator fetch", "status": "queued" }
+        { "id": "CR-02a", "title": "Add ALLOWED_HOSTS allowlist in infra/lambda-edge/sg-edge-render/index.mjs before orchestrator fetch (shipped v0.1.7)", "status": "done" }
       ]
     },
     {
