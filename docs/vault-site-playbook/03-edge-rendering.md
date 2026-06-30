@@ -55,11 +55,12 @@ environment — each request runs *its own* branch's orchestrator + manifests. Y
 test through the normal qa → dev → main → prod deploy flow and **never touch the
 Lambda**.
 
-> **Security note (CR-02):** the host is attacker-influenceable. The viewer-request
-> CF function is supposed to stamp the real host, but the Lambda should validate
-> `host` against a hardcoded allowlist before fetching+executing the orchestrator.
-> Add this allowlist when you wire a new distribution. Do not ship the unvalidated
-> form to a new environment.
+> **Security note (CR-02 — now shipped):** the host is attacker-influenceable, so
+> the Lambda validates it against a hardcoded `ALLOWED_HOSTS` set before
+> fetching+executing the orchestrator; an unrecognised host passes straight
+> through to S3. **When you wire a new distribution, add its hostname to
+> `ALLOWED_HOSTS`** in `infra/lambda-edge/sg-edge-render/index.mjs` — otherwise its
+> `.md`/`.llm.json`/`llms.txt` requests will fall through unrendered.
 
 ### Layer 2 — the orchestrator (`core/edge-render/v1/sg-edge-render.mjs`)
 
@@ -110,7 +111,7 @@ A manifest binds a representation to a vault + nav + inclusion rules. Schema
   "content_type": "text/plain; charset=utf-8",
   "vault": {
     "id": "pmcv9tfe",
-    "read_key": "dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw",  // PUBLIC read key
+    "read_key": "<library-public-read-key>",  // PUBLIC read key
     "nav_path": "library/_nav.json"
   },
   "site": {
@@ -201,8 +202,9 @@ they are noted here so a new site doesn't inherit them silently.
 ## 6. Local testing
 
 `tests/edge-render/run-local.mjs` renders a URI against the live vault without
-deploying — useful for verifying a manifest or a new renderer. It is **not yet
-wired into CI** (CR-04); run it manually:
+deploying — useful for verifying a manifest or a new renderer. It is now a
+**gating CI job** (CR-04 — shipped): the pipeline runs it for `/llms.txt` + a
+`.md` + a `.llm.json` and blocks the deploy if any fails. Run it manually too:
 
 ```bash
 node tests/edge-render/run-local.mjs /en-gb/library/get-started/claude-setup.md

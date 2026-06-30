@@ -52,7 +52,7 @@ orchestration glue.
 
   <sg-sub-nav site-title="Library"
               vault-id="pmcv9tfe"
-              read-key="dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw"
+              read-key="<library-public-read-key>"
               nav-path="library/_nav.json"></sg-sub-nav>
 
   <div class="sub-site" id="sub-site-shell">
@@ -204,9 +204,12 @@ function (the `DEV_REAL_PAGES` pattern) or they will be rewritten to the shell.
   `window.addEventListener('pageshow', e => { if (e.persisted) location.reload(); })`
   to avoid a stale shell after mobile back/forward.
 - **Read-key format:** base64url only (doc 01 §2).
-- **Vault-derived HTML is currently injected without sanitization** (CR-01) — a
-  known security gap. When building a new site, escape nav-derived strings and run
-  `marked` output through DOMPurify. Do not propagate the current unsanitized
-  pattern.
+- **Sanitize all vault-derived HTML** (CR-01 — now shipped). `sg-article-viewer`
+  runs `marked` output through a locally-vendored DOMPurify before injection, and
+  `sg-side-nav` / `sg-sub-nav` / the three shells escape every nav-derived
+  interpolation via the shared `_common/js/sg-escape.js` (`escHtml` + `safeUrl`).
+  When building a new site, **reuse `sg-escape.js` and keep this pattern** — never
+  interpolate vault strings into `innerHTML` raw, and route link hrefs through
+  `safeUrl` to block `javascript:` URLs.
 - **`document.title` is not updated on SPA navigation** today (CR-10) — add a
   one-liner in `nav:select` for a new site.

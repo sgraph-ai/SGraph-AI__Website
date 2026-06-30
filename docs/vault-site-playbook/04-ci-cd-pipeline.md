@@ -119,12 +119,14 @@ GitHub **Environments** (`dev`, `main`, `prod`; qa uses repo secrets):
 > code deploy (that's the whole model). The only secrets CI needs are AWS +
 > CloudFront.
 
-> **Hardening backlog (CR-03):** the external `OSBot-GitHub-Actions` actions are
-> pinned to the mutable `@dev` branch and run with `secrets: inherit`; the PROD
-> dispatcher passes `git_branch: 'main'` but the base `checkout` has no `ref:`, so
-> a PROD dispatch deploys whatever ref it runs on. Pin actions to SHAs, add
-> `ref: ${{ inputs.git_branch }}`, and add least-privilege `permissions:` blocks
-> before treating prod as locked-down. Migrate to OIDC instead of static keys.
+> **Hardening status (CR-03 — mostly shipped):** the external
+> `OSBot-GitHub-Actions` actions are now pinned to a commit SHA (was the mutable
+> `@dev` branch); every `checkout` pins `ref: ${{ inputs.git_branch }}` so a PROD
+> dispatch can no longer deploy whatever ref it ran from; and least-privilege
+> `permissions:` blocks are in place (default `contents: read`, with only the
+> tag-bump and deploy jobs opting up to `write`). **Still open:** migrate from
+> static AWS keys to OIDC role assumption (CR-03d — needs an IAM role ARN), and
+> the dev-deploy-invalidates-main distribution selection noted above.
 
 ---
 
@@ -182,17 +184,24 @@ bash sgraph_ai_website__deploy/website__run-locally.sh
 
 ---
 
-## 6. Testing in CI — current gap
+## 6. Testing in CI (CR-04 — shipped)
 
-All five workflows go **straight from push to deploy with no gating test**
-(CR-04). `tests/edge-render/run-local.mjs` and `tests/e2e/qa-vault-content.spec.js`
-exist but are wired into nothing, and the post-deploy smoke test only *warns* on
-failure (it can't go red).
+The base pipeline now has a test gate on both sides of the deploy:
 
-**When you scale, add a gating job before `deploy`:** run the edge-render harness
-per manifest route, and a portable Playwright pass against the freshly deployed
-qa URL. This is the single highest-value pipeline improvement and is cheap to add
-to the reusable base workflow (so every site benefits at once).
+- **`edge-render-test` (pre-deploy, gating):** runs `tests/edge-render/run-local.mjs`
+  against the live vault for `/llms.txt` + a `.md` + a `.llm.json`. A broken
+  orchestrator or manifest fails this job and `deploy` never runs (`needs:`).
+- **Post-deploy smoke (gating):** `deploy_static_site.py` retries the smoke curl
+  with backoff and the build now **exits non-zero** on persistent failure — a
+  broken deploy can no longer go green.
+- **`e2e` (post-deploy, qa + dev):** installs Playwright + Chromium and runs the
+  vault-content spec against the freshly deployed URL; a red blocks promotion.
+  The spec is portable — it resolves Playwright from `node_modules` and reads the
+  target URL / browser path from env (`SG_BASE_URL` / `PLAYWRIGHT_EXECUTABLE`).
+
+Because these live in the **reusable base workflow**, every sub-site is covered at
+once. When you add a new area, add one representative URL of each type to the
+`edge-render-test` step so its render path is gated too.
 
 ---
 

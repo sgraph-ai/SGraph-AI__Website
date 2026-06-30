@@ -194,10 +194,10 @@ and purpose. The current entries:
 
 | Vault ID | Read key (public, base64url) | Label | Owner | Served at |
 |---|---|---|---|---|
-| `pmcv9tfe` | `dJKFnqa4Ckip-XpsbkfxV4f7PJhkp0FkVPaYqJbyUMw` | Library Content | @Content | `/en-gb/library/` |
-| `1lfehfjh` | `gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs` | Project Status | @Content | `/en-gb/dev/workstreams/` |
-| `bf31a13c78c9` | `s68J93Gx5pzmP4FGo682Ns3JQ0aKdtSVKCjQKtSS_GA` | Dev Docs | @Dev | `/en-gb/dev/` |
-| `ub9jj0gq` | `fJaOQDUcy2QCXSJzfmspg6tCFP94d253qD2NXyxQBeM` | Invest | @Invest | `/en-gb/invest/` |
+| `pmcv9tfe` | `<library-public-read-key>` | Library Content | @Content | `/en-gb/library/` |
+| `1lfehfjh` | `<project-status-public-read-key>` | Project Status | @Content | `/en-gb/dev/workstreams/` |
+| `bf31a13c78c9` | `<dev-docs-public-read-key>` | Dev Docs | @Dev | `/en-gb/dev/` |
+| `ub9jj0gq` | `<invest-public-read-key>` | Invest | @Invest | `/en-gb/invest/` |
 
 These keys are **read-only and intentionally public** — they are already shipped
 in the site's HTML. They are reproduced here because this doc set is itself
