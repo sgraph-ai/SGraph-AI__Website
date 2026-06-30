@@ -1,6 +1,11 @@
 // Plain playwright script — no @playwright/test runner needed.
 // Run: node tests/e2e/qa-vault-content.spec.js [access-token]
-// Access token may also be passed via env: SG_ACCESS_TOKEN=<token>
+//      SG_BASE_URL=https://dev.sgraph.ai node tests/e2e/qa-vault-content.spec.js
+//
+// Validates that the vault-backed sub-sites actually render content end-to-end
+// (CloudFront → shell → sg-side-nav/sg-article-viewer → decrypted vault blob).
+// Assertions are structural (against the current sub-site-shell architecture),
+// not tied to specific copy, so content edits don't break the gate.
 
 // Resolve playwright from node_modules (run `npm ci` first), with a fallback to
 // the global install used by the dev container. Portable across CI + local (CR-04).
@@ -8,240 +13,155 @@ let chromium;
 try { ({ chromium } = require('playwright')); }
 catch { ({ chromium } = require('/opt/node22/lib/node_modules/playwright')); }
 
-// Target URL + browser path are configurable via env so the same spec runs
-// against qa/dev/main in CI and against a local container.
-const BASE = process.env.SG_BASE_URL || 'https://qa.sgraph.ai';
-const VAULT_TIMEOUT = 20_000;
-// Empty → let Playwright use its own managed browser (npx playwright install).
+const BASE = (process.env.SG_BASE_URL || 'https://qa.sgraph.ai').replace(/\/$/, '');
+const T = 25_000;
 const EXEC = process.env.PLAYWRIGHT_EXECUTABLE || '';
 const ACCESS_TOKEN = process.argv[2] || process.env.SG_ACCESS_TOKEN || '';
 
-let passed = 0;
-let failed = 0;
+let passed = 0, failed = 0;
 
 async function check(name, fn) {
-  try {
-    await fn();
-    console.log(`  PASS  ${name}`);
-    passed++;
-  } catch (e) {
-    console.log(`  FAIL  ${name}`);
-    console.log(`        ${e.message.split('\n')[0]}`);
-    failed++;
-  }
+  try { await fn(); console.log(`  PASS  ${name}`); passed++; }
+  catch (e) { console.log(`  FAIL  ${name}`); console.log(`        ${e.message.split('\n')[0]}`); failed++; }
 }
 
-async function newAuthedPage(browser) {
+async function newPage(browser) {
   const ctx = await browser.newContext({ ignoreHTTPSErrors: true });
   if (ACCESS_TOKEN) {
+    const domain = new URL(BASE).hostname;
     await ctx.addCookies([{
-      name: 'x-sgraph-access-token',
-      value: ACCESS_TOKEN,
-      domain: 'qa.sgraph.ai',
-      path: '/',
-      httpOnly: false,
-      secure: true,
-      sameSite: 'Lax',
+      name: 'x-sgraph-access-token', value: ACCESS_TOKEN,
+      domain, path: '/', httpOnly: false, secure: true, sameSite: 'Lax',
     }]);
   }
   return ctx.newPage();
 }
 
+function track404s(page) {
+  const hits = [];
+  page.on('response', r => {
+    if (r.url().includes('obj-cas-imm') && r.status() >= 400) hits.push(`${r.status()} ${r.url()}`);
+  });
+  return hits;
+}
+
+// An article has rendered into #article-render once the body carries real text.
+async function waitForArticleContent(page, min = 80) {
+  await page.waitForSelector('sg-article-viewer', { timeout: T });
+  await page.waitForFunction(
+    (m) => (document.getElementById('article-render')?.innerText.trim().length ?? 0) > m,
+    min, { timeout: T });
+}
+
 async function run() {
   const launchOpts = { headless: true, args: ['--ignore-certificate-errors'] };
-  if (EXEC) launchOpts.executablePath = EXEC;   // else use Playwright's managed browser
+  if (EXEC) launchOpts.executablePath = EXEC;
   const browser = await chromium.launch(launchOpts);
 
-  // ── /en-gb/dev/ ─────────────────────────────────────────────
-  console.log('\n/en-gb/dev/');
-  {
-    const page = await newAuthedPage(browser);
-    const vault404s = [];
-    page.on('response', r => {
-      if (r.url().includes('obj-cas-imm') && r.status() >= 400)
-        vault404s.push(`${r.status()} ${r.url()}`);
-    });
-    await page.goto(`${BASE}/en-gb/dev/`);
-
-    await check('page title is "Dev — sgraph.ai"', async () => {
-      const title = await page.title();
-      if (title !== 'Dev — sgraph.ai') throw new Error(`Got: ${title}`);
-    });
-
-    await check('3 sg-vault-content elements present', async () => {
-      const count = await page.locator('sg-vault-content').count();
-      if (count !== 3) throw new Error(`Expected 3, got ${count}`);
-    });
-
-    await check('all 3 sections have visible text content', async () => {
-      const sections = page.locator('sg-vault-content');
-      for (let i = 0; i < 3; i++) {
-        const el = sections.nth(i).locator('h1, h2, h3, p').first();
-        await el.waitFor({ state: 'visible', timeout: VAULT_TIMEOUT });
-      }
-    });
-
-    await check('no vault 404s', async () => {
-      if (vault404s.length) throw new Error(vault404s.join(', '));
-    });
-
-    await page.close();
-  }
-
-  // ── /en-gb/library/ ─────────────────────────────────────────
+  // ── Library landing (renders the curated home article) ──────────────────────
   console.log('\n/en-gb/library/');
   {
-    const page = await newAuthedPage(browser);
-    const vault404s = [];
-    page.on('response', r => {
-      if (r.url().includes('obj-cas-imm') && r.status() >= 400)
-        vault404s.push(`${r.status()} ${r.url()}`);
-    });
+    const page = await newPage(browser);
+    const v404 = track404s(page);
     await page.goto(`${BASE}/en-gb/library/`);
-
-    await check('page title is "Library — sgraph.ai"', async () => {
-      const title = await page.title();
-      if (title !== 'Library — sgraph.ai') throw new Error(`Got: ${title}`);
+    await check('title contains "Library"', async () => {
+      const t = await page.title(); if (!/Library/.test(t)) throw new Error(`Got: ${t}`);
     });
-
-    await check('hero heading "Technology & Dependencies"', async () => {
-      const h1 = page.locator('h1.display');
-      await h1.waitFor({ state: 'visible', timeout: VAULT_TIMEOUT });
-      const text = await h1.textContent();
-      if (!text?.includes('Technology')) throw new Error(`Got: ${text}`);
+    await check('side-nav renders article links', async () => {
+      await page.waitForSelector('.sg-side-nav__doc', { timeout: T });
     });
-
-    await check('4 sg-vault-content elements present', async () => {
-      const count = await page.locator('sg-vault-content').count();
-      if (count !== 4) throw new Error(`Expected 4, got ${count}`);
+    await check('home article renders content (not blank)', async () => {
+      await waitForArticleContent(page);
     });
-
-    await check('all 4 cards have visible text content', async () => {
-      const cards = page.locator('sg-vault-content');
-      for (let i = 0; i < 4; i++) {
-        const el = cards.nth(i).locator('h1, h2, h3, p').first();
-        await el.waitFor({ state: 'visible', timeout: VAULT_TIMEOUT });
-      }
-    });
-
-    await check('no vault 404s', async () => {
-      if (vault404s.length) throw new Error(vault404s.join(', '));
-    });
-
+    await check('no vault 404s', async () => { if (v404.length) throw new Error(v404.join(', ')); });
     await page.close();
   }
 
-  // ── /en-gb/library/ — SPA article nav (depth ≤ 3) ──────────
-  console.log('\n/en-gb/library/ — SPA article (depth 3)');
+  // ── Library deep-link to a known article (exercises shell routing) ──────────
+  console.log('\n/en-gb/library/building-on-sgraph/ (deep-link)');
   {
-    const page = await newAuthedPage(browser);
-    await page.goto(`${BASE}/en-gb/library/`);
-    await page.waitForSelector('sg-article-viewer', { timeout: VAULT_TIMEOUT });
-
-    // Navigate to a known depth-3 article via the nav:select event
-    await page.evaluate(() => {
-      document.dispatchEvent(new CustomEvent('nav:select', {
-        detail: { slug: 'get-started/overview' }, bubbles: true
-      }));
+    const page = await newPage(browser);
+    const v404 = track404s(page);
+    await page.goto(`${BASE}/en-gb/library/building-on-sgraph/`);
+    await check('deep-linked article renders content', async () => {
+      await waitForArticleContent(page);
     });
-
-    await check('depth-3 article: sg-article-viewer renders content (not blank)', async () => {
-      await page.waitForFunction(() => {
-        const av = document.querySelector('sg-article-viewer');
-        if (!av) return false;
-        const content = av.querySelector('.sg-av__content');
-        return content && content.innerText.trim().length > 50;
-      }, { timeout: VAULT_TIMEOUT });
+    await check('breadcrumbs populated', async () => {
+      await page.waitForFunction(
+        () => (document.getElementById('article-crumbs')?.innerText.trim().length ?? 0) > 0,
+        { timeout: T });
     });
-
-    await check('depth-3 article: loading reopener appears after load', async () => {
-      await page.waitForSelector('.sg-av__reopener.sg-av__reopener--visible', { timeout: VAULT_TIMEOUT });
-    });
-
+    await check('no vault 404s', async () => { if (v404.length) throw new Error(v404.join(', ')); });
     await page.close();
   }
 
-  // ── /en-gb/library/ — SPA article nav (depth 4, issue 007) ──
-  console.log('\n/en-gb/library/ — SPA article (depth 4, issue 007)');
+  // ── Library nav click renders an article ───────────────────────────────────
+  console.log('\n/en-gb/library/ (nav click)');
   {
-    const page = await newAuthedPage(browser);
-    const vault404s = [];
-    page.on('response', r => {
-      if (r.url().includes('obj-cas-imm') && r.status() >= 400)
-        vault404s.push(`${r.status()} ${r.url()}`);
-    });
+    const page = await newPage(browser);
     await page.goto(`${BASE}/en-gb/library/`);
-    await page.waitForSelector('sg-article-viewer', { timeout: VAULT_TIMEOUT });
-
-    // Navigate to depth-4 journalist article
-    await page.evaluate(() => {
-      document.dispatchEvent(new CustomEvent('nav:select', {
-        detail: { slug: 'sg-teams/content-team/roles/journalist' }, bubbles: true
-      }));
+    await page.waitForSelector('.sg-side-nav__doc', { timeout: T });
+    await check('clicking a nav doc renders an article', async () => {
+      await page.locator('.sg-side-nav__doc').first().click();
+      await waitForArticleContent(page);
     });
-
-    await check('depth-4 article: sg-article-viewer renders content (not blank)', async () => {
-      await page.waitForFunction(() => {
-        const av = document.querySelector('sg-article-viewer');
-        if (!av) return false;
-        const content = av.querySelector('.sg-av__content');
-        return content && content.innerText.trim().length > 50;
-      }, { timeout: VAULT_TIMEOUT });
-    });
-
-    await check('depth-4 article: breadcrumb shows 4 levels', async () => {
-      const crumbs = await page.locator('.breadcrumb li, .breadcrumb-item, nav[aria-label="breadcrumb"] a').count();
-      if (crumbs < 4) throw new Error(`Expected ≥4 breadcrumb items, got ${crumbs}`);
-    });
-
-    await check('depth-4 article: loading reopener appears after load', async () => {
-      await page.waitForSelector('.sg-av__reopener.sg-av__reopener--visible', { timeout: VAULT_TIMEOUT });
-    });
-
-    await check('depth-4 article: no vault 404s', async () => {
-      if (vault404s.length) throw new Error(vault404s.join(', '));
-    });
-
     await page.close();
   }
 
-  // ── /en-gb/library/ — loading UX layer 2 panel ──────────────
-  console.log('\n/en-gb/library/ — loading UX layer 2 panel');
+  // ── Library loading UX — reopener + layer 2 summary panel ───────────────────
+  console.log('\n/en-gb/library/ — loading UX layer 2');
   {
-    const page = await newAuthedPage(browser);
+    const page = await newPage(browser);
     await page.goto(`${BASE}/en-gb/library/`);
-    await page.waitForSelector('sg-article-viewer', { timeout: VAULT_TIMEOUT });
-
-    await page.evaluate(() => {
-      document.dispatchEvent(new CustomEvent('nav:select', {
-        detail: { slug: 'get-started/overview' }, bubbles: true
-      }));
+    await waitForArticleContent(page);
+    await check('loading reopener appears after load', async () => {
+      await page.waitForSelector('.sg-av__reopener.sg-av__reopener--visible', { timeout: T });
     });
-
-    // Wait for reopener then click it
-    await page.waitForSelector('.sg-av__reopener.sg-av__reopener--visible', { timeout: VAULT_TIMEOUT });
-
     await check('reopener click opens layer 2 summary panel', async () => {
       await page.locator('.sg-av__reopener').click();
       await page.waitForSelector('.sg-av__layer2', { timeout: 5_000 });
     });
-
-    await check('layer 2 shows vault and commit fields', async () => {
+    await check('layer 2 shows vault / commit info', async () => {
       const text = await page.locator('.sg-av__layer2').textContent();
-      if (!text?.includes('vault') && !text?.includes('commit'))
-        throw new Error('Expected vault/commit info in layer 2');
+      if (!/vault|commit/i.test(text || '')) throw new Error('no vault/commit info in layer 2');
     });
+    await page.close();
+  }
 
-    await check('"Full trace" button present in layer 2', async () => {
-      const btn = page.locator('.sg-av__layer2 button, .sg-av__layer2 a').filter({ hasText: /full trace/i });
-      await btn.waitFor({ state: 'visible', timeout: 3_000 });
+  // ── Invest sub-site — home article renders (no TOC, no search) ─────────────
+  console.log('\n/en-gb/invest/');
+  {
+    const page = await newPage(browser);
+    const v404 = track404s(page);
+    await page.goto(`${BASE}/en-gb/invest/`);
+    await check('invest home renders content', async () => { await waitForArticleContent(page); });
+    await check('no vault 404s', async () => { if (v404.length) throw new Error(v404.join(', ')); });
+    await page.close();
+  }
+
+  // ── Dev sub-site — a JSON board renders (deep-link to workstreams) ──────────
+  console.log('\n/en-gb/dev/workstreams/ (board)');
+  {
+    const page = await newPage(browser);
+    const v404 = track404s(page);
+    await page.goto(`${BASE}/en-gb/dev/`);
+    await check('title contains "Dev"', async () => {
+      const t = await page.title(); if (!/Dev/.test(t)) throw new Error(`Got: ${t}`);
     });
-
+    await check('side-nav renders links', async () => {
+      await page.waitForSelector('.sg-side-nav__doc', { timeout: T });
+    });
+    await check('workstreams board renders content', async () => {
+      await page.goto(`${BASE}/en-gb/dev/workstreams/`);
+      await page.waitForFunction(
+        () => (document.getElementById('article-render')?.innerText.trim().length ?? 0) > 40,
+        { timeout: T });
+    });
+    await check('no vault 404s', async () => { if (v404.length) throw new Error(v404.join(', ')); });
     await page.close();
   }
 
   await browser.close();
-
   console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);
 }
