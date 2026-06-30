@@ -64,7 +64,7 @@ Boards are registered as nav articles in `sgraph_ai_website/v0/v0.2/v0.2.0/en-gb
   "slug": "workstreams",
   "content_object_id": "obj-cas-imm-0def4605d6d4",
   "vault_id": "1lfehfjh",
-  "read_key": "gYfzgJ5mlhn4pMgSdGcB1oASjETpPB7jVhaF0QQ3uUs",
+  "read_key": "<project-status-public-read-key>",
   "render": "json",
   "schema": "project-workstreams-v2",
   "description": "All active workstreams and their tasks."
