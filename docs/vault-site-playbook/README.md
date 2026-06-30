@@ -36,6 +36,7 @@ pattern can be **replicated for new sites**.
 | 03 | [`03-edge-rendering.md`](./03-edge-rendering.md) | The edge renderer: Lambda@Edge + the orchestrator module + render manifests; the `.md` / `.llm.json` / `llms.txt` representations. |
 | 04 | [`04-ci-cd-pipeline.md`](./04-ci-cd-pipeline.md) | The deployment system: the GitHub Actions workflows, IFD versioning, the Python deploy scripts, the S3 layout, CloudFront, caching, and secrets. |
 | 05 | [`05-playbook-launch-new-site.md`](./05-playbook-launch-new-site.md) | **The scaling playbook** — a step-by-step to stand up a brand-new vault-backed sub-site, tying every layer together. |
+| 06 | [`06-operational-dashboard-patterns.md`](./06-operational-dashboard-patterns.md) | The **live operational surface** — structured-JSON boards, a live CI view, a self-verifying public vault directory, dual themes, and a style guide. The reusable dashboard patterns, with the real code. |
 
 Related, already-published references:
 - [`../dev-board-implementation-spec.md`](../dev-board-implementation-spec.md) — the structured-JSON board/kanban system (schemas + renderers).
