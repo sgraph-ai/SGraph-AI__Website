@@ -1,0 +1,14 @@
+{
+  "name": "sgraph-ai-website",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tooling + tests for the sgraph.ai website (the site itself is build-step-free static HTML/CSS/JS).",
+  "type": "commonjs",
+  "scripts": {
+    "test:edge": "node tests/edge-render/run-local.mjs /llms.txt && node tests/edge-render/run-local.mjs /en-gb/library/building-on-sgraph.md && node tests/edge-render/run-local.mjs /en-gb/library/building-on-sgraph.llm.json",
+    "test:e2e": "node tests/e2e/qa-vault-content.spec.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  }
+}

@@ -50,16 +50,48 @@ env:
   SITE_NAME   : sgraph-ai
   PACKAGE_NAME: sgraph_ai_website
 
+# Least-privilege default for the GITHUB_TOKEN; jobs that need more opt in
+# explicitly below (security review: CR-03).
+permissions:
+  contents: read
+
 jobs:
+  # ── Pre-deploy gate: render the edge representations against the live vault ──
+  # Catches a broken orchestrator / manifest before anything reaches CloudFront.
+  # No AWS needed — imports the repo's orchestrator and renders real content.
+  edge-render-test:
+    name: Edge-render smoke (gating)
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_branch }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Render llms.txt + a markdown + a llm.json page
+        run: |
+          set -e
+          node tests/edge-render/run-local.mjs /llms.txt                                   > /dev/null
+          node tests/edge-render/run-local.mjs /en-gb/library/building-on-sgraph.md        > /dev/null
+          node tests/edge-render/run-local.mjs /en-gb/library/building-on-sgraph.llm.json  > /dev/null
+          echo "edge-render smoke passed"
+
   increment-tag:
     name: Increment Tag
     runs-on: ubuntu-latest
+    permissions:
+      contents: write          # pushes the bumped tag + version file
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_branch }}
 
       - name: Increment Tag
         if: inputs.should_increment_tag
-        uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/git__increment-tag@dev
+        # Pinned to a commit SHA (was @dev, a mutable branch) — CR-03.
+        uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/git__increment-tag@c2af482d73aaad222f7e6b091d35ab1e5c116f3b # v0.14.33
         with:
           release_type: ${{ inputs.release_type }}
 
@@ -87,17 +119,25 @@ jobs:
     name: "Deploy to S3 + CloudFront (${{ inputs.target_deploy }})"
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [increment-tag, check-aws-credentials]
+    needs: [edge-render-test, increment-tag, check-aws-credentials]
+    permissions:
+      contents: write          # git__update_branch fast-forwards the tag bump
     environment: ${{ inputs.target_deploy }}
     concurrency:
       group: "website-deploy-${{ inputs.target_deploy }}"
       cancel-in-progress: false
     steps:
+      # ref pins the checkout to the dispatched branch. Without this, a PROD
+      # dispatch (which passes git_branch: 'main') would deploy whatever ref the
+      # workflow was launched from (security review: CR-03).
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_branch }}
 
       - name: Git Update Current Branch
         if: inputs.should_increment_tag
-        uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/git__update_branch@dev
+        # Pinned to a commit SHA (was @dev, a mutable branch) — CR-03.
+        uses: owasp-sbot/OSBot-GitHub-Actions/.github/actions/git__update_branch@c2af482d73aaad222f7e6b091d35ab1e5c116f3b # v0.14.33
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -184,3 +224,28 @@ jobs:
             --account-id ${{ secrets.AWS_ACCOUNT_ID }} \
             --region ${{ secrets.AWS_DEFAULT_REGION }} \
             --site ${{ env.SITE_NAME }}
+
+  # ── Post-deploy end-to-end check against the freshly deployed environment ──
+  # Runs for qa + dev (the promotion gates). A red here blocks promotion. Prod
+  # is left out so production deploys stay fast (it has already passed on main).
+  e2e:
+    name: "E2E (${{ inputs.target_deploy }})"
+    if: needs.deploy.result == 'success' && (inputs.target_deploy == 'qa' || inputs.target_deploy == 'dev')
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    needs: deploy
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_branch }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright + Chromium
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Run vault-content e2e
+        env:
+          SG_BASE_URL: ${{ inputs.target_deploy == 'dev' && 'https://dev.sgraph.ai' || 'https://qa.sgraph.ai' }}
+        run: node tests/e2e/qa-vault-content.spec.js

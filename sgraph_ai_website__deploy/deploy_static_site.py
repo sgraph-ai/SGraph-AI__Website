@@ -38,6 +38,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
@@ -469,25 +470,34 @@ def print_cloudfront_ttl_config():
 # Smoke test
 # ---------------------------------------------------------------------------
 
-def smoke_test(url):
-    """Verify the deployed site returns HTTP 200."""
+def smoke_test(url, attempts=5, base_delay=6):
+    """Verify the deployed site returns HTTP 200.
+
+    Retries with backoff to ride out CloudFront invalidation propagation, then
+    returns True/False. The caller treats a final False as a deploy failure
+    (non-zero exit) so a broken deploy can no longer go green (security/CI
+    review: CR-04).
+    """
     if not url:
         print("\n  SKIP: No URL provided for smoke test")
         return True
     print(f"\n--- Smoke test: {url} ---")
-    result = run_cmd(
-        ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", url],
-        description=f"Testing {url}",
-        check=False
-    )
-    status = result.stdout.strip()
-    if status == "200":
-        print(f"  OK: {url} returned HTTP 200")
-        return True
-    else:
-        print(f"  WARNING: {url} returned HTTP {status} (expected 200)")
-        print(f"  CloudFront invalidation may still be in progress")
-        return False
+    for attempt in range(1, attempts + 1):
+        result = run_cmd(
+            ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", url],
+            description=f"Testing {url} (attempt {attempt}/{attempts})",
+            check=False
+        )
+        status = result.stdout.strip()
+        if status == "200":
+            print(f"  OK: {url} returned HTTP 200")
+            return True
+        print(f"  HTTP {status} (expected 200)"
+              + ("" if attempt == attempts else " — retrying (CloudFront may still be invalidating)"))
+        if attempt < attempts:
+            time.sleep(base_delay * attempt)
+    print(f"  FAIL: {url} did not return HTTP 200 after {attempts} attempts")
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -653,9 +663,11 @@ def main():
     for dist_id in args.cloudfront_distribution_id:
         invalidate_cloudfront(dist_id)
 
-    # --- Smoke test ---
+    # --- Smoke test (gating) ---
     if args.smoke_test_url:
-        smoke_test(args.smoke_test_url)
+        if not smoke_test(args.smoke_test_url):
+            print("\nERROR: post-deploy smoke test failed — failing the build.", file=sys.stderr)
+            sys.exit(1)
 
     ifd_path = version_to_ifd_path(args.version)
     env_segment = f"{args.deploy_env}/" if args.deploy_env else ""

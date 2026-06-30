@@ -2,11 +2,18 @@
 // Run: node tests/e2e/qa-vault-content.spec.js [access-token]
 // Access token may also be passed via env: SG_ACCESS_TOKEN=<token>
 
-const { chromium } = require('/opt/node22/lib/node_modules/playwright');
+// Resolve playwright from node_modules (run `npm ci` first), with a fallback to
+// the global install used by the dev container. Portable across CI + local (CR-04).
+let chromium;
+try { ({ chromium } = require('playwright')); }
+catch { ({ chromium } = require('/opt/node22/lib/node_modules/playwright')); }
 
-const BASE = 'https://qa.sgraph.ai';
+// Target URL + browser path are configurable via env so the same spec runs
+// against qa/dev/main in CI and against a local container.
+const BASE = process.env.SG_BASE_URL || 'https://qa.sgraph.ai';
 const VAULT_TIMEOUT = 20_000;
-const EXEC = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+// Empty → let Playwright use its own managed browser (npx playwright install).
+const EXEC = process.env.PLAYWRIGHT_EXECUTABLE || '';
 const ACCESS_TOKEN = process.argv[2] || process.env.SG_ACCESS_TOKEN || '';
 
 let passed = 0;
@@ -41,7 +48,9 @@ async function newAuthedPage(browser) {
 }
 
 async function run() {
-  const browser = await chromium.launch({ executablePath: EXEC, headless: true, args: ['--ignore-certificate-errors'] });
+  const launchOpts = { headless: true, args: ['--ignore-certificate-errors'] };
+  if (EXEC) launchOpts.executablePath = EXEC;   // else use Playwright's managed browser
+  const browser = await chromium.launch(launchOpts);
 
   // ── /en-gb/dev/ ─────────────────────────────────────────────
   console.log('\n/en-gb/dev/');
