@@ -172,8 +172,7 @@ export function mountSubSite(config) {
       window.scrollTo({ top: 0, behavior: 'auto' });
       setBreadcrumbs(siteLabel, null, null);
       if (nextPrevEl) nextPrevEl.innerHTML = '';
-      showArticle(navHome.content_object_id, navHome.render ?? 'markdown',
-                  navHome.vault_id ?? null, navHome.read_key ?? null, { suppressToc: true });
+      showNode(navHome, '', { suppressToc: true });
       return;
     }
     showLanding();
@@ -183,11 +182,9 @@ export function mountSubSite(config) {
     // If the section declares an index article, load it as the landing page.
     if (section.index) {
       const indexArticle = (section.children ?? section.articles ?? []).find(a => a.slug === section.index);
-      if (indexArticle?.content_object_id) {
+      if (indexArticle?.content_object_id || indexArticle?.content_path) {
         setBreadcrumbs(siteLabel, section.title, null);
-        showArticle(indexArticle.content_object_id, indexArticle.render ?? 'markdown',
-                    indexArticle.vault_id, indexArticle.read_key);
-        buildNextPrev(indexArticle.slug);
+        showNode(indexArticle, indexArticle.slug);
         return;
       }
     }
@@ -312,6 +309,25 @@ export function mountSubSite(config) {
     });
   }
 
+  // Render a nav node that may carry a pinned content_object_id OR a live
+  // content_path (resolved to the current blob via the side-nav's vault context,
+  // so vault edits go live without a _nav.json rewrite). Library nodes use the
+  // object id, so resolution is skipped there.
+  async function showNode(node, slug, opts = {}) {
+    let objectId = node.content_object_id;
+    if (!objectId && node.content_path) {
+      try {
+        objectId = await sideNav?.resolveContentPath(node.content_path);
+      } catch (err) {
+        console.error('sub-site-shell: content_path resolution failed', node.content_path, err);
+        showNotFound(slug); return;
+      }
+    }
+    if (!objectId) { showNotFound(slug); return; }
+    showArticle(objectId, node.render ?? 'markdown', node.vault_id ?? null, node.read_key ?? null, opts);
+    if (slug) buildNextPrev(slug);
+  }
+
   function showArticle(objectId, render, vId, rKey, opts = {}) {
     if (landing) landing.hidden = true;
     if (articleEl) articleEl.hidden = false;
@@ -343,11 +359,13 @@ export function mountSubSite(config) {
     const siteHref    = base;
     const sectionHref = section ? `${base}${toSlug(section)}/` : null;
     const parts = [site, section, parent, article].filter(Boolean);
+    const sep = '<span class="sub-site__crumbs-sep">/</span>';
     crumbsEl.innerHTML = parts.map((p, i) => {
-      if (i === 0) return `<a class="sub-site__crumbs-link" href="${escHtml(safeUrl(siteHref))}">${escHtml(p)}</a><span class="sub-site__crumbs-sep">/</span>`;
-      if (i === 1 && parts.length > 2 && linkSection) return `<a class="sub-site__crumbs-link" href="${escHtml(safeUrl(sectionHref))}">${escHtml(p)}</a><span class="sub-site__crumbs-sep">/</span>`;
-      if (i < parts.length - 1) return `<span>${escHtml(p)}</span><span class="sub-site__crumbs-sep">/</span>`;
-      return `<span class="sub-site__crumbs-here">${escHtml(p)}</span>`;
+      const last = i === parts.length - 1;
+      if (last) return `<span class="sub-site__crumbs-here">${escHtml(p)}</span>`;
+      if (i === 0) return `<a class="sub-site__crumbs-link" href="${escHtml(safeUrl(siteHref))}">${escHtml(p)}</a>${sep}`;
+      if (i === 1 && linkSection) return `<a class="sub-site__crumbs-link" href="${escHtml(safeUrl(sectionHref))}">${escHtml(p)}</a>${sep}`;
+      return `<span>${escHtml(p)}</span>${sep}`;
     }).join('');
   }
 
@@ -449,7 +467,7 @@ export function mountSubSite(config) {
 
   // ── api (exposed for plugins / onSelect) ────────────────────────────────────
   const api = {
-    showArticle, showSectionIndex, showGroupIndex, showLanding, showHome,
+    showArticle, showNode, showSectionIndex, showGroupIndex, showLanding, showHome,
     showNotFound, setBreadcrumbs, buildNextPrev, buildToc, toSlug, compoundSlug,
     els: { shell, sideNav, landing, articleEl, articleToc, renderEl, nextPrevEl },
     getState: () => ({ allArticles, allSections, navHome }),
@@ -490,9 +508,8 @@ export function mountSubSite(config) {
     const found = findArticleBySlug(sections, slug);
     if (found) {
       setBreadcrumbs(siteLabel, found.sectionTitle, found.parentTitle || null, found.title);
-      if (found.content_object_id) {
-        showArticle(found.content_object_id, found.render ?? 'markdown', found.vault_id ?? null, found.read_key ?? null);
-        buildNextPrev(slug);
+      if (found.content_object_id || found.content_path) {
+        showNode(found, slug);
       } else if ((found.children ?? []).length) {
         showGroupIndex(found);
       } else {
