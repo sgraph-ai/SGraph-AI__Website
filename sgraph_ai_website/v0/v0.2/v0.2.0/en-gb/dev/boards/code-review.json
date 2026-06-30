@@ -33,12 +33,12 @@
       "title": "CI: pinning + permissions",
       "description": "Prod dispatch deploys whatever branch it runs on; external actions pinned to mutable @dev branch with secrets:inherit.",
       "color": "#f59e0b",
-      "status": "next",
+      "status": "in-progress",
       "tasks": [
-        { "id": "CR-03a", "title": "Add ref: ${{ inputs.git_branch }} to checkout step in ci-pipeline.yml", "status": "queued" },
-        { "id": "CR-03b", "title": "Pin owasp-sbot/OSBot-GitHub-Actions actions to commit SHAs", "status": "queued" },
-        { "id": "CR-03c", "title": "Add least-privilege permissions blocks to all five workflow files", "status": "queued" },
-        { "id": "CR-03d", "title": "Migrate from static AWS_ACCESS_KEY_ID/SECRET to OIDC role assumption", "status": "queued" }
+        { "id": "CR-03a", "title": "Add ref: ${{ inputs.git_branch }} to every checkout in ci-pipeline.yml (fixes prod-deploys-any-branch)", "status": "done" },
+        { "id": "CR-03b", "title": "Pin OSBot-GitHub-Actions actions to SHA c2af482 (= v0.14.33), was @dev", "status": "done" },
+        { "id": "CR-03c", "title": "Add least-privilege permissions blocks (default read; increment-tag + deploy write)", "status": "done" },
+        { "id": "CR-03d", "title": "Migrate static AWS keys → OIDC role assumption — DEFERRED: needs an IAM role ARN provisioned on the AWS side", "status": "next" }
       ]
     },
     {
@@ -46,11 +46,11 @@
       "title": "CI: gating tests",
       "description": "Push → deploy with zero checks. Smoke test is non-gating. Edge-render harness and Playwright spec both unwired from CI.",
       "color": "#f59e0b",
-      "status": "next",
+      "status": "done",
       "tasks": [
-        { "id": "CR-04a", "title": "Make post-deploy smoke exit non-zero on failure (deploy_static_site.py:472)", "status": "queued" },
-        { "id": "CR-04b", "title": "Wire tests/edge-render/run-local.mjs into CI as gating job (run per manifest route)", "status": "queued" },
-        { "id": "CR-04c", "title": "Add package.json + portable Playwright config; fix hardcoded machine paths in tests/e2e/qa-vault-content.spec.js", "status": "queued" }
+        { "id": "CR-04a", "title": "Post-deploy smoke now retries + exits non-zero on failure (deploy_static_site.py)", "status": "done" },
+        { "id": "CR-04b", "title": "edge-render harness wired as gating job (/llms.txt + .md + .llm.json); verified pass/fail locally", "status": "done" },
+        { "id": "CR-04c", "title": "package.json + portable Playwright (env-driven URL/browser); post-deploy e2e job for qa+dev", "status": "done" }
       ]
     },
     {
